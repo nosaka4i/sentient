@@ -1,0 +1,9 @@
+# Plugins are looked up on PATH; `make proto` puts .claudetmp/tools first.
+version: v2
+plugins:
+  - local: protoc-gen-go
+    out: .
+    opt: module=github.com/nosaka4i/sentient
+  - local: protoc-gen-go-grpc
+    out: .
+    opt: module=github.com/nosaka4i/sentient

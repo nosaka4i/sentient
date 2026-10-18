@@ -1,0 +1,14 @@
+{{define "content"}}
+  <section class="card attention" aria-labelledby="h-down">
+    <div class="card-head">
+      <h2 id="h-down">Monitor unreachable</h2>
+    </div>
+    <div class="down">
+      <h1>sentientd is not reachable</h1>
+      <p>sen serve could not reach the monitor on <code>{{.Socket}}</code>, so nothing can be shown.</p>
+      <p>While the monitor is down, agent activity may go unrecorded. Check it with <code>systemctl status sentientd</code>.</p>
+      {{if .Detail}}<p>Error: <code>{{.Detail}}</code></p>{{end}}
+      <p>This page checks again every 30 seconds.</p>
+    </div>
+  </section>
+{{end}}

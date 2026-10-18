@@ -1,0 +1,76 @@
+{{define "content"}}
+  <!-- NEEDS ATTENTION -->
+  <section class="card attention" aria-labelledby="h-att">
+    <div class="card-head">
+      <h2 id="h-att">Needs attention <span class="count">({{.AttentionCount}})</span></h2>
+      <a class="all-link" href="/alerts" title="Every alert, including reviewed">All alerts &rarr;</a>
+    </div>
+    <div class="empty" style="display:block"><span style="color:var(--high);margin-right:6px">&check;</span>Nothing needs your attention</div>
+  </section>
+
+  <!-- LAST 24H -->
+  <section class="card" aria-labelledby="h-today">
+    <div class="card-head">
+      <h2 id="h-today">Last 24h</h2>
+      <a class="all-link" href="/activity" title="All 22 resource/action counts">All activity &rarr;</a>
+    </div>
+    <div class="tiles">
+{{- range .Tiles}}
+      <a class="tile{{if .Wide}} wide{{end}}" href="{{.Href}}">
+        <span class="lbl"><b>{{.Resource}}</b> / {{.Action}}</span>
+        <span class="num">{{.Count}}</span>
+        <span class="{{.SumClass}}">{{.Sum}}</span>
+      </a>
+{{- end}}
+    </div>
+  </section>
+
+  <!-- PROMPTS -->
+  <section class="card" aria-labelledby="h-prompts">
+    <div class="card-head">
+      <h2 id="h-prompts">Prompts <span class="count">({{.PromptsTotal}})</span></h2>
+      <a class="all-link" href="/prompts" title="Every prompt, newest first">All prompts &rarr;</a>
+    </div>
+    <div class="table-scroll"{{if not .Prompts}} style="display:none"{{end}}>
+      <table class="prompts">
+        <thead>
+          <tr>
+            <th><span class="visually-hidden" style="position:absolute;left:-9999px">State</span></th>
+            <th>Prompt</th>
+            <th>Date</th>
+            <th>Agent</th>
+            <th>Repo</th>
+            <th>Session</th>
+            <th>Duration</th>
+            <th>Actions</th>
+            <th>Flags</th>
+          </tr>
+        </thead>
+        <tbody>
+{{- range .Prompts}}
+          <tr data-href="{{.Href}}">
+            <td class="state">{{if .Running}}<span class="running-dot" role="img" aria-label="running" title="Still running"></span>{{end}}</td>
+            <td class="prompt"><a href="{{.Href}}" title="{{.Title}}">{{if .Pasted}}<span class="pasted">pasted {{.Pasted}} lines</span> {{end}}{{.Text}}</a></td>
+            <td class="date metaline"><time datetime="{{.ISO}}">{{.Date}}</time><span class="m-only"> · {{template "agent-icon" .Agent}} · <span class="repo">{{.Repo}}</span> · <span class="mono">{{.SessionShort}}</span> · {{.Duration}} · {{.Actions}} actions{{if .Flags}} · <span class="flag">{{.Flags}} flag{{if ne .Flags 1}}s{{end}}</span>{{end}}{{if .Running}}<span class="running-label">running</span>{{end}}</span></td>
+            <td class="agent">{{template "agent-icon" .Agent}}</td>
+            <td class="repo-cell"><span class="repo">{{.Repo}}</span></td>
+            <td class="session"><a href="{{.SessionHref}}">{{.SessionShort}}</a></td>
+            <td class="dur">{{.Duration}}</td>
+            <td class="acts"><span class="acts" title="{{.Actions}} actions{{if .Running}} so far{{end}}">{{.Actions}}</span></td>
+            <td class="flags">{{if .Flags}}<span class="flag" title="{{.Flags}} attention item{{if ne .Flags 1}}s{{end}}">{{.Flags}}</span>{{end}}</td>
+          </tr>
+{{- end}}
+        </tbody>
+      </table>
+    </div>
+{{- if not .Prompts}}
+    <div class="empty" style="display:block">No prompts yet. They show up here as soon as an agent starts working.</div>
+{{- end}}
+  </section>
+
+  <footer class="cli">
+    <span>Same view in the terminal: <code>sen status</code></span>
+    <span><code>sen alert &lt;#&gt;</code> details for an attention item</span>
+    <span><code>sen session &lt;id&gt;</code> prompts in a session</span>
+  </footer>
+{{end}}

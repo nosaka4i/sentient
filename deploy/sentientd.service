@@ -1,0 +1,24 @@
+[Unit]
+Description=sentient monitor daemon (records what coding agents do)
+Documentation=https://github.com/nosaka4i/sentient
+# Kernel capture (build step 2) will need Tetragon up first:
+# Wants=tetragon.service
+# After=tetragon.service
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/opt/sentient/bin/sentientd \
+    --data-dir /opt/sentient/data \
+    --socket /run/sentient/sentientd.sock \
+    --socket-group sentient
+# Creates /run/sentient for the socket.
+RuntimeDirectory=sentient
+RuntimeDirectoryMode=0755
+Restart=on-failure
+RestartSec=2
+# Keep the store private.
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

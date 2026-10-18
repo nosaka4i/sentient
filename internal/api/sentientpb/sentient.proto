@@ -1,0 +1,67 @@
+// Local API between sentientd (server, owns the store) and its clients
+// (sen, sen serve), served over a Unix domain socket. Narrow by design:
+// only the reads the views need. Regenerate the Go code with `make proto`.
+syntax = "proto3";
+
+package sentient.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/nosaka4i/sentient/internal/api/sentientpb";
+
+service Sentient {
+  // Status returns the data behind `sen status` and the web dashboard.
+  rpc Status(StatusRequest) returns (StatusResponse);
+}
+
+message StatusRequest {
+  // The activity window [from, to), computed by the client (the last 24
+  // hours).
+  google.protobuf.Timestamp from = 1;
+  google.protobuf.Timestamp to = 2;
+  // How many of the newest prompts to return (0 = server default, 5).
+  int32 prompt_limit = 3;
+}
+
+message ActivityRow {
+  string resource = 1;
+  string action = 2;
+  int64 count = 3;
+  // One-line summary as the CLI prints it.
+  string summary = 4;
+  // Structured summary parts (see query.ActivityRow).
+  int64 repos = 5;
+  int64 outside = 6;
+  int64 added = 7;
+  int64 removed = 8;
+  int64 failed = 9;
+  string hosts = 10;
+}
+
+message Prompt {
+  int64 id = 1;
+  string text = 2;
+  google.protobuf.Timestamp started = 3;
+  google.protobuf.Duration duration = 4;
+  bool running = 5;
+  string agent = 6;
+  string repo = 7;
+  string session_id = 8;
+  int64 actions = 9;
+  int64 flags = 10;
+}
+
+message StatusResponse {
+  // Earliest ingested record; unset when nothing has been ingested yet.
+  google.protobuf.Timestamp history_begins = 1;
+  // The summary rows for the window, in display order.
+  repeated ActivityRow activity = 2;
+  // Stored log records of unknown type or unparsable lines.
+  int64 unknown_records = 3;
+  // sentientd's version.
+  string daemon_version = 4;
+  // Every prompt started in the window, and the newest prompt_limit.
+  int64 prompts_total = 5;
+  repeated Prompt prompts = 6;
+}
