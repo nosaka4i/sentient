@@ -39,8 +39,13 @@
     });
   }
 
+  // filter selects apply as soon as they change
+  document.querySelectorAll('select[data-autosubmit]').forEach(function (sel) {
+    sel.addEventListener('change', function () { sel.form.submit(); });
+  });
+
   // whole prompt row is clickable
-  document.querySelectorAll('.prompts tbody tr').forEach(function (tr) {
+  document.querySelectorAll('.prompts tbody tr[data-href]').forEach(function (tr) {
     tr.addEventListener('click', function (e) {
       if (e.target.closest('a')) return;
       location.href = tr.getAttribute('data-href');

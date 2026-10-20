@@ -84,4 +84,18 @@
 {{- end}}
 {{- end}}
 
+{{define "prompt-row"}}
+          <tr data-href="{{.Href}}">
+            <td class="state">{{if .Running}}<span class="running-dot" role="img" aria-label="running" title="Still running"></span>{{end}}</td>
+            <td class="prompt"><a href="{{.Href}}" title="{{.Title}}">{{if .Pasted}}<span class="pasted">pasted {{.Pasted}} lines</span> {{end}}{{.Text}}</a></td>
+            <td class="date metaline"><time datetime="{{.ISO}}">{{.Date}}</time><span class="m-only"> · {{template "agent-icon" .Agent}} · <span class="repo">{{.Repo}}</span> · <span class="mono">{{.SessionShort}}</span> · {{.Duration}} · {{.Actions}} actions{{if .Flags}} · <span class="flag">{{.Flags}} flag{{if ne .Flags 1}}s{{end}}</span>{{end}}{{if .Running}}<span class="running-label">running</span>{{end}}</span></td>
+            <td class="agent">{{template "agent-icon" .Agent}}</td>
+            <td class="repo-cell"><span class="repo">{{.Repo}}</span></td>
+            <td class="session"><a href="{{.SessionHref}}">{{.SessionShort}}</a></td>
+            <td class="dur">{{.Duration}}</td>
+            <td class="acts"><span class="acts" title="{{.Actions}} actions{{if .Running}} so far{{end}}">{{.Actions}}</span></td>
+            <td class="flags">{{if .Flags}}<span class="flag" title="{{.Flags}} attention item{{if ne .Flags 1}}s{{end}}">{{.Flags}}</span>{{end}}</td>
+          </tr>
+{{- end}}
+
 {{define "agent-icon"}}{{if or (eq . "claude") (eq . "codex")}}<svg class="agent-ic" role="img" aria-label="{{.}}"><title>{{.}}</title><use href="#i-{{.}}"/></svg>{{else}}{{.}}{{end}}{{end}}

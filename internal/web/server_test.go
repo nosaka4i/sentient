@@ -23,14 +23,38 @@ type fakeSource struct {
 	st       *query.Status
 	health   *health.Report
 	detail   *query.PromptDetail
+	list     *query.PromptList
+	groups   *query.SessionGroups
+	session  *query.SessionDetail
 	err      error
 	from, to time.Time
 	asked    int64 // the prompt id last requested
+	filter   query.PromptFilter
+	// the session grouping request last made
+	groupFilter query.PromptFilter
+	perSession  int
+	// the session id last requested
+	askedSession string
 }
 
 func (f *fakeSource) PromptDetail(ctx context.Context, id int64) (*query.PromptDetail, error) {
 	f.asked = id
 	return f.detail, f.err
+}
+
+func (f *fakeSource) ListPrompts(ctx context.Context, flt query.PromptFilter) (*query.PromptList, error) {
+	f.filter = flt
+	return f.list, f.err
+}
+
+func (f *fakeSource) ListSessionGroups(ctx context.Context, flt query.PromptFilter, perSession int) (*query.SessionGroups, error) {
+	f.groupFilter, f.perSession = flt, perSession
+	return f.groups, f.err
+}
+
+func (f *fakeSource) SessionDetail(ctx context.Context, id string) (*query.SessionDetail, error) {
+	f.askedSession = id
+	return f.session, f.err
 }
 
 func (f *fakeSource) Status(ctx context.Context, from, to time.Time) (*query.Status, string, error) {
@@ -199,7 +223,7 @@ func TestStaticAndRouting(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Errorf("js: %d", resp.StatusCode)
 	}
-	for _, path := range []string{"/activity?resource=file&action=read", "/session/404d", "/prompts", "/nope"} {
+	for _, path := range []string{"/activity?resource=file&action=read", "/alerts", "/nope"} {
 		if resp, _ := get(t, s, path, "127.0.0.1:7357"); resp.StatusCode != 404 {
 			t.Errorf("%s: %d, want 404 (not built yet)", path, resp.StatusCode)
 		}

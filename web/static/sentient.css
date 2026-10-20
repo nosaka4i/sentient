@@ -489,3 +489,78 @@ pre.diff .d { color: var(--del); background: var(--low-tint); }
   .steps ol .step .n { left: 20px; }
   .gap { padding-left: 52px; padding-right: 12px; }
 }
+
+/* list pages (prompts, session) */
+.page-title { margin-bottom: 22px; }
+.page-title h1 { margin: 0; font-size: clamp(21px, 3.2vw, 27px); line-height: 1.3; letter-spacing: -0.015em; font-weight: 600; }
+.page-title h1 .count { color: var(--text-3); font-weight: 500; margin-left: 6px; font-variant-numeric: tabular-nums; }
+.page-title .sub { margin: 4px 0 0; font-size: 13.5px; color: var(--text-2); }
+
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.search { position: relative; flex: 1 1 240px; min-width: 0; }
+.search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-3); pointer-events: none; }
+.search input, .filters select { font: inherit; font-size: 13.5px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; height: 32px; }
+.search input { width: 100%; padding: 0 10px 0 32px; }
+.search input::placeholder { color: var(--text-3); }
+.search input:focus, .filters select:focus { outline: none; border-color: var(--border-strong); }
+.filters select { padding: 0 8px; color: var(--text-2); cursor: pointer; }
+.filters label.sel { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-3); }
+.filters .shown { margin-left: auto; font-size: 12px; color: var(--text-3); white-space: nowrap; }
+.filters .shown a { color: var(--high); }
+a.chip { text-decoration: none; }
+
+.prompts tr.day th { background: var(--surface-2); color: var(--text-2); padding: 8px 12px; border-top: 1px solid var(--border); }
+.prompts tbody:first-of-type tr.day th { border-top: 0; }
+.prompts tr.day th { font-weight: 500; text-align: left; text-transform: none; letter-spacing: 0; font-size: 13px; }
+.prompts tr.day th > * + * { margin-left: 10px; }
+.prompts tr.day .sid { font-family: var(--mono); font-weight: 600; color: var(--accent); }
+.prompts tr.day .sid:hover { text-decoration: underline; }
+.prompts tr.day .agent-ic { vertical-align: -3px; }
+.prompts tr.day .repo { color: var(--text); font-weight: 600; }
+.prompts tr.day .dmeta { color: var(--text-3); font-weight: 500; letter-spacing: 0.02em; text-transform: none; margin-left: 10px; }
+.prompts th.n, .prompts td.n { width: 36px; padding-right: 0; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-3); }
+.prompts td.acts { font-variant-numeric: tabular-nums; }
+.pasted { font-family: var(--mono); font-size: 12px; color: var(--text-3); background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; margin-right: 4px; }
+.prompts .pn { color: var(--text-3); margin-right: 8px; font-variant-numeric: tabular-nums; }
+.more-row { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px; border-top: 1px solid var(--border); }
+.more-row .chip { padding: 5px 14px; font-size: 13px; }
+.more-row .left { font-size: 12px; color: var(--text-3); }
+
+.sumline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-2); }
+.sumline > span + span::before { content: "·"; color: var(--text-3); padding: 0 8px; }
+.sumline .repo { color: var(--text); font-weight: 600; }
+.sumline a.open { margin-left: auto; color: var(--high); }
+.sumline a.open:hover { text-decoration: underline; }
+.filters select option:disabled { color: var(--text-3); }
+
+.session-block { margin-bottom: 28px; }
+.session-block .eyebrow { margin: 0 0 8px; font-size: 12px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+.session-block h1 { margin: 0 0 8px; font-size: clamp(21px, 3.2vw, 27px); line-height: 1.3; letter-spacing: -0.015em; font-weight: 600; font-family: var(--mono); }
+.session-block .first { margin: 0 0 12px; font-size: 14.5px; color: var(--text-2); max-width: 860px; overflow-wrap: anywhere; }
+.session-block .first b { color: var(--text-3); font-weight: 500; font-size: 13px; }
+.pmeta + .pmeta { margin-top: 4px; }
+.pmeta .cwd { font-family: var(--mono); font-size: 12.5px; color: var(--text-2); overflow-wrap: anywhere; }
+.flag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--med); background: var(--med-tint); padding: 1px 7px; border-radius: 999px; }
+
+.subs { list-style: none; margin: 0; padding: 0; }
+.subs li + li { border-top: 1px solid var(--border); }
+.sub { display: grid; gap: 4px 16px; padding: 14px 16px; }
+.sub .task { font-size: 14.5px; color: var(--text); overflow-wrap: anywhere; }
+.sub .smeta { font-size: 12.5px; color: var(--text-3); display: flex; flex-wrap: wrap; gap: 2px 0; align-items: center; }
+.sub .smeta > span + span::before { content: "·"; padding: 0 8px; }
+
+@media (max-width: 720px) {
+  .filters { padding: 12px; }
+  .search { flex-basis: 100%; }
+  .filters label.sel { flex: 1 1 0; min-width: 0; }
+  .filters label.sel .lt { display: none; }
+  .filters select { width: 100%; min-width: 0; }
+  .filters .shown { flex-basis: 100%; margin-left: 0; }
+  .prompts tbody tr.day { display: block; padding: 0; border-bottom: 1px solid var(--border); }
+  .prompts tr.day th { display: block; padding: 8px 16px; border-bottom: 0; white-space: normal; }
+  .prompts th.n, .prompts td.n { display: none; }
+  .prompts td.time { display: inline; width: auto; font-size: 12.5px; }
+  .sumline { padding: 10px 12px; }
+  .sumline a.open { margin-left: 0; flex-basis: 100%; margin-top: 4px; }
+  .more-row { padding: 14px 12px; }
+}

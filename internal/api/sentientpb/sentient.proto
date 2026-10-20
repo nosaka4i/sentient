@@ -17,6 +17,105 @@ service Sentient {
   rpc Health(HealthRequest) returns (HealthResponse);
   // PromptDetail returns everything about one prompt (web /prompt/<id>).
   rpc PromptDetail(PromptDetailRequest) returns (PromptDetailResponse);
+  // ListPrompts returns prompts newest first, filtered (web /prompts).
+  rpc ListPrompts(ListPromptsRequest) returns (ListPromptsResponse);
+  // ListSessionGroups returns sessions with their newest matching prompts
+  // (web /prompts, all sessions).
+  rpc ListSessionGroups(ListSessionGroupsRequest) returns (ListSessionGroupsResponse);
+  // SessionDetail returns one session and its prompts (web /session/<id>).
+  rpc SessionDetail(SessionDetailRequest) returns (SessionDetailResponse);
+}
+
+message ListPromptsRequest {
+  string text = 1;   // substring of the prompt text, case-insensitive
+  string agent = 2;  // exact agent name
+  string repo = 3;   // repo (or cwd) basename
+  bool flagged = 4;  // only prompts with open alerts
+  int32 limit = 5;   // 0 = server default (50), max 1000
+  string session_id = 6; // only this session's prompts (the agent's session id)
+}
+
+message SessionSummary {
+  string session_id = 1;
+  string agent = 2;
+  string repo = 3;
+  google.protobuf.Timestamp started = 4;
+  google.protobuf.Timestamp last_activity = 5;
+  int64 prompts = 6;
+  int64 actions = 7; // actions on the system
+  int64 flags = 8;
+}
+
+// SessionOption is one entry of the Session filter menu.
+message SessionOption {
+  string session_id = 1;
+  string agent = 2;
+  string repo = 3;
+}
+
+message ListPromptsResponse {
+  google.protobuf.Timestamp history_begins = 1;
+  int64 total = 2;              // prompts matching the filter
+  repeated Prompt prompts = 3;  // the newest `limit` of them
+  repeated string agents = 4;   // every agent seen, for the filter
+  repeated string repos = 5;    // every repo seen, for the filter
+  SessionSummary session = 6;   // set when the request named a session
+  repeated SessionOption sessions = 7; // recent sessions, for the Session menu
+  int64 older_sessions = 8;     // sessions not in `sessions`
+}
+
+message ListSessionGroupsRequest {
+  string text = 1;
+  string agent = 2;
+  string repo = 3;
+  bool flagged = 4;
+  int32 session_limit = 5; // 0 = server default (10), max 200
+  int32 per_session = 6;   // prompts per session, 0 = 3
+}
+
+message SessionGroup {
+  SessionSummary session = 1; // `prompts` is the session's total
+  int64 matching = 2;         // its prompts matching the filter
+  repeated Prompt prompts = 3; // the newest few of those
+}
+
+message ListSessionGroupsResponse {
+  google.protobuf.Timestamp history_begins = 1;
+  int64 total_prompts = 2;   // prompts matching the filter, all sessions
+  int64 total_sessions = 3;  // sessions with a matching prompt
+  repeated SessionGroup groups = 4; // newest session first
+  repeated string agents = 5;
+  repeated string repos = 6;
+  repeated SessionOption sessions = 7;
+  int64 older_sessions = 8;
+}
+
+message SessionDetailRequest {
+  string session_id = 1; // the agent's session id
+}
+
+message Subagent {
+  string kind = 1; // subagent type (Explore, general-purpose…)
+  string task = 2;
+  google.protobuf.Timestamp at = 3;
+  int64 prompt_number = 4; // 1-based position of the prompt that started it, 0 if unknown
+}
+
+message SessionDetailResponse {
+  google.protobuf.Timestamp history_begins = 1;
+  string session_id = 2;
+  string agent = 3;
+  string agent_version = 4;
+  string repo = 5;
+  string cwd = 6;
+  google.protobuf.Timestamp started = 7;
+  google.protobuf.Timestamp last_activity = 8;
+  bool running = 9;
+  int64 actions = 10; // actions on the system, all prompts
+  int64 flags = 11;
+  repeated Prompt prompts = 12;      // oldest first
+  repeated ActivityRow activity = 13;
+  repeated Subagent subagents = 14;
 }
 
 message PromptDetailRequest {

@@ -41,13 +41,29 @@ func RecentPrompts(ctx context.Context, db *sql.DB, from, to time.Time, limit in
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM prompts WHERE started_at >= ? AND started_at < ?`, f, t).Scan(&total); err != nil {
 		return 0, nil, fmt.Errorf("prompt total: %w", err)
 	}
-	r, err := db.QueryContext(ctx, `
-SELECT p.id, p.session_id, p.text, p.started_at, p.ended_at, s.agent, COALESCE(s.repo_root, s.cwd, ''), s.agent_session_id
-FROM prompts p JOIN sessions s ON s.id = p.session_id
-WHERE p.started_at >= ? AND p.started_at < ?
-ORDER BY p.started_at DESC, p.id DESC LIMIT ?`, f, t, limit)
+	rows, err := loadPrompts(ctx, db, `p.started_at >= ? AND p.started_at < ?`, []any{f, t}, `p.started_at DESC, p.id DESC LIMIT ?`, limit, to)
 	if err != nil {
-		return 0, nil, fmt.Errorf("prompts: %w", err)
+		return 0, nil, err
+	}
+	return total, rows, nil
+}
+
+// promptSelect is the common SELECT for prompt rows (aliases p and s).
+const promptSelect = `
+SELECT p.id, p.session_id, p.text, p.started_at, p.ended_at, s.agent, COALESCE(s.repo_root, s.cwd, ''), s.agent_session_id
+FROM prompts p JOIN sessions s ON s.id = p.session_id`
+
+// loadPrompts returns the prompts matching where (with args), in the given
+// order, with their derived fields filled in. orderLimit is an ORDER BY
+// clause that may end in `LIMIT ?`, whose value is limit (pass 0 and no
+// LIMIT for none). now bounds the activity window of running prompts.
+func loadPrompts(ctx context.Context, db *sql.DB, where string, args []any, orderLimit string, limit int, now time.Time) ([]PromptRow, error) {
+	if strings.Contains(orderLimit, "LIMIT ?") {
+		args = append(append([]any(nil), args...), limit)
+	}
+	r, err := db.QueryContext(ctx, promptSelect+` WHERE `+where+` ORDER BY `+orderLimit, args...)
+	if err != nil {
+		return nil, fmt.Errorf("prompts: %w", err)
 	}
 	type raw struct {
 		row     PromptRow
@@ -61,7 +77,7 @@ ORDER BY p.started_at DESC, p.id DESC LIMIT ?`, f, t, limit)
 		var dir string
 		if err := r.Scan(&x.row.ID, &x.session, &x.row.Text, &x.start, &x.end, &x.row.Agent, &dir, &x.row.SessionID); err != nil {
 			r.Close()
-			return 0, nil, err
+			return nil, err
 		}
 		if dir != "" {
 			x.row.Repo = filepath.Base(dir)
@@ -70,18 +86,18 @@ ORDER BY p.started_at DESC, p.id DESC LIMIT ?`, f, t, limit)
 	}
 	r.Close()
 	if err := r.Err(); err != nil {
-		return 0, nil, err
+		return nil, err
 	}
 
 	rows := make([]PromptRow, 0, len(raws))
 	for _, x := range raws {
 		p := x.row
-		if err := finishPrompt(ctx, db, &p, x.session, x.start, x.end, to); err != nil {
-			return 0, nil, err
+		if err := finishPrompt(ctx, db, &p, x.session, x.start, x.end, now); err != nil {
+			return nil, err
 		}
 		rows = append(rows, p)
 	}
-	return total, rows, nil
+	return rows, nil
 }
 
 // finishPrompt fills in what a prompt row derives from other tables: its

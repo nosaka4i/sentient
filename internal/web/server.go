@@ -34,6 +34,9 @@ type Source interface {
 	Status(ctx context.Context, from, to time.Time) (*query.Status, string, error)
 	Health(ctx context.Context) (*health.Report, error)
 	PromptDetail(ctx context.Context, id int64) (*query.PromptDetail, error)
+	ListPrompts(ctx context.Context, f query.PromptFilter) (*query.PromptList, error)
+	ListSessionGroups(ctx context.Context, f query.PromptFilter, perSession int) (*query.SessionGroups, error)
+	SessionDetail(ctx context.Context, sessionID string) (*query.SessionDetail, error)
 }
 
 // Server is the web UI.
@@ -54,7 +57,7 @@ func New(src Source, socket string, log *slog.Logger) (*Server, error) {
 	}
 	home, _ := os.UserHomeDir()
 	s := &Server{src: src, socket: socket, now: time.Now, home: home, log: log, pages: map[string]*template.Template{}}
-	for _, page := range []string{"dashboard", "health", "prompt", "down"} {
+	for _, page := range []string{"dashboard", "health", "prompt", "prompts", "session", "down"} {
 		t, err := template.ParseFS(assets.FS, "templates/layout.html", "templates/"+page+".html")
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", page, err)
@@ -75,6 +78,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /{$}", s.dashboard)
 	mux.HandleFunc("GET /health", s.health)
 	mux.HandleFunc("GET /prompt/{id}", s.prompt)
+	mux.HandleFunc("GET /prompts", s.prompts)
+	mux.HandleFunc("GET /session/{id}", s.session)
 	mux.Handle("GET /static/", s.static)
 	return localOnly(mux)
 }

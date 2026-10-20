@@ -1,0 +1,104 @@
+{{define "content"}}
+  <a class="back" href="/">&larr; Dashboard</a>
+
+  <!-- SESSION -->
+  <div class="session-block">
+    <p class="eyebrow">Session</p>
+    <h1 title="{{.Head.ID}}">{{.Head.Short}}</h1>
+{{- if .Head.First}}
+    <p class="first"><b>started with</b> &ldquo;{{if .Head.Pasted}}<span class="pasted">pasted {{.Head.Pasted}} lines</span> {{end}}{{.Head.First}}&rdquo;</p>
+{{- end}}
+    <p class="pmeta">
+      <span>{{template "agent-icon" .Head.Agent}}{{if .Head.AgentVersion}} <span class="mono">{{.Head.AgentVersion}}</span>{{end}}</span>
+      {{- if .Head.Repo}}
+      <span class="repo">{{.Head.Repo}}</span>
+      {{- end}}
+      {{- if .Head.Date}}
+      <span><time datetime="{{.Head.ISO}}">{{.Head.Date}}</time>{{if .Head.End}}&ndash;{{.Head.End}}{{end}}</span>
+      {{- end}}
+      {{- if .Head.Duration}}
+      <span>{{.Head.Duration}}</span>
+      {{- end}}
+      <span>{{.Head.PromptCount}} prompt{{if ne .Head.PromptCount 1}}s{{end}}</span>
+      <span>{{.Head.Actions}} actions</span>
+      {{- if .Head.Flags}}
+      <span><span class="flag" title="{{.Head.Flags}} attention item{{if ne .Head.Flags 1}}s{{end}}">{{.Head.Flags}} flag{{if ne .Head.Flags 1}}s{{end}}</span></span>
+      {{- end}}
+      <span>{{if .Head.Running}}<span class="state-running"><span class="running-dot" aria-hidden="true"></span>running</span>{{else}}<span class="state-done"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L19 7"/></svg>ended</span>{{end}}</span>
+    </p>
+{{- if .Head.Cwd}}
+    <p class="pmeta">
+      <span class="cwd" title="Working directory">{{.Head.Cwd}}</span>
+    </p>
+{{- end}}
+  </div>
+
+  <!-- WHAT HAPPENED -->
+  <section class="card" aria-labelledby="h-what">
+    <div class="card-head">
+      <h2 id="h-what">What happened</h2>
+      <span class="hint">{{.Head.Actions}} actions in this session</span>
+    </div>
+    <div class="tiles">
+{{- template "tiles" .Tiles}}
+    </div>
+  </section>
+
+  <!-- PROMPTS -->
+  <section class="card" id="prompts" aria-labelledby="h-prompts">
+    <div class="card-head">
+      <h2 id="h-prompts">Prompts <span class="count">({{.Head.PromptCount}})</span></h2>
+      <span class="hint">oldest first</span>
+    </div>
+{{- if .Prompts}}
+    <div class="table-scroll">
+      <table class="prompts">
+        <thead>
+          <tr>
+            <th class="n">#</th>
+            <th>Prompt</th>
+            <th>Time</th>
+            <th>Duration</th>
+            <th>Actions</th>
+            <th>Flags</th>
+          </tr>
+        </thead>
+        <tbody>
+{{- range .Prompts}}
+          <tr data-href="{{.Href}}">
+            <td class="n">{{.N}}</td>
+            <td class="prompt"><a href="{{.Href}}" title="{{.Title}}"><span class="pn m-only">{{.N}}</span>{{if .Pasted}}<span class="pasted">pasted {{.Pasted}} lines</span> {{end}}{{.Text}}</a></td>
+            <td class="time metaline"><time datetime="{{.ISO}}">{{.Time}}</time><span class="m-only"> · {{.Duration}} · {{.Actions}} actions{{if .Flags}} · <span class="flag">{{.Flags}} flag{{if ne .Flags 1}}s{{end}}</span>{{end}}{{if .Running}}<span class="running-label">running</span>{{end}}</span></td>
+            <td class="dur">{{.Duration}}</td>
+            <td class="acts">{{.Actions}}</td>
+            <td class="flags">{{if .Flags}}<span class="flag" title="{{.Flags}} attention item{{if ne .Flags 1}}s{{end}}">{{.Flags}}</span>{{end}}</td>
+          </tr>
+{{- end}}
+        </tbody>
+      </table>
+    </div>
+{{- else}}
+    <div class="empty" style="display:block">No prompts recorded for this session.</div>
+{{- end}}
+  </section>
+{{- if .Subagents}}
+
+  <!-- SUBAGENTS -->
+  <section class="card" id="subagents" aria-labelledby="h-subs">
+    <div class="card-head">
+      <h2 id="h-subs">Subagents <span class="count">({{len .Subagents}})</span></h2>
+      <span class="hint">their actions are counted in the prompt that started them</span>
+    </div>
+    <ul class="subs">
+{{- range .Subagents}}
+      <li>
+        <div class="sub">
+          <span class="task">{{if .Task}}{{.Task}}{{else}}(no description){{end}}</span>
+          <span class="smeta">{{if .Kind}}<span class="tag">{{.Kind}}</span>{{end}}<span>{{.Clock}}</span>{{if .PromptNumber}}<span>prompt {{.PromptNumber}}</span>{{end}}</span>
+        </div>
+      </li>
+{{- end}}
+    </ul>
+  </section>
+{{- end}}
+{{end}}
