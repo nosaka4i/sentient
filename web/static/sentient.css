@@ -533,6 +533,23 @@ a.chip { text-decoration: none; }
 .sumline a.open:hover { text-decoration: underline; }
 .filters select option:disabled { color: var(--text-3); }
 
+/* sortable column heads (links) and the flat list */
+.prompts th.sortable { padding: 0; }
+.prompts th .sort { display: inline-flex; align-items: center; gap: 5px; padding: 10px 12px; color: var(--text-3); white-space: nowrap; }
+.prompts th .sort:hover { color: var(--text); }
+.prompts th[aria-sort="ascending"] .sort, .prompts th[aria-sort="descending"] .sort { color: var(--text); }
+.prompts th[aria-sort="ascending"] .sort::after { content: "\25B2"; font-size: 8px; }
+.prompts th[aria-sort="descending"] .sort::after { content: "\25BC"; font-size: 8px; }
+.prompts td.sesscell { white-space: nowrap; }
+.prompts td.sesscell .sid { font-family: var(--mono); font-weight: 600; color: var(--accent); }
+.prompts td.sesscell .sid:hover { text-decoration: underline; }
+.prompts td.sesscell .repo { color: var(--text); margin-left: 6px; }
+.prompts td.sesscell .agent-ic { margin-left: 6px; }
+.sortnote { padding: 8px 16px; font-size: 12px; color: var(--text-3); border-bottom: 1px solid var(--border); }
+.sortnote b { color: var(--text-2); font-weight: 600; }
+.sortnote a { color: var(--high); }
+.sortsel { display: none !important; } /* phones have no column heads: the Sort menu stands in */
+
 .session-block { margin-bottom: 28px; }
 .session-block .eyebrow { margin: 0 0 8px; font-size: 12px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
 .session-block h1 { margin: 0 0 8px; font-size: clamp(21px, 3.2vw, 27px); line-height: 1.3; letter-spacing: -0.015em; font-weight: 600; font-family: var(--mono); }
@@ -560,6 +577,9 @@ a.chip { text-decoration: none; }
   .prompts tr.day th { display: block; padding: 8px 16px; border-bottom: 0; white-space: normal; }
   .prompts th.n, .prompts td.n { display: none; }
   .prompts td.time { display: inline; width: auto; font-size: 12.5px; }
+  .sortsel { display: inline-flex !important; }
+  .sortnote { padding: 8px 12px; }
+  .prompts td.sesscell { display: none; }
   .sumline { padding: 10px 12px; }
   .sumline a.open { margin-left: 0; flex-basis: 100%; margin-top: 4px; }
   .more-row { padding: 14px 12px; }

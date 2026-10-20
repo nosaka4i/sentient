@@ -234,12 +234,116 @@ func TestPromptsPageOneSessionEmptyAndSelectedOlder(t *testing.T) {
 	}
 }
 
+func TestPromptsPageSortedIsAFlatList(t *testing.T) {
+	l := sampleOneSession()
+	l.Session = nil // no single session: all of them, in one list
+	l.Total = 6
+	other := promptRow(4, "other session", now.Add(-3*time.Hour), "codex", "sentient")
+	other.SessionID = "9c1e0000"
+	l.Prompts = []query.PromptRow{promptRow(5, "long <b>one</b>", now.Add(-time.Hour), "claude", "nosaka"), other}
+	src := &fakeSource{list: l}
+	s := newTestServer(t, src)
+	resp, body := get(t, s, "/prompts?sort=dur:desc&agent=claude", "localhost:7357")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status %d\n%s", resp.StatusCode, body)
+	}
+	if f := src.filter; f.Sort != "dur" || f.Asc || f.SessionID != "" || f.Agent != "claude" || f.Limit != promptStep {
+		t.Errorf("list request = %+v", f)
+	}
+	for _, want := range []string{
+		`Sorted by <b>duration, longest first</b> across all sessions`,
+		`<a href="/prompts?agent=claude">back to grouped by session</a>`,
+		// the session sits between the prompt and the date
+		`<th>Session</th>`,
+		`<td class="sesscell"><a class="sid" href="/session/404dabcd" title="Open session 404d">404d</a>`,
+		`<td class="sesscell"><a class="sid" href="/session/9c1e0000"`,
+		`long &lt;b&gt;one&lt;/b&gt;`,
+		// heads: the sorted column is marked and reverses; others sort by themselves
+		`<th class="sortable" aria-sort="descending"><a class="sort" href="/prompts?agent=claude&amp;sort=dur%3Aasc">Duration</a></th>`,
+		`<th class="sortable" aria-sort="none"><a class="sort" href="/prompts?agent=claude&amp;sort=prompt%3Aasc">Prompt</a></th>`,
+		// Date's first click is newest first, which is the default grouped view
+		`<th class="sortable" aria-sort="none"><a class="sort" href="/prompts?agent=claude">Date</a></th>`,
+		`<th class="sortable" aria-sort="none"><a class="sort" href="/prompts?agent=claude&amp;sort=acts%3Adesc">Actions</a></th>`,
+		// the phones' Sort menu
+		`<option value="dur:desc" selected>Longest</option>`,
+		`<option value="date:desc">Newest first</option>`,
+		`<option value="prompt:asc">Prompt A–Z</option>`,
+		`4 older prompts`, // 6 match, 2 shown
+		`href="/prompts?agent=claude&amp;n=52&amp;sort=dur%3Adesc"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("page missing %q", want)
+		}
+	}
+	if strings.Contains(body, `class="dmeta"`) {
+		t.Error("the flat list has no session group bars")
+	}
+	if t.Failed() {
+		t.Log(body)
+	}
+
+	// Newest first is the grouped view; oldest first is a flat list.
+	src = &fakeSource{list: l, groups: sampleGroups()}
+	s = newTestServer(t, src)
+	_, body = get(t, s, "/prompts?sort=date:desc", "localhost")
+	if !strings.Contains(body, `class="dmeta"`) || strings.Contains(body, `class="sortnote"`) {
+		t.Error("date:desc should be the grouped view")
+	}
+	_, body = get(t, s, "/prompts?sort=date:asc", "localhost")
+	if !strings.Contains(body, `<b>date, oldest first</b>`) {
+		t.Error("date:asc should be a flat list")
+	}
+	// An unknown sort is the default.
+	_, body = get(t, s, "/prompts?sort=bogus:asc", "localhost")
+	if !strings.Contains(body, `class="dmeta"`) {
+		t.Error("an unknown sort should fall back to the grouped view")
+	}
+}
+
+func TestSortHelpers(t *testing.T) {
+	for in, want := range map[string]struct {
+		key string
+		asc bool
+	}{
+		"": {"date", false}, "date:desc": {"date", false}, "dur:asc": {"dur", true}, "prompt:asc": {"prompt", true},
+		"acts": {"acts", false}, "nope:asc": {"date", false}, "flags:desc": {"flags", false},
+	} {
+		if k, a := parseSort(in); k != want.key || a != want.asc {
+			t.Errorf("parseSort(%q) = %s, %v; want %s, %v", in, k, a, want.key, want.asc)
+		}
+	}
+	if sortParam("date", false) != "" || sortParam("dur", true) != "dur:asc" || sortParam("acts", false) != "acts:desc" {
+		t.Error("sortParam")
+	}
+	for _, tc := range []struct {
+		f    query.PromptFilter
+		want string
+	}{
+		{query.PromptFilter{Sort: "prompt", Asc: true}, "prompt text, A to Z"},
+		{query.PromptFilter{Sort: "prompt"}, "prompt text, Z to A"},
+		{query.PromptFilter{Sort: "date", Asc: true}, "date, oldest first"},
+		{query.PromptFilter{Sort: "dur", Asc: true}, "duration, shortest first"},
+		{query.PromptFilter{Sort: "acts"}, "actions, most first"},
+		{query.PromptFilter{Sort: "acts", Asc: true}, "actions, fewest first"},
+		{query.PromptFilter{Sort: "flags"}, "flags, most first"},
+		{query.PromptFilter{Sort: "flags", Asc: true}, "flags, fewest first"},
+		{query.PromptFilter{Sort: "dur"}, "duration, longest first"},
+	} {
+		if got := sortNote(tc.f); got != tc.want {
+			t.Errorf("sortNote(%+v) = %q, want %q", tc.f, got, tc.want)
+		}
+	}
+	if !defaultSort(query.PromptFilter{Sort: "date"}) || defaultSort(query.PromptFilter{Sort: "date", Asc: true}) {
+		t.Error("defaultSort")
+	}
+}
+
 func TestListHrefAndHelpers(t *testing.T) {
-	if got := listHref(query.PromptFilter{}, "", false, 0); got != "/prompts" {
+	if got := listHref(query.PromptFilter{}, "", false, 0, ""); got != "/prompts" {
 		t.Errorf("listHref empty = %q", got)
 	}
 	f := query.PromptFilter{Text: "a b", Agent: "claude", Repo: "r"}
-	if got := listHref(f, "sid", true, 100); got != "/prompts?agent=claude&flagged=1&n=100&q=a+b&repo=r&session=sid" {
+	if got := listHref(f, "sid", true, 100, "dur:asc"); got != "/prompts?agent=claude&flagged=1&n=100&q=a+b&repo=r&session=sid&sort=dur%3Aasc" {
 		t.Errorf("listHref = %q", got)
 	}
 	if sessionLabel("404dabcd", "", "claude") != "404d · claude" || sessionLabel("404dabcd", "r", "claude") != "404d · r" {
@@ -279,7 +383,9 @@ func sampleSession() *query.SessionDetail {
 		HistoryBegins: now.Add(-48 * time.Hour),
 		ID:            "404dabcd-1111", Agent: "claude", AgentVersion: "2.1.3", Repo: "nosaka", Cwd: "/home/u/work/nosaka",
 		Started: started, LastActivity: started.Add(80 * time.Minute), Running: true, Actions: 6, Flags: 2,
-		Prompts:   []query.PromptRow{p1, p2},
+		// 9 prompts in all; the newest two are loaded, newest first
+		TotalPrompts: 9, FirstPrompt: p1.Text,
+		Prompts:   []query.PromptRow{p2, p1},
 		Activity:  rows,
 		Subagents: []query.Subagent{{Kind: "Explore", Task: "find the <crash>", At: started.Add(time.Minute), PromptNumber: 1}, {At: started.Add(2 * time.Minute)}},
 	}
@@ -301,7 +407,7 @@ func TestSessionPage(t *testing.T) {
 		`<h1 title="404dabcd-1111">404d</h1>`,
 		`started with</b> &ldquo;first &lt;i&gt;prompt&lt;/i&gt;&rdquo;`,
 		`<span class="mono">2.1.3</span>`,
-		`<span>2 prompts</span>`,
+		`<span>9 prompts</span>`,
 		`<span>6 actions</span>`,
 		`<span class="flag" title="2 attention items">2 flags</span>`,
 		`<span class="state-running">`,
@@ -309,9 +415,13 @@ func TestSessionPage(t *testing.T) {
 		`6 actions in this session`,
 		`<a class="tile zero" href="#prompts">`,
 		`<a class="tile" href="#subagents">`,
-		`<td class="n">1</td>`,
-		`<td class="n">2</td>`,
+		// numbered from the session's first prompt, so the newest is #9
+		`<td class="n">9</td>`,
+		`<td class="n">8</td>`,
 		`href="/prompt/2"`,
+		`newest 2 of 9`,
+		`<a class="chip" href="/prompts?session=404dabcd-1111">See all 9 prompts &rarr;</a>`,
+		`7 older, with search and sorting`,
 		`Subagents <span class="count">(2)</span>`,
 		`<span class="task">find the &lt;crash&gt;</span>`,
 		`<span class="tag">Explore</span>`,
@@ -335,7 +445,7 @@ func TestSessionPageEndedAndEmpty(t *testing.T) {
 	d.Flags = 0
 	d.Repo, d.Cwd = "", ""
 	d.Started, d.LastActivity = time.Time{}, time.Time{}
-	d.Prompts = nil
+	d.Prompts, d.TotalPrompts, d.FirstPrompt = nil, 0, ""
 	s := newTestServer(t, &fakeSource{session: d})
 	_, body := get(t, s, "/session/x", "localhost")
 	for _, want := range []string{`<span class="state-done">`, `No prompts recorded for this session.`} {

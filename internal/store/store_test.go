@@ -104,6 +104,151 @@ func TestUpgradeFromVersion1(t *testing.T) {
 	}
 }
 
+func TestUpgradeBackfillsPromptColumns(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	all := migrations
+	migrations = all[:3] // a database from before last_activity_at / action_count
+	st, err := Open(ctx, dir)
+	migrations = all
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		`INSERT INTO sessions (id, agent, agent_session_id) VALUES (1, 'claude', 's')`,
+		`INSERT INTO prompts (id, session_id, seq, text, started_at, ended_at) VALUES (1, 1, 1, 'a', '2026-10-17T09:00:00Z', '2026-10-17T10:00:00Z')`,
+		`INSERT INTO prompts (id, session_id, seq, text, started_at) VALUES (2, 1, 2, 'b', '2026-10-17T10:00:00Z')`,
+		`INSERT INTO prompts (id, session_id, seq, text, started_at) VALUES (3, 1, 3, 'quiet', '2026-10-17T11:00:00Z')`,
+		// activity of prompt 1 up to 09:20; the 10:00 record opens prompt 2; prompt 2 runs to 10:07
+		`INSERT INTO raw_log_records (session_id, ts, source_file, type, record, prev_hash, hash) VALUES (1, '2026-10-17T09:05:00Z', 'f', 'assistant', '{}', '', 'h1')`,
+		`INSERT INTO raw_log_records (session_id, ts, source_file, type, record, prev_hash, hash) VALUES (1, '2026-10-17T09:20:00Z', 'f', 'assistant', '{}', 'h1', 'h2')`,
+		`INSERT INTO raw_log_records (session_id, ts, source_file, type, record, prev_hash, hash) VALUES (1, '2026-10-17T10:00:00Z', 'f', 'user', '{}', 'h2', 'h3')`,
+		`INSERT INTO raw_log_records (session_id, ts, source_file, type, record, prev_hash, hash) VALUES (1, '2026-10-17T10:07:00Z', 'f', 'assistant', '{}', 'h3', 'h4')`,
+		// prompt 1: 2 system actions + a subagent start + a web search (not counted) + a web fetch (counted)
+		`INSERT INTO actions (prompt_id, ts, resource, action, evidence, tool_use_id) VALUES (1, 't', 'file', 'read', 'log', 'a')`,
+		`INSERT INTO actions (prompt_id, ts, resource, action, evidence, tool_use_id) VALUES (1, 't', 'command', 'execute', 'log', 'b')`,
+		`INSERT INTO actions (prompt_id, ts, resource, action, evidence, tool_use_id) VALUES (1, 't', 'subagent', 'start', 'log', 'c')`,
+		`INSERT INTO actions (prompt_id, ts, resource, action, evidence, tool_use_id) VALUES (1, 't', 'web', 'search', 'log', 'd')`,
+		`INSERT INTO actions (prompt_id, ts, resource, action, evidence, tool_use_id) VALUES (1, 't', 'web', 'fetch', 'log', 'e')`,
+	} {
+		if _, err := st.DB.Exec(q); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+	st.Close()
+
+	st, err = Open(ctx, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	want := map[int64]struct {
+		last    string
+		actions int
+	}{
+		1: {"2026-10-17T09:20:00Z", 3},
+		2: {"2026-10-17T10:07:00Z", 0},
+		3: {"2026-11-01T00:00:00Z", 0}, // placeholder, replaced below
+	}
+	for id, w := range want {
+		var last string
+		var n int
+		if err := st.DB.QueryRow(`SELECT last_activity_at, action_count FROM prompts WHERE id = ?`, id).Scan(&last, &n); err != nil {
+			t.Fatal(err)
+		}
+		if id == 3 {
+			w.last = "2026-10-17T11:00:00Z" // no records of its own: its own start
+		}
+		if last != w.last || n != w.actions {
+			t.Errorf("prompt %d: last_activity_at %q action_count %d, want %q and %d", id, last, n, w.last, w.actions)
+		}
+	}
+}
+
+func TestPromptActivityAndActionCountAreMaintained(t *testing.T) {
+	ctx := context.Background()
+	st := openTest(t)
+	tx, _ := st.Begin(ctx)
+	sid, _ := tx.UpsertSession(ctx, Session{Agent: "claude", AgentSessionID: "s"})
+	ts := func(s string) string { return "2026-10-17T" + s + ".000000000Z" }
+	raw := func(at string) {
+		t.Helper()
+		if _, err := tx.AppendRaw(ctx, RawRecord{SessionID: sid, TS: ts(at), SourceFile: "f", Type: "x", Record: "{}"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	prompt := func(at string) int64 {
+		t.Helper()
+		// like the ingester: the prompt's own record is appended first
+		raw(at)
+		id, err := tx.AddPrompt(ctx, sid, "p", ts(at))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	raw("08:55:00") // before any prompt: nobody's activity
+	p1 := prompt("09:00:00")
+	raw("09:05:00")
+	raw("09:20:00")
+	p2 := prompt("10:00:00") // the 10:00 record must not extend prompt 1
+	raw("10:07:00")
+	raw("10:03:00") // out of order: never moves the last activity back
+
+	for _, a := range []Action{
+		{PromptID: p1, Resource: "file", Action: "read", ToolUseID: "t1"},
+		{PromptID: p1, Resource: "command", Action: "execute", ToolUseID: "t2", Part: 0},
+		{PromptID: p1, Resource: "command", Action: "execute", ToolUseID: "t2", Part: 1},
+		{PromptID: p1, Resource: "command", Action: "execute", ToolUseID: "t2", Part: 1}, // duplicate: not counted
+		{PromptID: p1, Resource: "subagent", Action: "start", ToolUseID: "t3"},
+		{PromptID: p1, Resource: "web", Action: "search", ToolUseID: "t4"},
+		{PromptID: p1, Resource: "web", Action: "fetch", ToolUseID: "t5"},
+		{PromptID: 0, Resource: "file", Action: "read", ToolUseID: "t6"}, // no prompt: nothing to count
+		{PromptID: p2, Resource: "git", Action: "commit", ToolUseID: "t7"},
+	} {
+		a.SessionID, a.TS, a.Evidence = sid, ts("09:30:00"), "log"
+		if err := tx.AddAction(ctx, a); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, w := range []struct {
+		id      int64
+		last    string
+		actions int
+	}{
+		{p1, ts("09:20:00"), 4},
+		{p2, ts("10:07:00"), 1},
+	} {
+		var last string
+		var n int
+		if err := st.DB.QueryRow(`SELECT last_activity_at, action_count FROM prompts WHERE id = ?`, w.id).Scan(&last, &n); err != nil {
+			t.Fatal(err)
+		}
+		if last != w.last || n != w.actions {
+			t.Errorf("prompt %d: last_activity_at %q action_count %d, want %q and %d", w.id, last, n, w.last, w.actions)
+		}
+	}
+}
+
+func TestIsSystemAction(t *testing.T) {
+	for _, tc := range []struct {
+		res, act string
+		want     bool
+	}{
+		{"file", "update", true}, {"dir", "create", true}, {"command", "execute", true}, {"process", "kill", true},
+		{"network", "connect", true}, {"git", "push", true}, {"launch item", "add", true},
+		{"web", "fetch", true}, {"web", "search", false}, {"prompt", "request", false}, {"subagent", "start", false}, {"monitor", "gap", false},
+	} {
+		if got := IsSystemAction(tc.res, tc.act); got != tc.want {
+			t.Errorf("IsSystemAction(%q, %q) = %v", tc.res, tc.act, got)
+		}
+	}
+}
+
 func TestOpenBadDir(t *testing.T) {
 	if _, err := Open(context.Background(), "/proc/sentient-nope"); err == nil {
 		t.Error("want error creating data dir under /proc")

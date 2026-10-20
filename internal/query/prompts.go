@@ -92,7 +92,7 @@ func loadPrompts(ctx context.Context, db *sql.DB, where string, args []any, orde
 	rows := make([]PromptRow, 0, len(raws))
 	for _, x := range raws {
 		p := x.row
-		if err := finishPrompt(ctx, db, &p, x.session, x.start, x.end, now); err != nil {
+		if err := finishPrompt(ctx, db, &p, x.start, x.end, now); err != nil {
 			return nil, err
 		}
 		rows = append(rows, p)
@@ -100,38 +100,31 @@ func loadPrompts(ctx context.Context, db *sql.DB, where string, args []any, orde
 	return rows, nil
 }
 
-// finishPrompt fills in what a prompt row derives from other tables: its
-// start, duration, running state, action count and flags. now bounds the
-// activity window for a prompt that hasn't ended.
-func finishPrompt(ctx context.Context, db *sql.DB, p *PromptRow, session int64, start string, endAt sql.NullString, now time.Time) error {
+// openFlags counts a prompt's open alerts (alias p).
+const openFlags = `(SELECT COUNT(*) FROM alerts al JOIN actions a ON a.id = al.action_id WHERE a.prompt_id = p.id AND al.status = 'open')`
+
+// finishPrompt fills in what a prompt row shows beyond its text: its start,
+// duration, running state, action count and flags. The first three come
+// from columns the store keeps (prompts.last_activity_at, action_count), so
+// this is one primary-key lookup. now decides whether a prompt that hasn't
+// ended is still running.
+func finishPrompt(ctx context.Context, db *sql.DB, p *PromptRow, start string, endAt sql.NullString, now time.Time) error {
 	var err error
 	if p.Started, err = dbtime.Parse(start); err != nil {
 		return err
 	}
-	end := dbtime.Format(now)
-	if endAt.Valid {
-		end = endAt.String
-	}
 	var last sql.NullString
-	if err := db.QueryRowContext(ctx, `
-SELECT MAX(ts) FROM raw_log_records WHERE session_id = ? AND ts >= ? AND ts < ?`, session, start, end).Scan(&last); err != nil {
-		return fmt.Errorf("prompt activity: %w", err)
+	if err := db.QueryRowContext(ctx, `SELECT p.last_activity_at, p.action_count, `+openFlags+` FROM prompts p WHERE p.id = ?`, p.ID).
+		Scan(&last, &p.Actions, &p.Flags); err != nil {
+		return fmt.Errorf("prompt counts: %w", err)
 	}
 	if last.Valid {
 		lt, err := dbtime.Parse(last.String)
 		if err != nil {
 			return err
 		}
-		p.Duration = lt.Sub(p.Started)
+		p.Duration = max(lt.Sub(p.Started), 0)
 		p.Running = !endAt.Valid && now.Sub(lt) <= RunningWindow
-	}
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM actions a WHERE a.prompt_id = ? AND `+systemAction, p.ID).Scan(&p.Actions); err != nil {
-		return fmt.Errorf("prompt actions: %w", err)
-	}
-	if err := db.QueryRowContext(ctx, `
-SELECT COUNT(*) FROM alerts al JOIN actions a ON a.id = al.action_id
-WHERE a.prompt_id = ? AND al.status = 'open'`, p.ID).Scan(&p.Flags); err != nil {
-		return fmt.Errorf("prompt flags: %w", err)
 	}
 	return nil
 }

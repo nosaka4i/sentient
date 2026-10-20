@@ -7,15 +7,28 @@
             <td class="flags">{{if .Flags}}<span class="flag" title="{{.Flags}} attention item{{if ne .Flags 1}}s{{end}}">{{.Flags}}</span>{{end}}</td>
 {{- end}}
 
+{{/* The flat list adds the prompt's session between the prompt and the date. */}}
+{{define "flat-cells"}}
+            <td class="state">{{if .Running}}<span class="running-dot" role="img" aria-label="running" title="Still running"></span>{{end}}</td>
+            <td class="prompt"><a href="{{.Href}}" title="{{.Title}}">{{if .Pasted}}<span class="pasted">pasted {{.Pasted}} lines</span> {{end}}{{.Text}}</a></td>
+            <td class="sesscell"><a class="sid" href="{{.SessionHref}}" title="Open session {{.SessionShort}}">{{.SessionShort}}</a>{{template "agent-icon" .Agent}}{{if .Repo}}<span class="repo">{{.Repo}}</span>{{end}}</td>
+            <td class="date metaline"><time datetime="{{.ISO}}">{{.Date}}</time><span class="m-only"> · {{.SessionShort}}{{if .Repo}} · {{.Repo}}{{end}} · {{.Duration}} · {{.Actions}} actions{{if .Flags}} · <span class="flag">{{.Flags}} flag{{if ne .Flags 1}}s{{end}}</span>{{end}}{{if .Running}}<span class="running-label">running</span>{{end}}</span></td>
+            <td class="dur">{{.Duration}}</td>
+            <td class="acts"><span class="acts" title="{{.Actions}} actions{{if .Running}} so far{{end}}">{{.Actions}}</span></td>
+            <td class="flags">{{if .Flags}}<span class="flag" title="{{.Flags}} attention item{{if ne .Flags 1}}s{{end}}">{{.Flags}}</span>{{end}}</td>
+{{- end}}
+
+{{/* Column heads are links: click to sort, again to reverse. */}}
 {{define "prompts-head"}}
         <thead>
           <tr>
             <th><span class="visually-hidden" style="position:absolute;left:-9999px">State</span></th>
-            <th>Prompt</th>
-            <th>Date</th>
-            <th>Duration</th>
-            <th>Actions</th>
-            <th>Flags</th>
+{{- range .Heads}}
+{{- if and $.Flat (eq .Key "date")}}
+            <th>Session</th>
+{{- end}}
+            <th class="sortable" aria-sort="{{.Aria}}"><a class="sort" href="{{.Href}}">{{.Label}}</a></th>
+{{- end}}
           </tr>
         </thead>
 {{- end}}
@@ -25,7 +38,7 @@
 
   <div class="page-title">
     <h1>Prompts <span class="count">{{.Total}}</span></h1>
-    <p class="sub">All sessions by default, grouped by session. Pick a session to focus on it</p>
+    <p class="sub">Grouped by session, newest first. Pick a session to focus on it, or click a column to sort</p>
   </div>
 
   <section class="card" aria-label="All prompts">
@@ -58,6 +71,13 @@
 {{- end}}
         </select>
       </label>
+      <label class="sel sortsel"><span class="lt">Sort</span>
+        <select name="sort" aria-label="Sort by" data-autosubmit>
+{{- range .SortOptions}}
+          <option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>
+{{- end}}
+        </select>
+      </label>
       {{- if .Flagged}}
       <input type="hidden" name="flagged" value="1">
       {{- end}}
@@ -83,7 +103,7 @@
 {{- if .Rows}}
     <div class="table-scroll">
       <table class="prompts">
-{{- template "prompts-head"}}
+{{- template "prompts-head" .}}
         <tbody>
 {{- range .Rows}}
           <tr data-href="{{.Href}}">{{template "prompt-cells" .}}
@@ -95,11 +115,29 @@
 {{- else}}
     <div class="empty" style="display:block">No prompts in this session match these filters.</div>
 {{- end}}
+{{- else if .Flat}}
+
+    <div class="sortnote" style="display:block">Sorted by <b>{{.SortNote}}</b> across all sessions &middot; <a href="{{.ResetSort}}">back to grouped by session</a></div>
+{{- if .FlatRows}}
+    <div class="table-scroll">
+      <table class="prompts">
+{{- template "prompts-head" .}}
+        <tbody>
+{{- range .FlatRows}}
+          <tr data-href="{{.Href}}">{{template "flat-cells" .}}
+          </tr>
+{{- end}}
+        </tbody>
+      </table>
+    </div>
+{{- else}}
+    <div class="empty" style="display:block">No prompts match these filters.</div>
+{{- end}}
 {{- else if .Groups}}
 
     <div class="table-scroll">
       <table class="prompts">
-{{- template "prompts-head"}}
+{{- template "prompts-head" .}}
 {{- range .Groups}}
         <tbody>
           <tr class="day"><th colspan="6" scope="rowgroup"><a class="sid" href="{{.SessionHref}}" title="Open session {{.ID}}">{{.Short}}</a>{{template "agent-icon" .Agent}}{{if .Repo}}<span class="repo">{{.Repo}}</span>{{end}}<span class="dmeta">{{.Range}} · {{.CountText}}{{if .SeeAll}} · <a class="sid" href="{{.SeeAll}}">newest {{len .Rows}} shown, see all &rarr;</a>{{end}}</span></th></tr>

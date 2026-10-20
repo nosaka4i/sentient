@@ -33,6 +33,8 @@ message ListPromptsRequest {
   bool flagged = 4;  // only prompts with open alerts
   int32 limit = 5;   // 0 = server default (50), max 1000
   string session_id = 6; // only this session's prompts (the agent's session id)
+  string sort = 7;       // date (default), dur, acts, flags or prompt
+  bool ascending = 8;    // lowest/oldest/A-Z first; default is newest/highest first
 }
 
 message SessionSummary {
@@ -113,7 +115,9 @@ message SessionDetailResponse {
   bool running = 9;
   int64 actions = 10; // actions on the system, all prompts
   int64 flags = 11;
-  repeated Prompt prompts = 12;      // oldest first
+  repeated Prompt prompts = 12;      // the newest few, newest first
+  int64 total_prompts = 15;          // every prompt in the session
+  string first_prompt = 16;          // the text the session started with
   repeated ActivityRow activity = 13;
   repeated Subagent subagents = 14;
 }

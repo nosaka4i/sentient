@@ -48,7 +48,7 @@
   <section class="card" id="prompts" aria-labelledby="h-prompts">
     <div class="card-head">
       <h2 id="h-prompts">Prompts <span class="count">({{.Head.PromptCount}})</span></h2>
-      <span class="hint">oldest first</span>
+      <span class="hint">{{if .MoreHref}}newest {{len .Prompts}} of {{.Head.PromptCount}}{{else}}newest first{{end}}</span>
     </div>
 {{- if .Prompts}}
     <div class="table-scroll">
@@ -79,6 +79,13 @@
     </div>
 {{- else}}
     <div class="empty" style="display:block">No prompts recorded for this session.</div>
+{{- end}}
+{{- if .MoreHref}}
+
+    <div class="more-row">
+      <a class="chip" href="{{.MoreHref}}">See all {{.Head.PromptCount}} prompts &rarr;</a>
+      <span class="left">{{.Older}} older, with search and sorting</span>
+    </div>
 {{- end}}
   </section>
 {{- if .Subagents}}

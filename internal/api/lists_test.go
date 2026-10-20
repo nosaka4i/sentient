@@ -98,8 +98,29 @@ func TestListSessionGroupsRejectsBadLimits(t *testing.T) {
 
 func TestListPromptsRejectsBadLimit(t *testing.T) {
 	srv := NewServer(nil)
-	_, err := srv.ListPrompts(context.Background(), &sentientpb.ListPromptsRequest{Limit: query.MaxListLimit + 1})
-	if status.Code(err) != codes.InvalidArgument {
-		t.Errorf("err = %v, want InvalidArgument", err)
+	for _, req := range []*sentientpb.ListPromptsRequest{
+		{Limit: query.MaxListLimit + 1},
+		{Sort: "nope"},
+	} {
+		if _, err := srv.ListPrompts(context.Background(), req); status.Code(err) != codes.InvalidArgument {
+			t.Errorf("%+v: err = %v, want InvalidArgument", req, err)
+		}
+	}
+}
+
+func TestListPromptsSortOverTheWire(t *testing.T) {
+	sock := startServer(t)
+	c, err := Dial(sock, "test client")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	l, err := c.ListPrompts(context.Background(), query.PromptFilter{Sort: "dur", Asc: true})
+	if err != nil || l.Total != 1 {
+		t.Fatalf("sorted list = %+v, %v", l, err)
+	}
+	d, err := c.SessionDetail(context.Background(), "s")
+	if err != nil || d.TotalPrompts != 1 || d.FirstPrompt != "hi" {
+		t.Errorf("session total prompts = %+v, %v", d, err)
 	}
 }

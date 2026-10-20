@@ -11,6 +11,10 @@ import (
 	"github.com/nosaka4i/sentient/internal/dbtime"
 )
 
+// SessionPromptPreview is how many of a session's newest prompts its page
+// lists; the prompts page has the rest.
+const SessionPromptPreview = 5
+
 // SessionDetail is everything the session page shows.
 type SessionDetail struct {
 	HistoryBegins time.Time
@@ -24,7 +28,9 @@ type SessionDetail struct {
 	Running       bool
 	Actions       int64 // actions on the system, all prompts
 	Flags         int64
-	Prompts       []PromptRow // oldest first
+	TotalPrompts  int64
+	FirstPrompt   string      // the text the session started with
+	Prompts       []PromptRow // the newest SessionPromptPreview, newest first
 	// Activity holds exactly the rows of StatusRows, scoped to the session.
 	Activity  []ActivityRow
 	Subagents []Subagent
@@ -80,19 +86,32 @@ FROM sessions WHERE agent_session_id = ? ORDER BY id LIMIT 1`, agentSessionID).
 		}
 	}
 
-	if d.Prompts, err = loadPrompts(ctx, db, `p.session_id = ?`, []any{id}, `p.seq`, 0, now); err != nil {
+	// Totals cover the whole session; only the newest few prompts are loaded
+	// (the prompts page lists them all).
+	sum, err := GetSessionSummary(ctx, db, agentSessionID)
+	if err != nil {
 		return nil, err
 	}
-	number := map[int64]int64{}
-	for i, p := range d.Prompts {
-		number[p.ID] = int64(i + 1)
-		d.Actions += p.Actions
-		d.Flags += p.Flags
+	d.TotalPrompts, d.Actions, d.Flags = sum.Prompts, sum.Actions, sum.Flags
+	if err := db.QueryRowContext(ctx, `SELECT COALESCE((SELECT text FROM prompts WHERE session_id = ? ORDER BY seq LIMIT 1), '')`, id).Scan(&d.FirstPrompt); err != nil {
+		return nil, fmt.Errorf("first prompt: %w", err)
 	}
-	if n := len(d.Prompts); n > 0 {
-		d.Running = d.Prompts[n-1].Running
-		if d.Started.IsZero() {
-			d.Started = d.Prompts[0].Started
+	if d.Prompts, err = loadPrompts(ctx, db, `p.session_id = ?`, []any{id}, `p.seq DESC LIMIT ?`, SessionPromptPreview, now); err != nil {
+		return nil, err
+	}
+	if len(d.Prompts) > 0 {
+		d.Running = d.Prompts[0].Running
+	}
+	if d.Started.IsZero() {
+		d.Started = sum.Started
+	}
+	if d.Started.IsZero() && d.TotalPrompts > 0 {
+		var first string
+		if err := db.QueryRowContext(ctx, `SELECT MIN(started_at) FROM prompts WHERE session_id = ?`, id).Scan(&first); err != nil {
+			return nil, fmt.Errorf("session start: %w", err)
+		}
+		if d.Started, err = dbtime.Parse(first); err != nil {
+			return nil, err
 		}
 	}
 
@@ -101,7 +120,7 @@ FROM sessions WHERE agent_session_id = ? ORDER BY id LIMIT 1`, agentSessionID).
 		rows[r[0]+" "+r[1]] = &ActivityRow{Resource: r[0], Action: r[1]}
 	}
 	pr := rows["prompt request"]
-	pr.Count = int64(len(d.Prompts))
+	pr.Count = d.TotalPrompts
 	if d.Repo != "" && pr.Count > 0 {
 		pr.Repos, pr.Summary = 1, "1 repo"
 	}
@@ -113,8 +132,9 @@ FROM sessions WHERE agent_session_id = ? ORDER BY id LIMIT 1`, agentSessionID).
 	}
 
 	sr, err := db.QueryContext(ctx, `
-SELECT a.ts, COALESCE(a.path, ''), COALESCE(a.summary, ''), COALESCE(a.prompt_id, 0)
-FROM actions a WHERE a.session_id = ? AND a.resource = 'subagent' AND a.action = 'start' ORDER BY a.ts, a.id`, id)
+SELECT a.ts, COALESCE(a.path, ''), COALESCE(a.summary, ''), COALESCE(p.seq, 0)
+FROM actions a LEFT JOIN prompts p ON p.id = a.prompt_id
+WHERE a.session_id = ? AND a.resource = 'subagent' AND a.action = 'start' ORDER BY a.ts, a.id`, id)
 	if err != nil {
 		return nil, fmt.Errorf("subagents: %w", err)
 	}
@@ -122,14 +142,12 @@ FROM actions a WHERE a.session_id = ? AND a.resource = 'subagent' AND a.action =
 	for sr.Next() {
 		var ts string
 		var s Subagent
-		var promptID int64
-		if err := sr.Scan(&ts, &s.Kind, &s.Task, &promptID); err != nil {
+		if err := sr.Scan(&ts, &s.Kind, &s.Task, &s.PromptNumber); err != nil {
 			return nil, err
 		}
 		if s.At, err = dbtime.Parse(ts); err != nil {
 			return nil, err
 		}
-		s.PromptNumber = number[promptID]
 		d.Subagents = append(d.Subagents, s)
 	}
 	return d, sr.Err()

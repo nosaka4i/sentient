@@ -21,6 +21,50 @@ type PromptFilter struct {
 	Flagged   bool   // only prompts with open alerts
 	SessionID string // only this session's prompts (the agent's session id)
 	Limit     int    // 0 = DefaultListLimit, capped at MaxListLimit
+	// Sort is the column to order by: "date" (the default), "dur", "acts",
+	// "flags" or "prompt". Newest/highest first unless Asc.
+	Sort string
+	Asc  bool
+}
+
+// SortKeys are the columns the prompt list can be sorted by.
+var SortKeys = []string{"date", "dur", "acts", "flags", "prompt"}
+
+// ValidSort reports whether key names a sortable column ("" counts: date).
+func ValidSort(key string) bool {
+	if key == "" {
+		return true
+	}
+	for _, k := range SortKeys {
+		if k == key {
+			return true
+		}
+	}
+	return false
+}
+
+// order is the ORDER BY for the list (aliases p and s). Ties go to the
+// newest prompt, so the order is always total.
+func (f PromptFilter) order() string {
+	dir := "DESC"
+	if f.Asc {
+		dir = "ASC"
+	}
+	var key string
+	switch f.Sort {
+	case "prompt":
+		key = `lower(p.text)`
+	case "acts":
+		key = `p.action_count`
+	case "flags":
+		key = openFlags
+	case "dur":
+		// from the prompt's start to its last log record (stored by the ingester)
+		key = `(julianday(COALESCE(p.last_activity_at, p.started_at)) - julianday(p.started_at))`
+	default:
+		return "p.started_at " + dir + ", p.id " + dir
+	}
+	return key + " " + dir + ", p.started_at DESC, p.id DESC"
 }
 
 // DefaultListLimit and MaxListLimit bound how many prompts the list returns.
@@ -112,7 +156,7 @@ func ListPrompts(ctx context.Context, db *sql.DB, f PromptFilter, now time.Time)
 	if limit > MaxListLimit {
 		limit = MaxListLimit
 	}
-	if l.Prompts, err = loadPrompts(ctx, db, cond, args, `p.started_at DESC, p.id DESC LIMIT ?`, limit, now); err != nil {
+	if l.Prompts, err = loadPrompts(ctx, db, cond, args, f.order()+` LIMIT ?`, limit, now); err != nil {
 		return nil, err
 	}
 	if l.Agents, l.Repos, err = filterOptions(ctx, db); err != nil {

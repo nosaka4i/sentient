@@ -19,9 +19,12 @@ func (s *Server) ListPrompts(ctx context.Context, req *sentientpb.ListPromptsReq
 	if req.GetLimit() < 0 || req.GetLimit() > query.MaxListLimit {
 		return nil, status.Errorf(codes.InvalidArgument, "limit must be 0..%d", query.MaxListLimit)
 	}
+	if !query.ValidSort(req.GetSort()) {
+		return nil, status.Errorf(codes.InvalidArgument, "sort must be one of %v", query.SortKeys)
+	}
 	l, err := query.ListPrompts(ctx, s.db, query.PromptFilter{
 		Text: req.GetText(), Agent: req.GetAgent(), Repo: req.GetRepo(), Flagged: req.GetFlagged(),
-		SessionID: req.GetSessionId(), Limit: int(req.GetLimit()),
+		SessionID: req.GetSessionId(), Limit: int(req.GetLimit()), Sort: req.GetSort(), Asc: req.GetAscending(),
 	}, time.Now())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "list prompts: %v", err)
@@ -123,7 +126,7 @@ func (s *Server) SessionDetail(ctx context.Context, req *sentientpb.SessionDetai
 	}
 	r := &sentientpb.SessionDetailResponse{
 		SessionId: d.ID, Agent: d.Agent, AgentVersion: d.AgentVersion, Repo: d.Repo, Cwd: d.Cwd,
-		Running: d.Running, Actions: d.Actions, Flags: d.Flags,
+		Running: d.Running, Actions: d.Actions, Flags: d.Flags, TotalPrompts: d.TotalPrompts, FirstPrompt: d.FirstPrompt,
 	}
 	if !d.HistoryBegins.IsZero() {
 		r.HistoryBegins = timestamppb.New(d.HistoryBegins)
@@ -154,6 +157,7 @@ func (c *Client) ListPrompts(ctx context.Context, f query.PromptFilter) (*query.
 	defer cancel()
 	resp, err := c.c.ListPrompts(ctx, &sentientpb.ListPromptsRequest{
 		Text: f.Text, Agent: f.Agent, Repo: f.Repo, Flagged: f.Flagged, SessionId: f.SessionID, Limit: int32(f.Limit),
+		Sort: f.Sort, Ascending: f.Asc,
 	})
 	if err != nil {
 		return nil, c.callErr(err)
@@ -219,6 +223,7 @@ func (c *Client) SessionDetail(ctx context.Context, sessionID string) (*query.Se
 	d := &query.SessionDetail{
 		ID: resp.GetSessionId(), Agent: resp.GetAgent(), AgentVersion: resp.GetAgentVersion(), Repo: resp.GetRepo(),
 		Cwd: resp.GetCwd(), Running: resp.GetRunning(), Actions: resp.GetActions(), Flags: resp.GetFlags(),
+		TotalPrompts: resp.GetTotalPrompts(), FirstPrompt: resp.GetFirstPrompt(),
 	}
 	if resp.GetHistoryBegins() != nil {
 		d.HistoryBegins = resp.GetHistoryBegins().AsTime()

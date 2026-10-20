@@ -103,6 +103,20 @@ ALTER TABLE sessions ADD COLUMN agent_version TEXT;
 CREATE INDEX raw_log_records_unknown ON raw_log_records(unknown) WHERE unknown = 1;
 CREATE INDEX sessions_ended ON sessions(ended_at);
 `,
+	// 4: per-prompt values the lists sort and show, kept as columns instead
+	// of derived on every read: the time of the prompt's last log record
+	// (duration = this − started_at) and its count of actions on the system
+	// (the systemAction rule in internal/query). Maintained by AppendRaw,
+	// AddPrompt and AddAction; backfilled here.
+	`
+ALTER TABLE prompts ADD COLUMN last_activity_at TEXT;
+ALTER TABLE prompts ADD COLUMN action_count INTEGER NOT NULL DEFAULT 0;
+UPDATE prompts SET
+	last_activity_at = COALESCE((SELECT MAX(r.ts) FROM raw_log_records r
+		WHERE r.session_id = prompts.session_id AND r.ts >= prompts.started_at AND r.ts < COALESCE(prompts.ended_at, '9999')), prompts.started_at),
+	action_count = (SELECT COUNT(*) FROM actions a WHERE a.prompt_id = prompts.id
+		AND (a.resource IN ('file', 'dir', 'command', 'process', 'network', 'git', 'launch item') OR (a.resource = 'web' AND a.action = 'fetch')));
+`,
 }
 
 // SchemaVersion is the version the code expects.

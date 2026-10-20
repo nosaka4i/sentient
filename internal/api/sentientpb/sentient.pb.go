@@ -35,6 +35,8 @@ type ListPromptsRequest struct {
 	Flagged       bool                   `protobuf:"varint,4,opt,name=flagged,proto3" json:"flagged,omitempty"`                     // only prompts with open alerts
 	Limit         int32                  `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`                         // 0 = server default (50), max 1000
 	SessionId     string                 `protobuf:"bytes,6,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"` // only this session's prompts (the agent's session id)
+	Sort          string                 `protobuf:"bytes,7,opt,name=sort,proto3" json:"sort,omitempty"`                            // date (default), dur, acts, flags or prompt
+	Ascending     bool                   `protobuf:"varint,8,opt,name=ascending,proto3" json:"ascending,omitempty"`                 // lowest/oldest/A-Z first; default is newest/highest first
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -109,6 +111,20 @@ func (x *ListPromptsRequest) GetSessionId() string {
 		return x.SessionId
 	}
 	return ""
+}
+
+func (x *ListPromptsRequest) GetSort() string {
+	if x != nil {
+		return x.Sort
+	}
+	return ""
+}
+
+func (x *ListPromptsRequest) GetAscending() bool {
+	if x != nil {
+		return x.Ascending
+	}
+	return false
 }
 
 type SessionSummary struct {
@@ -741,7 +757,9 @@ type SessionDetailResponse struct {
 	Running       bool                   `protobuf:"varint,9,opt,name=running,proto3" json:"running,omitempty"`
 	Actions       int64                  `protobuf:"varint,10,opt,name=actions,proto3" json:"actions,omitempty"` // actions on the system, all prompts
 	Flags         int64                  `protobuf:"varint,11,opt,name=flags,proto3" json:"flags,omitempty"`
-	Prompts       []*Prompt              `protobuf:"bytes,12,rep,name=prompts,proto3" json:"prompts,omitempty"` // oldest first
+	Prompts       []*Prompt              `protobuf:"bytes,12,rep,name=prompts,proto3" json:"prompts,omitempty"`                                // the newest few, newest first
+	TotalPrompts  int64                  `protobuf:"varint,15,opt,name=total_prompts,json=totalPrompts,proto3" json:"total_prompts,omitempty"` // every prompt in the session
+	FirstPrompt   string                 `protobuf:"bytes,16,opt,name=first_prompt,json=firstPrompt,proto3" json:"first_prompt,omitempty"`     // the text the session started with
 	Activity      []*ActivityRow         `protobuf:"bytes,13,rep,name=activity,proto3" json:"activity,omitempty"`
 	Subagents     []*Subagent            `protobuf:"bytes,14,rep,name=subagents,proto3" json:"subagents,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -860,6 +878,20 @@ func (x *SessionDetailResponse) GetPrompts() []*Prompt {
 		return x.Prompts
 	}
 	return nil
+}
+
+func (x *SessionDetailResponse) GetTotalPrompts() int64 {
+	if x != nil {
+		return x.TotalPrompts
+	}
+	return 0
+}
+
+func (x *SessionDetailResponse) GetFirstPrompt() string {
+	if x != nil {
+		return x.FirstPrompt
+	}
+	return ""
 }
 
 func (x *SessionDetailResponse) GetActivity() []*ActivityRow {
@@ -2541,7 +2573,7 @@ var File_sentient_proto protoreflect.FileDescriptor
 
 const file_sentient_proto_rawDesc = "" +
 	"\n" +
-	"\x0esentient.proto\x12\vsentient.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa1\x01\n" +
+	"\x0esentient.proto\x12\vsentient.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd3\x01\n" +
 	"\x12ListPromptsRequest\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\x12\x14\n" +
 	"\x05agent\x18\x02 \x01(\tR\x05agent\x12\x12\n" +
@@ -2549,7 +2581,9 @@ const file_sentient_proto_rawDesc = "" +
 	"\aflagged\x18\x04 \x01(\bR\aflagged\x12\x14\n" +
 	"\x05limit\x18\x05 \x01(\x05R\x05limit\x12\x1d\n" +
 	"\n" +
-	"session_id\x18\x06 \x01(\tR\tsessionId\"\x9a\x02\n" +
+	"session_id\x18\x06 \x01(\tR\tsessionId\x12\x12\n" +
+	"\x04sort\x18\a \x01(\tR\x04sort\x12\x1c\n" +
+	"\tascending\x18\b \x01(\bR\tascending\"\x9a\x02\n" +
 	"\x0eSessionSummary\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x14\n" +
@@ -2602,7 +2636,7 @@ const file_sentient_proto_rawDesc = "" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x12\n" +
 	"\x04task\x18\x02 \x01(\tR\x04task\x12*\n" +
 	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12#\n" +
-	"\rprompt_number\x18\x04 \x01(\x03R\fpromptNumber\"\xb5\x04\n" +
+	"\rprompt_number\x18\x04 \x01(\x03R\fpromptNumber\"\xfd\x04\n" +
 	"\x15SessionDetailResponse\x12A\n" +
 	"\x0ehistory_begins\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\rhistoryBegins\x12\x1d\n" +
 	"\n" +
@@ -2617,7 +2651,9 @@ const file_sentient_proto_rawDesc = "" +
 	"\aactions\x18\n" +
 	" \x01(\x03R\aactions\x12\x14\n" +
 	"\x05flags\x18\v \x01(\x03R\x05flags\x12-\n" +
-	"\aprompts\x18\f \x03(\v2\x13.sentient.v1.PromptR\aprompts\x124\n" +
+	"\aprompts\x18\f \x03(\v2\x13.sentient.v1.PromptR\aprompts\x12#\n" +
+	"\rtotal_prompts\x18\x0f \x01(\x03R\ftotalPrompts\x12!\n" +
+	"\ffirst_prompt\x18\x10 \x01(\tR\vfirstPrompt\x124\n" +
 	"\bactivity\x18\r \x03(\v2\x18.sentient.v1.ActivityRowR\bactivity\x123\n" +
 	"\tsubagents\x18\x0e \x03(\v2\x15.sentient.v1.SubagentR\tsubagents\"%\n" +
 	"\x13PromptDetailRequest\x12\x0e\n" +

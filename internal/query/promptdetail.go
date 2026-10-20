@@ -114,7 +114,7 @@ FROM prompts p JOIN sessions s ON s.id = p.session_id WHERE p.id = ?`, id).
 		p.Repo = filepath.Base(dir)
 	}
 	d.RepoRoot = repoRoot
-	if err := finishPrompt(ctx, db, p, session, start, endAt, now); err != nil {
+	if err := finishPrompt(ctx, db, p, start, endAt, now); err != nil {
 		return nil, err
 	}
 

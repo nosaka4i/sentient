@@ -98,21 +98,36 @@ VALUES (NULLIF(?, 0), NULLIF(?, ''), ?, ?, ?, ?, ?, ?)`,
 	if err != nil {
 		return 0, fmt.Errorf("append raw record: %w", err)
 	}
+	// The record is activity of the session's latest prompt that had started.
+	if r.SessionID != 0 && r.TS != "" {
+		if _, err := t.tx.ExecContext(ctx, `
+UPDATE prompts SET last_activity_at = ?
+WHERE session_id = ? AND seq = (SELECT MAX(seq) FROM prompts WHERE session_id = ? AND started_at <= ?)
+  AND (last_activity_at IS NULL OR last_activity_at < ?)`,
+			r.TS, r.SessionID, r.SessionID, r.TS, r.TS); err != nil {
+			return 0, fmt.Errorf("record prompt activity: %w", err)
+		}
+	}
 	return res.LastInsertId()
 }
 
 // AddPrompt records a user prompt as the next in its session.
 func (t *Tx) AddPrompt(ctx context.Context, sessionID int64, text, ts string) (int64, error) {
-	// The previous prompt ends when the next one starts.
+	// The previous prompt ends when the next one starts. Its last activity is
+	// the last record before that: records are appended before the prompt
+	// they open exists, so AppendRaw may have credited this one too early.
 	if _, err := t.tx.ExecContext(ctx, `
-UPDATE prompts SET ended_at = ? WHERE session_id = ? AND seq = (SELECT MAX(seq) FROM prompts WHERE session_id = ?)`,
-		ts, sessionID, sessionID); err != nil {
+UPDATE prompts SET ended_at = ?,
+	last_activity_at = COALESCE((SELECT MAX(r.ts) FROM raw_log_records r
+		WHERE r.session_id = prompts.session_id AND r.ts >= prompts.started_at AND r.ts < ?), prompts.started_at)
+WHERE session_id = ? AND seq = (SELECT MAX(seq) FROM prompts WHERE session_id = ?)`,
+		ts, ts, sessionID, sessionID); err != nil {
 		return 0, err
 	}
 	res, err := t.tx.ExecContext(ctx, `
-INSERT INTO prompts (session_id, seq, text, started_at)
-VALUES (?, COALESCE((SELECT MAX(seq) FROM prompts WHERE session_id = ?), 0) + 1, ?, ?)`,
-		sessionID, sessionID, text, ts)
+INSERT INTO prompts (session_id, seq, text, started_at, last_activity_at)
+VALUES (?, COALESCE((SELECT MAX(seq) FROM prompts WHERE session_id = ?), 0) + 1, ?, ?, ?)`,
+		sessionID, sessionID, text, ts, ts)
 	if err != nil {
 		return 0, fmt.Errorf("add prompt: %w", err)
 	}
@@ -149,7 +164,7 @@ type Action struct {
 // AddAction inserts an action. An action whose (tool_use_id, part) already
 // exists is ignored (Claude Code may write the same tool call twice).
 func (t *Tx) AddAction(ctx context.Context, a Action) error {
-	_, err := t.tx.ExecContext(ctx, `
+	res, err := t.tx.ExecContext(ctx, `
 INSERT INTO actions (session_id, prompt_id, ts, resource, action, path, summary, evidence, raw_record_id, tool_use_id, part)
 VALUES (NULLIF(?, 0), NULLIF(?, 0), ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, NULLIF(?, 0), NULLIF(?, ''), ?)
 ON CONFLICT DO NOTHING`,
@@ -157,7 +172,27 @@ ON CONFLICT DO NOTHING`,
 	if err != nil {
 		return fmt.Errorf("add action: %w", err)
 	}
+	if n, _ := res.RowsAffected(); n == 1 && a.PromptID != 0 && IsSystemAction(a.Resource, a.Action) {
+		if _, err := t.tx.ExecContext(ctx, `UPDATE prompts SET action_count = action_count + 1 WHERE id = ?`, a.PromptID); err != nil {
+			return fmt.Errorf("count action: %w", err)
+		}
+	}
 	return nil
+}
+
+// IsSystemAction reports whether an action acts on this machine, which is
+// what a prompt's ACTIONS count (docs/design.md "Counting commands"): file,
+// dir, command, process, network, git, web fetch and launch item. The
+// prompt itself, subagent starts and server-side web searches are not.
+// Keep in step with query's systemAction SQL.
+func IsSystemAction(resource, action string) bool {
+	switch resource {
+	case "file", "dir", "command", "process", "network", "git", "launch item":
+		return true
+	case "web":
+		return action == "fetch"
+	}
+	return false
 }
 
 // ToolResult is what a tool call's result tells us about its action.

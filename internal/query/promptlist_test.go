@@ -204,6 +204,135 @@ func TestListSessionGroups(t *testing.T) {
 	}
 }
 
+func TestSessionDetailLoadsOnlyTheNewestPrompts(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	tx, _ := st.Begin(ctx)
+	sid, _ := tx.UpsertSession(ctx, store.Session{Agent: "claude", AgentSessionID: "long", Cwd: "/w/r"})
+	n := SessionPromptPreview + 3
+	for i := 1; i <= n; i++ {
+		ts := time.Date(2026, 10, 17, 9, i, 0, 0, time.UTC).Format("2006-01-02T15:04:05.000000000Z")
+		pid, _ := tx.AddPrompt(ctx, sid, "p", ts)
+		tx.AddAction(ctx, store.Action{SessionID: sid, PromptID: pid, TS: ts, Resource: "file", Action: "read", Path: "/w/r/a", Evidence: "log", ToolUseID: "t" + ts})
+		if i == n {
+			tx.AddAction(ctx, store.Action{SessionID: sid, PromptID: pid, TS: ts, Resource: "subagent", Action: "start", Path: "Explore", Summary: "look", Evidence: "log", ToolUseID: "sub"})
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	d, err := GetSessionDetail(ctx, st.DB, "long", time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Prompts) != SessionPromptPreview || d.TotalPrompts != int64(n) || d.Actions != int64(n) {
+		t.Errorf("loaded %d of %d prompts, %d actions", len(d.Prompts), d.TotalPrompts, d.Actions)
+	}
+	if d.Prompts[0].Started.Minute() != n || d.Prompts[SessionPromptPreview-1].Started.Minute() != n-SessionPromptPreview+1 {
+		t.Errorf("not the newest prompts, newest first: %v … %v", d.Prompts[0].Started, d.Prompts[len(d.Prompts)-1].Started)
+	}
+	if d.Activity[0].Count != int64(n) {
+		t.Errorf("prompt tile counts %d, want the session's %d", d.Activity[0].Count, n)
+	}
+	if len(d.Subagents) != 1 || d.Subagents[0].PromptNumber != int64(n) {
+		t.Errorf("subagent = %+v, want prompt number %d", d.Subagents, n)
+	}
+}
+
+func TestListPromptsSort(t *testing.T) {
+	ctx := context.Background()
+	st, ids := seedPrompts(t)
+	now := time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
+	// seedPrompts: p1 09:00 (flagged, 1 action, 0m), p2 10:00 (1 action, 20m), p3 11:00, p4 11:30
+	order := func(f PromptFilter) []int64 {
+		t.Helper()
+		l, err := ListPrompts(ctx, st.DB, f, now)
+		if err != nil {
+			t.Fatalf("%+v: %v", f, err)
+		}
+		var out []int64
+		for _, p := range l.Prompts {
+			out = append(out, p.ID)
+		}
+		return out
+	}
+	same := func(got, want []int64) bool {
+		if len(got) != len(want) {
+			return false
+		}
+		for i := range got {
+			if got[i] != want[i] {
+				return false
+			}
+		}
+		return true
+	}
+	for _, tc := range []struct {
+		name string
+		f    PromptFilter
+		want []int64
+	}{
+		{"default is newest first", PromptFilter{}, []int64{ids["p4"], ids["p3"], ids["p2"], ids["p1"]}},
+		{"date, oldest first", PromptFilter{Sort: "date", Asc: true}, []int64{ids["p1"], ids["p2"], ids["p3"], ids["p4"]}},
+		// p2 ran 20 minutes, the others are quiet: longest first, ties newest first
+		{"duration", PromptFilter{Sort: "dur"}, []int64{ids["p2"], ids["p4"], ids["p3"], ids["p1"]}},
+		{"shortest", PromptFilter{Sort: "dur", Asc: true}, []int64{ids["p4"], ids["p3"], ids["p1"], ids["p2"]}},
+		// p1 and p2 each have one action
+		{"actions", PromptFilter{Sort: "acts"}, []int64{ids["p2"], ids["p1"], ids["p4"], ids["p3"]}},
+		{"flags", PromptFilter{Sort: "flags"}, []int64{ids["p1"], ids["p4"], ids["p3"], ids["p2"]}},
+		// "100% done_ish?" < "add a --json flag" < "Fix the Snooze crash" < "run the tests"
+		{"prompt A to Z", PromptFilter{Sort: "prompt", Asc: true}, []int64{ids["p4"], ids["p3"], ids["p1"], ids["p2"]}},
+		{"sorted within a session", PromptFilter{Sort: "dur", SessionID: "404dabcd"}, []int64{ids["p2"], ids["p1"]}},
+	} {
+		if got := order(tc.f); !same(got, tc.want) {
+			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
+	}
+	if !ValidSort("") || !ValidSort("dur") || ValidSort("nope") {
+		t.Error("ValidSort")
+	}
+}
+
+// The store counts a prompt's system actions as it ingests (IsSystemAction);
+// the queries describe the same rule in SQL (systemAction). They must agree.
+func TestStoredActionCountMatchesTheSQLRule(t *testing.T) {
+	ctx := context.Background()
+	st, ids := seedPrompts(t)
+	tx, _ := st.Begin(ctx)
+	sid := ids["s1"]
+	for i, ra := range [][2]string{
+		{"file", "update"}, {"file", "delete"}, {"dir", "create"}, {"command", "execute"}, {"process", "kill"},
+		{"network", "connect"}, {"git", "force-push"}, {"launch item", "add"}, {"web", "fetch"}, {"web", "search"},
+		{"subagent", "start"}, {"prompt", "request"}, {"monitor", "gap"},
+	} {
+		if err := tx.AddAction(ctx, store.Action{SessionID: sid, PromptID: ids["p1"], TS: "2026-10-17T09:30:00.000000000Z",
+			Resource: ra[0], Action: ra[1], Evidence: "log", ToolUseID: "rule" + string(rune('a'+i))}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := st.DB.Query(`SELECT p.id, p.action_count, (SELECT COUNT(*) FROM actions a WHERE a.prompt_id = p.id AND ` + systemAction + `) FROM prompts p`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, stored, derived int64
+		if err := rows.Scan(&id, &stored, &derived); err != nil {
+			t.Fatal(err)
+		}
+		if stored != derived {
+			t.Errorf("prompt %d: stored action_count %d, SQL rule counts %d", id, stored, derived)
+		}
+	}
+}
+
 func TestSessionMenuIsCapped(t *testing.T) {
 	ctx := context.Background()
 	st, err := store.Open(ctx, t.TempDir())
@@ -242,8 +371,11 @@ func TestGetSessionDetail(t *testing.T) {
 	if d.Agent != "claude" || d.Repo != "nosaka" || d.Cwd != "/w/nosaka/ios" || d.AgentVersion != "2.1.3" || d.ID != "404dabcd" {
 		t.Errorf("session = %+v", d)
 	}
-	if len(d.Prompts) != 2 || d.Prompts[0].ID != ids["p1"] || d.Prompts[1].ID != ids["p2"] {
-		t.Fatalf("prompts (oldest first) = %+v", d.Prompts)
+	if len(d.Prompts) != 2 || d.TotalPrompts != 2 || d.Prompts[0].ID != ids["p2"] || d.Prompts[1].ID != ids["p1"] {
+		t.Fatalf("prompts (newest first) = %+v, total %d", d.Prompts, d.TotalPrompts)
+	}
+	if d.FirstPrompt != "Fix the Snooze crash" {
+		t.Errorf("FirstPrompt = %q", d.FirstPrompt)
 	}
 	if d.Actions != 2 || d.Flags != 1 || d.Running {
 		t.Errorf("actions %d flags %d running %v", d.Actions, d.Flags, d.Running)
