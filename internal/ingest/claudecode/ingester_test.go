@@ -72,9 +72,12 @@ func TestIngestFixture(t *testing.T) {
 	if n := count(t, st, `SELECT COUNT(*) FROM sessions`); n != 1 {
 		t.Errorf("sessions = %d, want 1 (subagent folds into parent)", n)
 	}
-	var cwd, started, ended string
-	if err := st.DB.QueryRow(`SELECT cwd, started_at, ended_at FROM sessions`).Scan(&cwd, &started, &ended); err != nil {
+	var cwd, started, ended, ver string
+	if err := st.DB.QueryRow(`SELECT cwd, started_at, ended_at, agent_version FROM sessions`).Scan(&cwd, &started, &ended, &ver); err != nil {
 		t.Fatal(err)
+	}
+	if ver != "2.0.5" {
+		t.Errorf("agent_version = %q, want the newest seen (2.0.5)", ver)
 	}
 	if cwd != "/home/dev/proj" || started != "2026-10-17T09:00:00.000000000Z" || ended != "2026-10-17T09:31:00.000000000Z" {
 		t.Errorf("session = %q %q %q", cwd, started, ended)

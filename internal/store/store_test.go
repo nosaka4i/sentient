@@ -84,7 +84,7 @@ func TestUpgradeFromVersion1(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer st.Close()
-	if v, _ := st.Version(ctx); v != 2 {
+	if v, _ := st.Version(ctx); v != SchemaVersion() {
 		t.Fatalf("version after upgrade = %d", v)
 	}
 	var part int
@@ -216,6 +216,46 @@ func TestWritesAndChain(t *testing.T) {
 	}
 	if bad, _ := st.VerifyChain(ctx); bad != rawIDs[1] {
 		t.Errorf("VerifyChain after edit = %d, want %d", bad, rawIDs[1])
+	}
+}
+
+func TestVerifyChainIncremental(t *testing.T) {
+	ctx := context.Background()
+	st := openTest(t)
+	appendN := func(n int) {
+		tx, _ := st.Begin(ctx)
+		for i := 0; i < n; i++ {
+			if _, err := tx.AppendRaw(ctx, RawRecord{SourceFile: "f", Type: "user", Record: `{"i":1}`}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := tx.Commit(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	appendN(3)
+	full, err := st.VerifyChainFrom(ctx, ChainPoint{})
+	if err != nil || full.Checked != 3 || full.BadID != 0 || full.Last.ID != 3 {
+		t.Fatalf("full = %+v, %v", full, err)
+	}
+	appendN(2)
+	inc, err := st.VerifyChainFrom(ctx, full.Last)
+	if err != nil || inc.Checked != 2 || inc.BadID != 0 || inc.Last.ID != 5 {
+		t.Fatalf("incremental = %+v, %v", inc, err)
+	}
+	// Nothing new: nothing checked, position kept.
+	if again, _ := st.VerifyChainFrom(ctx, inc.Last); again.Checked != 0 || again.Last != inc.Last {
+		t.Errorf("no-op = %+v", again)
+	}
+	// A record whose prev_hash doesn't continue the chain is caught.
+	appendN(1)
+	st.DB.Exec(`UPDATE raw_log_records SET prev_hash = 'x' WHERE id = 6`)
+	if bad, _ := st.VerifyChainFrom(ctx, inc.Last); bad.BadID != 6 {
+		t.Errorf("tampered = %+v", bad)
+	}
+	st.Close()
+	if _, err := st.VerifyChainFrom(ctx, ChainPoint{}); err == nil {
+		t.Error("want error on closed db")
 	}
 }
 

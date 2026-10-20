@@ -32,6 +32,9 @@ func TestRecentPrompts(t *testing.T) {
 		tx.AddAction(ctx, store.Action{SessionID: s1, PromptID: p1, TS: ts("09:01:00"), Resource: "command", Action: "execute", Path: path, Evidence: "log", ToolUseID: "t1", Part: i})
 	}
 	tx.AddAction(ctx, store.Action{SessionID: s2, PromptID: p3, TS: ts("11:51:00"), Resource: "file", Action: "read", Path: "/a", Evidence: "log", ToolUseID: "t2"})
+	// Not actions on the system: not in ACTIONS.
+	tx.AddAction(ctx, store.Action{SessionID: s2, PromptID: p3, TS: ts("11:52:00"), Resource: "subagent", Action: "start", Evidence: "log", ToolUseID: "t4"})
+	tx.AddAction(ctx, store.Action{SessionID: s2, PromptID: p3, TS: ts("11:52:00"), Resource: "web", Action: "search", Evidence: "log", ToolUseID: "t5"})
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}

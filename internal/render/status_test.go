@@ -45,7 +45,7 @@ func row(res, act string, n int64, summary string) query.ActivityRow {
 
 // The terminal layout, aligned with three spaces between columns as in
 // docs/mocks/cli/status.md.
-const wantTTY = `Monitored from Oct 6 09:12 (1 day 6h ago)
+const wantTTY = `Monitored from Oct 6 09:12 (1d 6h ago)
 
 NEEDS ATTENTION (4) (sample data)
 #    DATE          AGENT    REPO     SEVERITY   RESOURCE   ACTION   PATH
@@ -155,10 +155,10 @@ func TestAgo(t *testing.T) {
 		12 * time.Minute:              "12m ago",
 		3 * time.Hour:                 "3h ago",
 		6*time.Hour + 12*time.Minute:  "6h 12m ago",
-		30 * time.Hour:                "1 day 6h ago",
-		48 * time.Hour:                "2 days ago",
-		3*24*time.Hour + 2*time.Hour:  "3 days 2h ago",
-		24*time.Hour + 59*time.Minute: "1 day ago",
+		30 * time.Hour:                "1d 6h ago",
+		48 * time.Hour:                "2d ago",
+		3*24*time.Hour + 2*time.Hour:  "3d 2h ago",
+		24*time.Hour + 59*time.Minute: "1d ago",
 	}
 	for d, want := range cases {
 		if got := Ago(now.Add(-d), now); got != want {

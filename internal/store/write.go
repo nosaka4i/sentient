@@ -34,6 +34,7 @@ type Session struct {
 	Cwd            string
 	RepoRoot       string
 	TS             string // record timestamp, may be empty
+	AgentVersion   string // agent version in the record, may be empty
 }
 
 // UpsertSession returns the session's id, creating it on first sight and
@@ -45,16 +46,17 @@ func (t *Tx) UpsertSession(ctx context.Context, s Session) (int64, error) {
 		ts = s.TS
 	}
 	_, err := t.tx.ExecContext(ctx, `
-INSERT INTO sessions (agent, agent_session_id, repo_root, cwd, started_at, ended_at)
-VALUES (?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?)
+INSERT INTO sessions (agent, agent_session_id, repo_root, cwd, started_at, ended_at, agent_version)
+VALUES (?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?, NULLIF(?, ''))
 ON CONFLICT (agent, agent_session_id) DO UPDATE SET
+	agent_version = COALESCE(excluded.agent_version, sessions.agent_version),
 	cwd        = COALESCE(sessions.cwd, excluded.cwd),
 	repo_root  = COALESCE(sessions.repo_root, excluded.repo_root),
 	started_at = CASE WHEN sessions.started_at IS NULL OR excluded.started_at < sessions.started_at
 	                  THEN COALESCE(excluded.started_at, sessions.started_at) ELSE sessions.started_at END,
 	ended_at   = CASE WHEN sessions.ended_at IS NULL OR excluded.ended_at > sessions.ended_at
 	                  THEN COALESCE(excluded.ended_at, sessions.ended_at) ELSE sessions.ended_at END`,
-		s.Agent, s.AgentSessionID, s.RepoRoot, s.Cwd, ts, ts)
+		s.Agent, s.AgentSessionID, s.RepoRoot, s.Cwd, ts, ts, s.AgentVersion)
 	if err != nil {
 		return 0, fmt.Errorf("upsert session: %w", err)
 	}
@@ -209,25 +211,50 @@ ON CONFLICT (path) DO UPDATE SET offset = excluded.offset`, path, off)
 // VerifyChain walks raw_log_records in order and returns the id of the
 // first record whose hash doesn't match (0 if the chain is intact).
 func (s *Store) VerifyChain(ctx context.Context) (int64, error) {
+	r, err := s.VerifyChainFrom(ctx, ChainPoint{})
+	return r.BadID, err
+}
+
+// ChainPoint is a verified position in the chain: the last record checked
+// and its hash. The zero value is the start of the chain.
+type ChainPoint struct {
+	ID   int64
+	Hash string
+}
+
+// ChainResult is the outcome of a chain check.
+type ChainResult struct {
+	Last    ChainPoint // where the check ended (resume from here next time)
+	Checked int64      // records checked
+	BadID   int64      // first mismatching record (0 = intact)
+}
+
+// VerifyChainFrom checks the records after `from`, given that `from` was
+// already verified. Starting from the zero point checks everything;
+// resuming from the last result checks only what was appended since,
+// which is cheap.
+func (s *Store) VerifyChainFrom(ctx context.Context, from ChainPoint) (ChainResult, error) {
+	res := ChainResult{Last: from}
 	rows, err := s.DB.QueryContext(ctx, `
-SELECT id, COALESCE(ts, ''), source_file, record, prev_hash, hash FROM raw_log_records ORDER BY id`)
+SELECT id, COALESCE(ts, ''), source_file, record, prev_hash, hash FROM raw_log_records WHERE id > ? ORDER BY id`, from.ID)
 	if err != nil {
-		return 0, err
+		return res, err
 	}
 	defer rows.Close()
-	prev := ""
 	for rows.Next() {
 		var id int64
 		var ts, src, rec, ph, h string
 		if err := rows.Scan(&id, &ts, &src, &rec, &ph, &h); err != nil {
-			return 0, err
+			return res, err
 		}
-		if ph != prev || ChainHash(prev, ts, src, rec) != h {
-			return id, nil
+		res.Checked++
+		if ph != res.Last.Hash || ChainHash(res.Last.Hash, ts, src, rec) != h {
+			res.BadID = id
+			return res, nil
 		}
-		prev = h
+		res.Last = ChainPoint{ID: id, Hash: h}
 	}
-	return 0, rows.Err()
+	return res, rows.Err()
 }
 
 func boolInt(b bool) int {

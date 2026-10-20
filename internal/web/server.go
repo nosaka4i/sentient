@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/nosaka4i/sentient/internal/api"
+	"github.com/nosaka4i/sentient/internal/health"
 	"github.com/nosaka4i/sentient/internal/query"
 	"github.com/nosaka4i/sentient/internal/render"
 	"github.com/nosaka4i/sentient/internal/version"
@@ -27,14 +28,15 @@ import (
 // over SSE land).
 const RefreshSeconds = 30
 
-// StatusSource is what the dashboard needs from sentientd (api.Client).
-type StatusSource interface {
+// Source is what the pages need from sentientd (api.Client).
+type Source interface {
 	Status(ctx context.Context, from, to time.Time) (*query.Status, string, error)
+	Health(ctx context.Context) (*health.Report, error)
 }
 
 // Server is the web UI.
 type Server struct {
-	src    StatusSource
+	src    Source
 	socket string // shown when sentientd is unreachable
 	now    func() time.Time
 	log    *slog.Logger
@@ -43,12 +45,12 @@ type Server struct {
 }
 
 // New returns a Server reading from src. socket is only used in messages.
-func New(src StatusSource, socket string, log *slog.Logger) (*Server, error) {
+func New(src Source, socket string, log *slog.Logger) (*Server, error) {
 	if log == nil {
 		log = slog.Default()
 	}
 	s := &Server{src: src, socket: socket, now: time.Now, log: log, pages: map[string]*template.Template{}}
-	for _, page := range []string{"dashboard", "down"} {
+	for _, page := range []string{"dashboard", "health", "down"} {
 		t, err := template.ParseFS(assets.FS, "templates/layout.html", "templates/"+page+".html")
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", page, err)
@@ -67,6 +69,7 @@ func New(src StatusSource, socket string, log *slog.Logger) (*Server, error) {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.dashboard)
+	mux.HandleFunc("GET /health", s.health)
 	mux.Handle("GET /static/", s.static)
 	return localOnly(mux)
 }
@@ -99,6 +102,8 @@ type page struct {
 	Refresh int
 	Live    bool
 	Since   *since
+	Nav     string // current header link ("health")
+	Sub     bool   // a sub-page (back link, tighter top spacing)
 }
 
 type since struct{ ISO, Date, Ago string }

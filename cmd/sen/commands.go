@@ -76,7 +76,7 @@ func newStatusCmd() *cobra.Command {
 }
 
 func runStatus(cmd *cobra.Command, socket string) error {
-	c, err := api.Dial(socket)
+	c, err := api.Dial(socket, "sen status")
 	if err != nil {
 		return err
 	}

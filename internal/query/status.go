@@ -98,16 +98,9 @@ func summaryRow(res, act string) string {
 // promptLimit prompts (DefaultPromptLimit if <= 0).
 func GetStatus(ctx context.Context, db *sql.DB, from, to time.Time, promptLimit int) (*Status, error) {
 	st := &Status{}
-	var begins sql.NullString
-	if err := db.QueryRowContext(ctx, `SELECT MIN(ts) FROM raw_log_records WHERE ts IS NOT NULL`).Scan(&begins); err != nil {
-		return nil, fmt.Errorf("history begins: %w", err)
-	}
-	if begins.Valid {
-		t, err := dbtime.Parse(begins.String)
-		if err != nil {
-			return nil, fmt.Errorf("history begins: %w", err)
-		}
-		st.HistoryBegins = t
+	var err error
+	if st.HistoryBegins, err = HistoryBegins(ctx, db); err != nil {
+		return nil, err
 	}
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM raw_log_records WHERE unknown = 1`).Scan(&st.UnknownRecords); err != nil {
 		return nil, fmt.Errorf("unknown records: %w", err)
@@ -130,7 +123,6 @@ func GetStatus(ctx context.Context, db *sql.DB, from, to time.Time, promptLimit 
 	if promptLimit <= 0 {
 		promptLimit = DefaultPromptLimit
 	}
-	var err error
 	if st.PromptsTotal, st.Prompts, err = RecentPrompts(ctx, db, from, to, promptLimit); err != nil {
 		return nil, err
 	}
@@ -230,12 +222,13 @@ WHERE a.ts >= ? AND a.ts < ?`, from, to)
 }
 
 // PromptActionCounts returns, for each prompt started in [from, to), the
-// number of actions linked to it: commands (one per simple command) plus
-// file, web, subagent… actions. This is the ACTIONS column of PROMPTS.
+// number of actions on the system linked to it (see systemAction):
+// commands (one per simple command) plus file, network, git, web fetch…
+// actions. This is the ACTIONS column of PROMPTS.
 // Prompts with no actions are present with 0.
 func PromptActionCounts(ctx context.Context, db *sql.DB, from, to time.Time) (map[int64]int64, error) {
 	r, err := db.QueryContext(ctx, `
-SELECT p.id, COUNT(a.id) FROM prompts p LEFT JOIN actions a ON a.prompt_id = p.id
+SELECT p.id, COUNT(a.id) FROM prompts p LEFT JOIN actions a ON a.prompt_id = p.id AND `+systemAction+`
 WHERE p.started_at >= ? AND p.started_at < ?
 GROUP BY p.id`, dbtime.Format(from), dbtime.Format(to))
 	if err != nil {

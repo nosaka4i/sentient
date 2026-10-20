@@ -42,7 +42,7 @@ func TestRunIngestsAndServes(t *testing.T) {
 		t.Fatalf("Run exited early: %v", err)
 	}
 
-	c, err := api.Dial(sock)
+	c, err := api.Dial(sock, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,6 +59,37 @@ func TestRunIngestsAndServes(t *testing.T) {
 		}
 		if time.Now().After(deadline) {
 			t.Fatalf("fixture not ingested: %+v", st)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	// Health over the same socket, once the startup integrity check ran.
+	for {
+		h, err := c.Health(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !h.Integrity.CheckedAt.IsZero() {
+			// The startup check may run before ingest stored anything.
+			if !h.Integrity.OK || h.Integrity.Interval != time.Hour {
+				t.Errorf("integrity = %+v", h.Integrity)
+			}
+			if h.Daemon.Socket != sock || h.Storage.DBBytes <= 0 || len(h.Agents) != 1 || h.Agents[0].Version != "2.0.5" {
+				t.Errorf("health = %+v", h)
+			}
+			if len(h.Ingest) != 1 || h.Ingest[0].Files != 2 || h.Ingest[0].Unknown != 2 {
+				t.Errorf("ingest = %+v", h.Ingest)
+			}
+			if len(h.API.Clients) != 1 || h.API.Clients[0] != "test" || h.API.Requests == 0 {
+				t.Errorf("api = %+v", h.API)
+			}
+			if os.Geteuid() != 0 && h.Sudo.Checked {
+				t.Errorf("sudo checked without root: %+v", h.Sudo)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("integrity check never ran")
 		}
 		time.Sleep(20 * time.Millisecond)
 	}

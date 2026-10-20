@@ -45,6 +45,26 @@ Manual steps for now; a package or `sen install` can come later.
    sen status
    ```
 
+5. **Web dashboard:** `sen serve` serves it on `http://127.0.0.1:7357`
+   (loopback only; from another machine use an SSH tunnel:
+   `ssh -N -L 7357:127.0.0.1:7357 <host>`). `/health` shows sentient's own
+   state.
+
+## Passwordless sudo
+
+sentientd runs as root so the agent can't stop it or edit its records. If
+the account the agent runs as can `sudo` without a password, that boundary
+is gone, and the /health page warns about it. To fix it, remove `NOPASSWD`
+for that account:
+
+```sh
+sudo grep -rn NOPASSWD /etc/sudoers /etc/sudoers.d/   # find the rule
+sudo visudo -f /etc/sudoers.d/<file>                  # delete NOPASSWD (or the rule)
+sudo -l -U <account>                                  # check: no NOPASSWD left
+```
+
+Better still, run agents in a sandbox or a separate account without sudo.
+
 ## Development
 
 Run `sentientd` unprivileged with paths under `.claudetmp/`:

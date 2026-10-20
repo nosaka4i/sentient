@@ -19,6 +19,8 @@ type tile struct {
 	Wide             bool
 	SumClass         string
 	Sum              template.HTML
+	// A second link inside the tile (command execute: "N failed").
+	SubHref, SubText string
 }
 
 const nbsp = template.HTML("&nbsp;")
@@ -50,7 +52,8 @@ func tiles(rows []query.ActivityRow) []tile {
 			}
 		case "command execute":
 			if r.Failed > 0 {
-				t.Sum = template.HTML(fmt.Sprintf(`<span class="warn">%d failed</span>`, r.Failed))
+				t.SubHref = ActivityHref(r.Resource, r.Action) + "&failed=1"
+				t.SubText = fmt.Sprintf("%d failed", r.Failed)
 			}
 		case "web search":
 			if r.Hosts != "" {

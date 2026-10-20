@@ -258,6 +258,7 @@ func (in *Ingester) ingestLine(ctx context.Context, tx *store.Tx, path, fallback
 		Cwd:            rec.Cwd,
 		RepoRoot:       in.repoRoot(rec.Cwd),
 		TS:             ts,
+		AgentVersion:   rec.Version,
 	})
 	if err != nil {
 		return err

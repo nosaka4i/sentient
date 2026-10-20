@@ -13,6 +13,97 @@ option go_package = "github.com/nosaka4i/sentient/internal/api/sentientpb";
 service Sentient {
   // Status returns the data behind `sen status` and the web dashboard.
   rpc Status(StatusRequest) returns (StatusResponse);
+  // Health returns sentient's own state (web /health, later `sen health`).
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+message HealthRequest {}
+
+message NamedCount {
+  string name = 1;
+  int64 count = 2;
+}
+
+message HealthResponse {
+  google.protobuf.Timestamp checked_at = 1;
+  google.protobuf.Timestamp history_begins = 2; // unset if no data
+
+  message Daemon {
+    string version = 1;
+    google.protobuf.Timestamp started = 2;
+    double cpu_percent = 3;
+    google.protobuf.Duration cpu_window = 4;
+    int64 rss_bytes = 5;
+    string socket = 6;
+    string user = 7;
+    bool root = 8;
+  }
+  Daemon daemon = 3;
+
+  message API {
+    google.protobuf.Timestamp since = 1;
+    int64 requests = 2;
+    double per_sec_now = 3;
+    google.protobuf.Duration p50 = 4;
+    google.protobuf.Duration p95 = 5;
+    google.protobuf.Duration p99 = 6;
+    int64 latency_count = 7;
+    int64 errors = 8;
+    repeated NamedCount errors_by_code = 9;
+    repeated NamedCount methods = 10;
+    repeated string clients = 11;
+  }
+  API api = 4;
+
+  message Storage {
+    string data_dir = 1;
+    string db_path = 2;
+    int64 db_bytes = 3;
+    int64 free_bytes = 4;
+    int64 size_bytes = 5;
+  }
+  Storage storage = 5;
+
+  message IngestAgent {
+    string agent = 1;
+    google.protobuf.Timestamp last_record = 2; // unset if none
+    int64 files = 3;
+    int64 unknown = 4;
+  }
+  repeated IngestAgent ingest = 6;
+
+  message Integrity {
+    google.protobuf.Timestamp checked_at = 1; // unset = not checked yet
+    google.protobuf.Timestamp full_at = 2;
+    int64 records = 3;
+    bool ok = 4;
+    int64 bad_record_id = 5;
+    google.protobuf.Duration interval = 6;
+    bool gap_tracking = 7;
+  }
+  Integrity integrity = 7;
+
+  message Agent {
+    string agent = 1;
+    string version = 2;
+    string logs = 3;
+  }
+  repeated Agent agents = 8;
+
+  message LiveSession {
+    string session_id = 1;
+    string agent = 2;
+    string repo = 3;
+    google.protobuf.Timestamp last_activity = 4;
+  }
+  repeated LiveSession live = 9;
+
+  message Sudo {
+    bool checked = 1;
+    string reason = 2;
+    repeated string passwordless = 3;
+  }
+  Sudo sudo = 10;
 }
 
 message StatusRequest {

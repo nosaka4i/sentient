@@ -1,0 +1,132 @@
+{{define "htile"}}{{if .Href}}<a class="tile{{if .Wide}} wide{{end}}{{if .Muted}} muted{{end}}" href="{{.Href}}"{{if .Title}} title="{{.Title}}"{{end}}>{{else}}<div class="tile{{if .Wide}} wide{{end}}{{if .Muted}} muted{{end}}">{{end}}
+        <span class="lbl"><b>{{.Label}}</b>{{if .LabelRest}} {{.LabelRest}}{{end}}</span>
+        <span class="num{{if .NumTxt}} txt{{end}}{{if .NumMono}} mono{{end}}">{{if .Running}}<span class="running-dot" aria-hidden="true"></span>{{end}}{{if .Icon}}{{template "agent-icon" .Icon}}{{end}}{{.Num}}{{if .Check}} <span class="okt" style="color:var(--ok)">&#10003;</span>{{end}}{{if .NumSmall}} <small>{{.NumSmall}}</small>{{end}}</span>
+        <span class="sum{{if .SumMono}} mono{{end}}">{{.Sum}}{{if .Go}} <span class="go">&rarr;</span>{{end}}</span>
+      {{if .Href}}</a>{{else}}</div>{{end}}{{end}}
+
+{{define "content"}}
+  <a class="back" href="/">&larr; Dashboard</a>
+
+  <!-- VERDICT -->
+  <div class="verdict">
+    <h1><span class="okdot{{if not .OK}} bad{{end}}" role="img" aria-label="{{if .OK}}ok{{else}}problem{{end}}"></span>{{.Headline}}</h1>
+    <p class="sub">Recording agent logs · kernel capture not set up yet · {{if .Warnings}}<strong>{{len .Warnings}} warning{{if ne (len .Warnings) 1}}s{{end}}</strong>{{else}}no warnings{{end}} · checked <time datetime="{{.Checked.ISO}}">{{.Checked.Date}}</time></p>
+{{- range .Warnings}}
+    <div class="notice{{if .Critical}} critical{{end}}" role="note">
+      <span class="sev sev-medium">{{if .Critical}}Critical{{else}}Warning{{end}}</span>
+      <span class="what">{{if .Account}}Agent account <span class="mono">'{{.Account}}'</span> has passwordless sudo{{else}}{{.What}}{{end}}</span>
+      <span class="why">{{.Why}}</span>
+      {{if .FixHref}}<a class="fix" href="{{.FixHref}}" title="Steps to remove NOPASSWD for this account">how to fix &rarr;</a>{{end}}
+    </div>
+{{- end}}
+  </div>
+
+  <!-- DAEMON -->
+  <section class="card" aria-labelledby="h-daemon">
+    <div class="card-head">
+      <h2 id="h-daemon">Daemon</h2>
+      <span class="state-ok"><span class="okdot"></span>running</span>
+      <span class="hint">{{.DaemonOn}}</span>
+    </div>
+    <div class="tiles">
+{{- range .Daemon}}
+      {{template "htile" .}}
+{{- end}}
+    </div>
+  </section>
+
+  <!-- COLLECTOR -->
+  <section class="card muted" aria-labelledby="h-coll">
+    <div class="card-head">
+      <h2 id="h-coll">Collector</h2>
+      <span class="state-off">not set up yet</span>
+      <span class="hint">Tetragon (eBPF) kernel events</span>
+    </div>
+    <div class="tiles">
+      <div class="tile wide muted">
+        <span class="lbl"><b>tetragon</b></span>
+        <span class="num txt">not set up yet</span>
+        <span class="sum">kernel capture is the next build step; until then sentient records the agents' own logs only</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- LOCAL API -->
+  <section class="card" aria-labelledby="h-api">
+    <div class="card-head">
+      <h2 id="h-api">Local API</h2>
+      <span class="state-ok"><span class="okdot"></span>serving</span>
+      <span class="hint">{{.APIHint}}</span>
+    </div>
+    <div class="tiles">
+{{- range .API}}
+      {{template "htile" .}}
+{{- end}}
+    </div>
+  </section>
+
+  <!-- STORAGE -->
+  <section class="card" aria-labelledby="h-store">
+    <div class="card-head">
+      <h2 id="h-store">Storage</h2>
+      <span class="hint mono">{{.DataDir}}</span>
+    </div>
+    <div class="tiles">
+{{- range .Storage}}
+      {{template "htile" .}}
+{{- end}}
+    </div>
+  </section>
+
+  <!-- INGEST -->
+  <section class="card" aria-labelledby="h-ingest">
+    <div class="card-head">
+      <h2 id="h-ingest">Ingest</h2>
+      <span class="hint">agents' own logs</span>
+    </div>
+    <ul class="ingest">
+      <li class="irow head" aria-hidden="true">
+        <span>Agent</span><span>Last record</span><span>Lag</span><span>Files tracked</span><span>Unknown types</span>
+      </li>
+{{- range .Ingest}}
+      <li class="irow">
+        <span class="who">{{template "agent-icon" .Agent}}{{if or (eq .Agent "claude") (eq .Agent "codex")}}{{.Agent}}{{end}}</span>
+        <span><span class="k">Last record</span><span class="v">{{.Last}}</span></span>
+        <span><span class="k">Lag</span><span class="v">{{.Lag}}</span></span>
+        <span><span class="k">Files tracked</span><span class="v">{{.Files}} <small>jsonl</small></span></span>
+        <span><span class="k">Unknown types</span><span class="v">{{.Unknown}}</span></span>
+      </li>
+{{- end}}
+    </ul>
+  </section>
+
+  <!-- INTEGRITY -->
+  <section class="card" aria-labelledby="h-integ">
+    <div class="card-head">
+      <h2 id="h-integ">Integrity</h2>
+      <span class="hint">records are hash-chained</span>
+    </div>
+    <div class="tiles">
+{{- range .Integrity}}
+      {{template "htile" .}}
+{{- end}}
+    </div>
+  </section>
+
+  <!-- AGENTS -->
+  <section class="card" aria-labelledby="h-agents">
+    <div class="card-head">
+      <h2 id="h-agents">Agents <span class="count">({{.AgentsN}})</span></h2>
+      <span class="hint">detected on this machine</span>
+    </div>
+    <div class="tiles">
+{{- range .Agents}}
+      {{template "htile" .}}
+{{- end}}
+    </div>
+  </section>
+
+  <footer class="cli">
+    <span>Same view in the terminal: <code>sen health</code> (later)</span>
+  </footer>
+{{end}}

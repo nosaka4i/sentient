@@ -22,6 +22,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/nosaka4i/sentient/internal/api/sentientpb"
+	"github.com/nosaka4i/sentient/internal/health"
 	"github.com/nosaka4i/sentient/internal/query"
 	"github.com/nosaka4i/sentient/internal/version"
 )
@@ -32,11 +33,36 @@ const DefaultSocket = "/run/sentient/sentientd.sock"
 // Server implements the Sentient service on top of the store.
 type Server struct {
 	sentientpb.UnimplementedSentientServer
-	db *sql.DB
+	db     *sql.DB
+	stats  *Stats
+	health HealthFunc
 }
 
+// HealthFunc builds the health report (everything except the API's own
+// traffic, which the server adds).
+type HealthFunc func(ctx context.Context) (*health.Report, error)
+
 // NewServer returns a server reading db.
-func NewServer(db *sql.DB) *Server { return &Server{db: db} }
+func NewServer(db *sql.DB) *Server { return &Server{db: db, stats: NewStats()} }
+
+// SetHealth sets what the Health call reports.
+func (s *Server) SetHealth(f HealthFunc) { s.health = f }
+
+// Stats returns the server's traffic stats.
+func (s *Server) Stats() *Stats { return s.stats }
+
+// Health implements sentientpb.SentientServer.
+func (s *Server) Health(ctx context.Context, _ *sentientpb.HealthRequest) (*sentientpb.HealthResponse, error) {
+	if s.health == nil {
+		return nil, status.Error(codes.Unimplemented, "health reporting not configured")
+	}
+	r, err := s.health(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "health: %v", err)
+	}
+	r.API = s.stats.Snapshot()
+	return healthToProto(r), nil
+}
 
 // Status implements sentientpb.SentientServer.
 func (s *Server) Status(ctx context.Context, req *sentientpb.StatusRequest) (*sentientpb.StatusResponse, error) {
@@ -112,9 +138,13 @@ func Listen(path, group string, log *slog.Logger) (net.Listener, error) {
 	return lis, nil
 }
 
-// Serve serves the API on lis until ctx is cancelled.
+// Serve serves the API on lis until ctx is cancelled, recording traffic in
+// srv's Stats.
 func Serve(ctx context.Context, lis net.Listener, srv *Server) error {
-	g := grpc.NewServer()
+	g := grpc.NewServer(
+		grpc.UnaryInterceptor(srv.stats.UnaryInterceptor()),
+		grpc.StatsHandler(srv.stats.StatsHandler()),
+	)
 	sentientpb.RegisterSentientServer(g, srv)
 	errc := make(chan error, 1)
 	go func() { errc <- g.Serve(lis) }()

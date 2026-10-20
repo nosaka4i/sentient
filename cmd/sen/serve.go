@@ -61,7 +61,7 @@ func runServe(ctx context.Context, cmd *cobra.Command, socket, addr string, read
 	if err := checkLoopback(addr); err != nil {
 		return err
 	}
-	c, err := api.Dial(socket)
+	c, err := api.Dial(socket, "sen serve")
 	if err != nil {
 		return err
 	}

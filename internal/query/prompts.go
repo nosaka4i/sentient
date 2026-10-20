@@ -96,7 +96,7 @@ SELECT MAX(ts) FROM raw_log_records WHERE session_id = ? AND ts >= ? AND ts < ?`
 			p.Duration = lt.Sub(p.Started)
 			p.Running = !x.end.Valid && to.Sub(lt) <= RunningWindow
 		}
-		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM actions WHERE prompt_id = ?`, p.ID).Scan(&p.Actions); err != nil {
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM actions a WHERE a.prompt_id = ? AND `+systemAction, p.ID).Scan(&p.Actions); err != nil {
 			return 0, nil, fmt.Errorf("prompt actions: %w", err)
 		}
 		if err := db.QueryRowContext(ctx, `
@@ -108,6 +108,14 @@ WHERE a.prompt_id = ? AND al.status = 'open'`, p.ID).Scan(&p.Flags); err != nil 
 	}
 	return total, rows, nil
 }
+
+// systemAction is the SQL condition (on actions alias a) for actions on
+// the system, which a prompt's ACTIONS count (design.md "Counting
+// commands"): file, dir, command, process, network, git, web fetch and
+// launch item. Subagent starts and web searches (server-side) don't touch
+// this machine and aren't counted.
+const systemAction = `(a.resource IN ('file', 'dir', 'command', 'process', 'network', 'git', 'launch item')
+	OR (a.resource = 'web' AND a.action = 'fetch'))`
 
 var pastedRE = regexp.MustCompile(`(?s)<pasted_content[^>]*>(.*?)</pasted_content>`)
 

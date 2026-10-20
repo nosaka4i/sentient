@@ -164,13 +164,19 @@ func TestPromptActionCounts(t *testing.T) {
 	p1, _ := tx.AddPrompt(ctx, sid, "one", "2026-10-17T09:00:00.000000000Z")
 	p2, _ := tx.AddPrompt(ctx, sid, "two", "2026-10-17T10:00:00.000000000Z")
 	old, _ := tx.AddPrompt(ctx, sid, "old", "2026-10-15T10:00:00.000000000Z")
-	// p1: a 3-part command line plus a file read = 4 actions.
+	// p1: a 3-part command line plus a file read.
 	for part, path := range []string{"cd x", "ls", "sort"} {
 		tx.AddAction(ctx, store.Action{SessionID: sid, PromptID: p1, TS: "2026-10-17T09:01:00.000000000Z",
 			Resource: "command", Action: "execute", Path: path, Evidence: "log", ToolUseID: "t1", Part: part})
 	}
 	tx.AddAction(ctx, store.Action{SessionID: sid, PromptID: p1, TS: "2026-10-17T09:02:00.000000000Z",
 		Resource: "file", Action: "read", Path: "/a", Evidence: "log", ToolUseID: "t2"})
+	// Web fetch counts (it reaches this machine); subagent starts and web
+	// searches don't (not actions on the system). p1 = 3 + 1 + 1 = 5.
+	for i, ra := range [][2]string{{"web", "fetch"}, {"web", "search"}, {"subagent", "start"}} {
+		tx.AddAction(ctx, store.Action{SessionID: sid, PromptID: p1, TS: "2026-10-17T09:03:00.000000000Z",
+			Resource: ra[0], Action: ra[1], Evidence: "log", ToolUseID: "w" + string(rune('0'+i))})
+	}
 	tx.AddAction(ctx, store.Action{SessionID: sid, PromptID: old, TS: "2026-10-15T10:01:00.000000000Z",
 		Resource: "file", Action: "read", Path: "/b", Evidence: "log", ToolUseID: "t3"})
 	if err := tx.Commit(); err != nil {
@@ -181,8 +187,8 @@ func TestPromptActionCounts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 2 || got[p1] != 4 || got[p2] != 0 {
-		t.Errorf("PromptActionCounts = %v, want {%d:4 %d:0}", got, p1, p2)
+	if len(got) != 2 || got[p1] != 5 || got[p2] != 0 {
+		t.Errorf("PromptActionCounts = %v, want {%d:5 %d:0}", got, p1, p2)
 	}
 
 	// The chained command also counts 3 in LAST 24H's command execute.

@@ -96,6 +96,13 @@ DROP INDEX actions_tool_use;
 CREATE UNIQUE INDEX actions_tool_use ON actions(tool_use_id, part) WHERE tool_use_id IS NOT NULL;
 CREATE INDEX actions_prompt ON actions(prompt_id);
 `,
+	// 3: health page. The agent's version as seen in its records, and a
+	// partial index so counting unknown records doesn't scan the table.
+	`
+ALTER TABLE sessions ADD COLUMN agent_version TEXT;
+CREATE INDEX raw_log_records_unknown ON raw_log_records(unknown) WHERE unknown = 1;
+CREATE INDEX sessions_ended ON sessions(ended_at);
+`,
 }
 
 // SchemaVersion is the version the code expects.

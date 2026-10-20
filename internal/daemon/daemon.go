@@ -30,7 +30,10 @@ type Config struct {
 	SocketGroup  string        // group allowed to use the socket; "" = owner only
 	Homes        []string      // home dirs whose ~/.claude/projects is ingested
 	PollInterval time.Duration // ingest poll interval
-	Logger       *slog.Logger
+	// IntegrityInterval is how often the full hash-chain check runs
+	// (default hourly).
+	IntegrityInterval time.Duration
+	Logger            *slog.Logger
 	// Ready, if set, is closed once the socket is listening.
 	Ready chan<- struct{}
 }
@@ -62,6 +65,9 @@ func Run(ctx context.Context, cfg Config) error {
 	if len(cfg.Homes) == 0 {
 		cfg.Homes = DefaultHomes()
 	}
+	if cfg.IntegrityInterval <= 0 {
+		cfg.IntegrityInterval = time.Hour
+	}
 
 	st, err := store.Open(ctx, cfg.DataDir)
 	if err != nil {
@@ -84,11 +90,16 @@ func Run(ctx context.Context, cfg Config) error {
 	defer cancel()
 	ing := claudecode.New(st, claudecode.Config{Homes: cfg.Homes, PollInterval: cfg.PollInterval, Logger: log})
 
+	mon := newMonitor(st, cfg, log)
+	srv := api.NewServer(st.DB)
+	srv.SetHealth(mon.report)
+
 	var wg sync.WaitGroup
 	errc := make(chan error, 2)
-	wg.Add(2)
+	wg.Add(3)
 	go func() { defer wg.Done(); errc <- ing.Run(ctx) }()
-	go func() { defer wg.Done(); errc <- api.Serve(ctx, lis, api.NewServer(st.DB)) }()
+	go func() { defer wg.Done(); errc <- api.Serve(ctx, lis, srv) }()
+	go func() { defer wg.Done(); mon.run(ctx) }()
 
 	var first error
 	select {

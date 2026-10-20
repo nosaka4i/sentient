@@ -39,6 +39,7 @@ func newRootCmd() *cobra.Command {
 	f.StringVar(&cfg.SocketGroup, "socket-group", daemon.DefaultSocketGroup, "group allowed to connect to the socket (empty: owner only)")
 	f.StringSliceVar(&cfg.Homes, "home", nil, "home directory whose ~/.claude/projects to ingest; repeatable (default /root and /home/*)")
 	f.DurationVar(&cfg.PollInterval, "poll-interval", 2*time.Second, "how often transcripts are checked for new records")
+	f.DurationVar(&cfg.IntegrityInterval, "integrity-interval", time.Hour, "how often the full hash-chain check runs")
 	cmd.SetContext(context.Background())
 	return cmd
 }

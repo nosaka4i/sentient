@@ -16,11 +16,21 @@
     </div>
     <div class="tiles">
 {{- range .Tiles}}
+{{- if .SubHref}}
+      <div class="tile linked{{if .Wide}} wide{{end}}">
+        <a class="stretch" href="{{.Href}}">
+          <span class="lbl"><b>{{.Resource}}</b> / {{.Action}}</span>
+          <span class="num">{{.Count}}</span>
+        </a>
+        <span class="{{.SumClass}}"><a class="sublink warn" href="{{.SubHref}}">{{.SubText}}</a></span>
+      </div>
+{{- else}}
       <a class="tile{{if .Wide}} wide{{end}}" href="{{.Href}}">
         <span class="lbl"><b>{{.Resource}}</b> / {{.Action}}</span>
         <span class="num">{{.Count}}</span>
         <span class="{{.SumClass}}">{{.Sum}}</span>
       </a>
+{{- end}}
 {{- end}}
     </div>
   </section>

@@ -72,7 +72,7 @@ func startServer(t *testing.T) string {
 
 func TestStatusRoundTrip(t *testing.T) {
 	sock := startServer(t)
-	c, err := Dial(sock)
+	c, err := Dial(sock, "test client")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestStatusInternalError(t *testing.T) {
 }
 
 func TestUnreachable(t *testing.T) {
-	c, err := Dial(filepath.Join(shortDir(t), "none.sock"))
+	c, err := Dial(filepath.Join(shortDir(t), "none.sock"), "")
 	if err != nil {
 		t.Fatal(err)
 	}

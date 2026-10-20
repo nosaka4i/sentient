@@ -73,7 +73,7 @@ func Date(t, now time.Time) string {
 	return t.Format("Jan 2 15:04")
 }
 
-// Ago formats how long ago t was: `12m ago`, `6h 12m ago`, `1 day 6h ago`.
+// Ago formats how long ago t was: `12m ago`, `6h 12m ago`, `1d 6h ago`.
 func Ago(t, now time.Time) string {
 	d := now.Sub(t)
 	if d < time.Minute {
@@ -83,14 +83,10 @@ func Ago(t, now time.Time) string {
 	days, hours, m := mins/(24*60), (mins/60)%24, mins%60
 	switch {
 	case days > 0:
-		unit := "days"
-		if days == 1 {
-			unit = "day"
-		}
 		if hours == 0 {
-			return fmt.Sprintf("%d %s ago", days, unit)
+			return fmt.Sprintf("%dd ago", days)
 		}
-		return fmt.Sprintf("%d %s %dh ago", days, unit, hours)
+		return fmt.Sprintf("%dd %dh ago", days, hours)
 	case hours > 0:
 		if m == 0 {
 			return fmt.Sprintf("%dh ago", hours)

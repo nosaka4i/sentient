@@ -1,4 +1,5 @@
 /.claudetmp/
 /.mocks/
 /bin/
+/logs/
 *.swp

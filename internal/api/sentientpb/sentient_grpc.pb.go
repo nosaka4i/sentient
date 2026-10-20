@@ -24,6 +24,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	Sentient_Status_FullMethodName = "/sentient.v1.Sentient/Status"
+	Sentient_Health_FullMethodName = "/sentient.v1.Sentient/Health"
 )
 
 // SentientClient is the client API for Sentient service.
@@ -32,6 +33,8 @@ const (
 type SentientClient interface {
 	// Status returns the data behind `sen status` and the web dashboard.
 	Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error)
+	// Health returns sentient's own state (web /health, later `sen health`).
+	Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error)
 }
 
 type sentientClient struct {
@@ -52,12 +55,24 @@ func (c *sentientClient) Status(ctx context.Context, in *StatusRequest, opts ...
 	return out, nil
 }
 
+func (c *sentientClient) Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HealthResponse)
+	err := c.cc.Invoke(ctx, Sentient_Health_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SentientServer is the server API for Sentient service.
 // All implementations must embed UnimplementedSentientServer
 // for forward compatibility.
 type SentientServer interface {
 	// Status returns the data behind `sen status` and the web dashboard.
 	Status(context.Context, *StatusRequest) (*StatusResponse, error)
+	// Health returns sentient's own state (web /health, later `sen health`).
+	Health(context.Context, *HealthRequest) (*HealthResponse, error)
 	mustEmbedUnimplementedSentientServer()
 }
 
@@ -70,6 +85,9 @@ type UnimplementedSentientServer struct{}
 
 func (UnimplementedSentientServer) Status(context.Context, *StatusRequest) (*StatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Status not implemented")
+}
+func (UnimplementedSentientServer) Health(context.Context, *HealthRequest) (*HealthResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Health not implemented")
 }
 func (UnimplementedSentientServer) mustEmbedUnimplementedSentientServer() {}
 func (UnimplementedSentientServer) testEmbeddedByValue()                  {}
@@ -110,6 +128,24 @@ func _Sentient_Status_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Sentient_Health_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HealthRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SentientServer).Health(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Sentient_Health_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SentientServer).Health(ctx, req.(*HealthRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Sentient_ServiceDesc is the grpc.ServiceDesc for Sentient service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -120,6 +156,10 @@ var Sentient_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Status",
 			Handler:    _Sentient_Status_Handler,
+		},
+		{
+			MethodName: "Health",
+			Handler:    _Sentient_Health_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -42,6 +42,7 @@ type record struct {
 	SessionID     string          `json:"sessionId"`
 	Timestamp     string          `json:"timestamp"`
 	Cwd           string          `json:"cwd"`
+	Version       string          `json:"version"` // Claude Code version
 	IsSidechain   bool            `json:"isSidechain"`
 	IsMeta        bool            `json:"isMeta"`
 	Origin        *origin         `json:"origin"`

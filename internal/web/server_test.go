@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nosaka4i/sentient/internal/api"
+	"github.com/nosaka4i/sentient/internal/health"
 	"github.com/nosaka4i/sentient/internal/query"
 	"github.com/nosaka4i/sentient/internal/version"
 )
@@ -20,6 +21,7 @@ var now = time.Date(2026, 10, 7, 15, 40, 0, 0, time.Local)
 
 type fakeSource struct {
 	st       *query.Status
+	health   *health.Report
 	err      error
 	from, to time.Time
 }
@@ -29,7 +31,11 @@ func (f *fakeSource) Status(ctx context.Context, from, to time.Time) (*query.Sta
 	return f.st, "test", f.err
 }
 
-func newTestServer(t *testing.T, src StatusSource) *Server {
+func (f *fakeSource) Health(ctx context.Context) (*health.Report, error) {
+	return f.health, f.err
+}
+
+func newTestServer(t *testing.T, src Source) *Server {
 	t.Helper()
 	s, err := New(src, "/run/sentient/sentientd.sock", slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
@@ -83,7 +89,7 @@ func TestDashboard(t *testing.T) {
 	}
 	for _, want := range []string{
 		`<meta http-equiv="refresh" content="30">`,
-		`Monitored from <time datetime="` + now.Add(-(30*time.Hour + 28*time.Minute)).Format("2006-01-02T15:04") + `">Oct 6 09:12</time> (1 day 6h ago)`,
+		`Monitored from <time datetime="` + now.Add(-(30*time.Hour + 28*time.Minute)).Format("2006-01-02T15:04") + `">Oct 6 09:12</time> (1d 6h ago)`,
 		`Needs attention <span class="count">(0)</span>`,
 		`Nothing needs your attention`,
 		`href="/alerts"`,
@@ -91,7 +97,11 @@ func TestDashboard(t *testing.T) {
 		`<span class="num">214</span>`,
 		`<span class="warn">38 outside repo</span>`,
 		`<span class="sum mono"><span class="add">+248</span> <span class="del">&minus;61</span></span>`,
-		`<span class="warn">2 failed</span>`,
+		// command execute: the tile's main link and a separate "failed" link
+		`<div class="tile linked">`,
+		`<a class="stretch" href="/activity?action=execute&amp;resource=command">`,
+		`<a class="sublink warn" href="/activity?action=execute&amp;resource=command&amp;failed=1">2 failed</a>`,
+		`<a class="icon-btn" href="/health" aria-label="Health"`,
 		`a.dev, &lt;b&gt;.dev`, // escaped
 		`2 repos`,
 		`<a class="tile wide" href="/activity?action=connect&amp;resource=network">`,
@@ -120,7 +130,7 @@ func TestDashboard(t *testing.T) {
 	if strings.Contains(body, `class="sevbar"`) {
 		t.Error("severity bar shown with 0 alerts")
 	}
-	if n := strings.Count(body, `<a class="tile`); n != 11 {
+	if n := strings.Count(body, `<a class="tile`) + strings.Count(body, `<div class="tile `); n != 11 {
 		t.Errorf("tiles = %d, want 11", n)
 	}
 	if resp.Header.Get("X-Frame-Options") != "DENY" || resp.Header.Get("Cache-Control") != "no-store" {
@@ -143,6 +153,9 @@ func TestDashboardFreshInstall(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("fresh dashboard missing %q", want)
 		}
+	}
+	if strings.Contains(body, "sublink") {
+		t.Error("failed link shown with 0 failures")
 	}
 	if strings.Contains(body, `class="since"`) {
 		t.Error("Monitored from shown with no history")

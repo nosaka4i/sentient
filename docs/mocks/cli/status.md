@@ -6,7 +6,7 @@ Alerts first, then a summary of activity in the window, then the window's prompt
 
 ```
 $ sen status
-Monitored from Oct 6 09:12 (1 day 6h ago)
+Monitored from Oct 6 09:12 (1d 6h ago)
 
 NEEDS ATTENTION (4)
 #    DATE          AGENT    REPO     SEVERITY   RESOURCE   ACTION    PATH

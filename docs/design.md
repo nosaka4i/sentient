@@ -176,8 +176,9 @@ A small Swift system extension using Endpoint Security (processes, files)
 and a Network Extension content filter (connections, bytes), streaming
 normalized events to the Go monitor over a root-only local socket. Endpoint
 Security has no TCP/IP events, hence the Network Extension. Needs Apple's
-Endpoint Security entitlement (to apply for). `eslogger` + `nettop` can
-serve as an interim, unsupported source behind the same interface.
+Endpoint Security entitlement (requested 2026-10-18; forum reports of
+long waits). Until then `eslogger` + `nettop` are the Mac source behind
+the same interface, and they ship at launch.
 
 ### Ingester (agent logs)
 
@@ -218,15 +219,18 @@ Claude Code adapter, per [brief.md](brief.md#data-sources):
   skipped. Processes a command spawns (`npm test`'s children) don't
   count; they're drill-down detail. Scripts count as one command, with
   their child processes visible underneath. A prompt's ACTIONS count
-  (dashboard and `sen status`) is all its actions: commands plus file,
-  network, etc.
+  (dashboard and `sen status`) counts actions on the system only: file,
+  dir, command, process, network, git, web fetch, launch item. Things
+  inside the agent are not actions: the prompt itself, subagent start,
+  and server-side web search.
 - **Claim vs record.** A kernel-observed write with no matching tool call
   or command in the log is the key mismatch ("not in agent's log").
 - **Repo root** is resolved by us from the path (nearest `.git`), not taken
   from the log's `gitBranch`/`cwd`.
 - **Rules** are deterministic and produce alerts with a severity
   (high/medium/low, as in [status.md](mocks/cli/status.md)). No model
-  judges severity. Bulk writes under `node_modules/`, `.venv/` etc. are
+  judges severity. The rule list and each rule's wording are in
+  [rules.md](rules.md). Bulk writes under `node_modules/`, `.venv/` etc. are
   collapsed, not dropped. Later: leftover processes (agent-started
   processes still running after the session), user-defined rules.
 
@@ -348,7 +352,12 @@ Everything in steps 1–3 can be built and tested on the Linux dev box.
    filtered by binary in one evaluation run).
 4. **Rules and alerts.** NEEDS ATTENTION (web and `sen status`), review
    state, `sen alert`.
-5. Remaining CLI commands as needed; then the macOS collector.
+5. **macOS collector via `eslogger`** (+ `nettop` for network): required
+   for launch, since most agent users are on Macs. No Apple approval
+   needed (root + Full Disk Access). Launch = Linux (Tetragon) + Mac
+   (eslogger).
+6. Remaining CLI commands as needed; the native Endpoint Security system
+   extension once Apple grants the entitlement (requested 2026-10-18).
 
 ## Why kernel capture, not the agent's logs alone
 

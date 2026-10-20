@@ -35,6 +35,9 @@
     </a>
     {{if .Since}}<div class="since">Monitored from <time datetime="{{.Since.ISO}}">{{.Since.Date}}</time> ({{.Since.Ago}})</div>{{end}}
     <div class="top-right">
+      <a class="icon-btn" href="/health"{{if eq .Nav "health"}} aria-current="page"{{end}} aria-label="Health" title="Health: sentient's own status">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      </a>
       {{if .Live}}<span class="live" title="New activity appears here as it happens"><span class="dot"></span>live</span>{{end}}
       <button class="icon-btn" id="theme" type="button" aria-label="Toggle light or dark theme" title="Toggle theme">
         <svg class="moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
@@ -44,7 +47,7 @@
   </div>
 </header>
 
-<main class="wrap">
+<main class="wrap{{if .Sub}} sub{{end}}">
 {{template "content" .}}
 </main>
 
