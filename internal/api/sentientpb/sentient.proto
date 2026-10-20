@@ -15,6 +15,56 @@ service Sentient {
   rpc Status(StatusRequest) returns (StatusResponse);
   // Health returns sentient's own state (web /health, later `sen health`).
   rpc Health(HealthRequest) returns (HealthResponse);
+  // PromptDetail returns everything about one prompt (web /prompt/<id>).
+  rpc PromptDetail(PromptDetailRequest) returns (PromptDetailResponse);
+}
+
+message PromptDetailRequest {
+  int64 id = 1;
+}
+
+message DiffLine {
+  // "h" hunk/note, "a" added, "d" removed, "c" context.
+  string kind = 1;
+  string text = 2;
+}
+
+message FileChange {
+  string path = 1;
+  int64 added = 2;
+  int64 removed = 3;
+  bool outside_repo = 4;
+  repeated int64 steps = 5; // step numbers of the edits
+  string by = 6;            // tool that made the change (Edit, Write…)
+  string action = 7;        // create | update | delete
+  google.protobuf.Timestamp first = 8;
+  repeated DiffLine diff = 9;
+}
+
+message Step {
+  int64 n = 1;
+  google.protobuf.Duration offset = 2; // since the prompt started
+  string resource = 3;
+  string action = 4;
+  string path = 5;
+  bool failed = 6;
+  string evidence = 7; // kernel | log | both
+  // A Bash tool call that ran several commands: the same call_id on each
+  // of its steps, with the whole command line on the first.
+  string call_id = 8;
+  string call_command = 9;
+  bool builtin = 10; // a shell builtin (never execs): evidence is log only
+}
+
+message PromptDetailResponse {
+  google.protobuf.Timestamp history_begins = 1;
+  Prompt prompt = 2;
+  repeated ActivityRow activity = 3;
+  repeated FileChange files = 4;
+  repeated Step steps = 5;
+  string reply = 6; // the agent's final message for the prompt
+  google.protobuf.Timestamp reply_at = 7;
+  string repo_root = 8; // empty if the session has no repo
 }
 
 message HealthRequest {}

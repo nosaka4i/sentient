@@ -76,37 +76,48 @@ ORDER BY p.started_at DESC, p.id DESC LIMIT ?`, f, t, limit)
 	rows := make([]PromptRow, 0, len(raws))
 	for _, x := range raws {
 		p := x.row
-		if p.Started, err = dbtime.Parse(x.start); err != nil {
+		if err := finishPrompt(ctx, db, &p, x.session, x.start, x.end, to); err != nil {
 			return 0, nil, err
-		}
-		end := t
-		if x.end.Valid {
-			end = x.end.String
-		}
-		var last sql.NullString
-		if err := db.QueryRowContext(ctx, `
-SELECT MAX(ts) FROM raw_log_records WHERE session_id = ? AND ts >= ? AND ts < ?`, x.session, x.start, end).Scan(&last); err != nil {
-			return 0, nil, fmt.Errorf("prompt activity: %w", err)
-		}
-		if last.Valid {
-			lt, err := dbtime.Parse(last.String)
-			if err != nil {
-				return 0, nil, err
-			}
-			p.Duration = lt.Sub(p.Started)
-			p.Running = !x.end.Valid && to.Sub(lt) <= RunningWindow
-		}
-		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM actions a WHERE a.prompt_id = ? AND `+systemAction, p.ID).Scan(&p.Actions); err != nil {
-			return 0, nil, fmt.Errorf("prompt actions: %w", err)
-		}
-		if err := db.QueryRowContext(ctx, `
-SELECT COUNT(*) FROM alerts al JOIN actions a ON a.id = al.action_id
-WHERE a.prompt_id = ? AND al.status = 'open'`, p.ID).Scan(&p.Flags); err != nil {
-			return 0, nil, fmt.Errorf("prompt flags: %w", err)
 		}
 		rows = append(rows, p)
 	}
 	return total, rows, nil
+}
+
+// finishPrompt fills in what a prompt row derives from other tables: its
+// start, duration, running state, action count and flags. now bounds the
+// activity window for a prompt that hasn't ended.
+func finishPrompt(ctx context.Context, db *sql.DB, p *PromptRow, session int64, start string, endAt sql.NullString, now time.Time) error {
+	var err error
+	if p.Started, err = dbtime.Parse(start); err != nil {
+		return err
+	}
+	end := dbtime.Format(now)
+	if endAt.Valid {
+		end = endAt.String
+	}
+	var last sql.NullString
+	if err := db.QueryRowContext(ctx, `
+SELECT MAX(ts) FROM raw_log_records WHERE session_id = ? AND ts >= ? AND ts < ?`, session, start, end).Scan(&last); err != nil {
+		return fmt.Errorf("prompt activity: %w", err)
+	}
+	if last.Valid {
+		lt, err := dbtime.Parse(last.String)
+		if err != nil {
+			return err
+		}
+		p.Duration = lt.Sub(p.Started)
+		p.Running = !endAt.Valid && now.Sub(lt) <= RunningWindow
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM actions a WHERE a.prompt_id = ? AND `+systemAction, p.ID).Scan(&p.Actions); err != nil {
+		return fmt.Errorf("prompt actions: %w", err)
+	}
+	if err := db.QueryRowContext(ctx, `
+SELECT COUNT(*) FROM alerts al JOIN actions a ON a.id = al.action_id
+WHERE a.prompt_id = ? AND al.status = 'open'`, p.ID).Scan(&p.Flags); err != nil {
+		return fmt.Errorf("prompt flags: %w", err)
+	}
+	return nil
 }
 
 // systemAction is the SQL condition (on actions alias a) for actions on

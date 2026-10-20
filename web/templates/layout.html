@@ -64,4 +64,24 @@
 </html>
 {{end}}
 
+{{define "tiles"}}
+{{- range .}}
+{{- if .SubHref}}
+      <div class="tile linked{{if .Wide}} wide{{end}}{{if .Zero}} zero{{end}}">
+        <a class="stretch" href="{{.Href}}">
+          <span class="lbl"><b>{{.Resource}}</b> / {{.Action}}</span>
+          <span class="num">{{.Count}}</span>
+        </a>
+        <span class="{{.SumClass}}"><a class="sublink warn" href="{{.SubHref}}">{{.SubText}}</a></span>
+      </div>
+{{- else}}
+      <a class="tile{{if .Wide}} wide{{end}}{{if .Zero}} zero{{end}}" href="{{.Href}}">
+        <span class="lbl"><b>{{.Resource}}</b> / {{.Action}}</span>
+        <span class="num">{{.Count}}</span>
+        <span class="{{.SumClass}}">{{.Sum}}</span>
+      </a>
+{{- end}}
+{{- end}}
+{{- end}}
+
 {{define "agent-icon"}}{{if or (eq . "claude") (eq . "codex")}}<svg class="agent-ic" role="img" aria-label="{{.}}"><title>{{.}}</title><use href="#i-{{.}}"/></svg>{{else}}{{.}}{{end}}{{end}}

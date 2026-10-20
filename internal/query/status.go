@@ -114,7 +114,7 @@ func GetStatus(ctx context.Context, db *sql.DB, from, to time.Time, promptLimit 
 	if err := promptRow(ctx, db, f, t, rows["prompt request"]); err != nil {
 		return nil, err
 	}
-	if err := actionRows(ctx, db, f, t, rows); err != nil {
+	if err := actionRows(ctx, db, `a.ts >= ? AND a.ts < ?`, []any{f, t}, rows); err != nil {
 		return nil, err
 	}
 	for _, r := range StatusRows {
@@ -158,11 +158,13 @@ WHERE p.started_at >= ? AND p.started_at < ?`, from, to)
 	return nil
 }
 
-func actionRows(ctx context.Context, db *sql.DB, from, to string, rows map[string]*ActivityRow) error {
+// actionRows tallies the actions matching where (a condition on alias a,
+// with its args) into the summary rows.
+func actionRows(ctx context.Context, db *sql.DB, where string, args []any, rows map[string]*ActivityRow) error {
 	r, err := db.QueryContext(ctx, `
 SELECT a.resource, a.action, COALESCE(a.path, ''), a.failed, a.lines_added, a.lines_removed, COALESCE(s.repo_root, '')
 FROM actions a LEFT JOIN sessions s ON s.id = a.session_id
-WHERE a.ts >= ? AND a.ts < ?`, from, to)
+WHERE `+where, args...)
 	if err != nil {
 		return fmt.Errorf("actions: %w", err)
 	}

@@ -17,6 +17,7 @@ type tile struct {
 	Count            int64
 	Href             string
 	Wide             bool
+	Zero             bool // dim the number (the prompt page)
 	SumClass         string
 	Sum              template.HTML
 	// A second link inside the tile (command execute: "N failed").

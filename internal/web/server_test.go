@@ -22,8 +22,15 @@ var now = time.Date(2026, 10, 7, 15, 40, 0, 0, time.Local)
 type fakeSource struct {
 	st       *query.Status
 	health   *health.Report
+	detail   *query.PromptDetail
 	err      error
 	from, to time.Time
+	asked    int64 // the prompt id last requested
+}
+
+func (f *fakeSource) PromptDetail(ctx context.Context, id int64) (*query.PromptDetail, error) {
+	f.asked = id
+	return f.detail, f.err
 }
 
 func (f *fakeSource) Status(ctx context.Context, from, to time.Time) (*query.Status, string, error) {
@@ -192,7 +199,7 @@ func TestStaticAndRouting(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Errorf("js: %d", resp.StatusCode)
 	}
-	for _, path := range []string{"/activity?resource=file&action=read", "/prompt/4", "/prompts", "/nope"} {
+	for _, path := range []string{"/activity?resource=file&action=read", "/session/404d", "/prompts", "/nope"} {
 		if resp, _ := get(t, s, path, "127.0.0.1:7357"); resp.StatusCode != 404 {
 			t.Errorf("%s: %d, want 404 (not built yet)", path, resp.StatusCode)
 		}

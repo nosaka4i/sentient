@@ -15,23 +15,7 @@
       <a class="all-link" href="/activity" title="All 22 resource/action counts">All activity &rarr;</a>
     </div>
     <div class="tiles">
-{{- range .Tiles}}
-{{- if .SubHref}}
-      <div class="tile linked{{if .Wide}} wide{{end}}">
-        <a class="stretch" href="{{.Href}}">
-          <span class="lbl"><b>{{.Resource}}</b> / {{.Action}}</span>
-          <span class="num">{{.Count}}</span>
-        </a>
-        <span class="{{.SumClass}}"><a class="sublink warn" href="{{.SubHref}}">{{.SubText}}</a></span>
-      </div>
-{{- else}}
-      <a class="tile{{if .Wide}} wide{{end}}" href="{{.Href}}">
-        <span class="lbl"><b>{{.Resource}}</b> / {{.Action}}</span>
-        <span class="num">{{.Count}}</span>
-        <span class="{{.SumClass}}">{{.Sum}}</span>
-      </a>
-{{- end}}
-{{- end}}
+{{- template "tiles" .Tiles}}
     </div>
   </section>
 

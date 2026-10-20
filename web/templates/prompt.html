@@ -1,0 +1,126 @@
+{{define "step"}}
+        <li class="step">
+          <span class="n">{{.N}}</span><span class="t">{{.T}}</span>
+          <span class="k ra"><span class="r">{{.Res}}</span><span class="sep">/</span>{{.Act}}</span>
+          <span class="p">{{.Path}}{{if .Note}} <span class="note">· {{.Note}}</span>{{end}}{{if .Failed}} <span class="tag fail">failed</span>{{end}}</span>
+          <span class="d"></span><span class="ev"><span class="tag">{{.Ev}}</span></span>
+        </li>
+{{- end}}
+
+{{define "content"}}
+  <a class="back" href="/">&larr; Dashboard</a>
+
+  <!-- PROMPT -->
+  <div class="prompt-block">
+    <p class="eyebrow">Prompt</p>
+    <h1>{{if .Head.Pasted}}<span class="pasted">pasted {{.Head.Pasted}} lines</span> {{end}}{{.Head.Line}}</h1>
+{{- if .Head.Full}}
+    <details class="fulltext"><summary>Show full prompt</summary><pre>{{.Head.Full}}</pre></details>
+{{- end}}
+    <p class="pmeta">
+      <span><time datetime="{{.Head.ISO}}">{{.Head.Date}}</time>{{if .Head.End}}&ndash;{{.Head.End}}{{end}}</span>
+      <span>{{template "agent-icon" .Head.Agent}}</span>
+      {{- if .Head.Repo}}
+      <span class="repo">{{.Head.Repo}}</span>
+      {{- end}}
+      <span>session <a class="sess" href="{{.Head.SessionHref}}" title="All prompts in this session">{{.Head.SessionShort}}</a></span>
+      <span>{{.Head.Duration}}</span>
+      <span>{{.Head.Actions}} actions</span>
+      <span>{{if .Head.Running}}<span class="state-running"><span class="running-dot" aria-hidden="true"></span>running</span>{{else}}<span class="state-done"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L19 7"/></svg>done</span>{{end}}</span>
+    </p>
+  </div>
+
+  <!-- WHAT HAPPENED -->
+  <section class="card" aria-labelledby="h-what">
+    <div class="card-head">
+      <h2 id="h-what">What happened</h2>
+      <span class="hint">{{.Actions}} actions in this prompt</span>
+    </div>
+    <div class="tiles">
+{{- template "tiles" .Tiles}}
+    </div>
+  </section>
+
+{{- if .Files}}
+
+  <!-- FILES CHANGED -->
+  <section class="card" id="files" aria-labelledby="h-files">
+    <div class="card-head">
+      <h2 id="h-files">Files changed <span class="count">({{len .Files}})</span></h2>
+      <span class="hint mono"><span class="add">+{{.FilesAdded}}</span> <span class="del">&minus;{{.FilesRemoved}}</span></span>
+    </div>
+    <ul class="files">
+{{- range .Files}}
+      <li>
+        <details{{if .Open}} open{{end}}>
+          <summary>
+            <svg class="tw" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+            <span class="fpath">{{.Path}}{{if .Outside}} <span class="tag outside">outside repo</span>{{end}}</span>
+            <span class="stat"><span class="add">+{{.Added}}</span> <span class="del">&minus;{{.Removed}}</span></span>
+          </summary>
+          <div class="commit">{{.StepsLabel}} · <span class="ra"><span class="r">file</span><span class="sep">/</span>{{.Verb}}</span>{{if .By}} by {{.By}}{{end}} · {{.Clock}}</div>
+<pre class="diff">{{range .Diff}}<span class="{{.Class}}">{{.Prefix}}{{.Text}}</span>{{end}}</pre>
+        </details>
+      </li>
+{{- end}}
+    </ul>
+  </section>
+{{- end}}
+
+  <!-- TRACE -->
+  <section class="card collapsed" id="trace" aria-labelledby="h-trace">
+    <div class="card-head">
+      <h2 id="h-trace">Trace <span class="count">({{.StepCount}})</span></h2>
+      <button class="chip" id="trace-toggle" type="button" aria-expanded="false" aria-controls="trace-body" data-show="Show all {{.StepCount}} steps" data-hide="Hide steps">
+        <span class="lbl-txt">Show all {{.StepCount}} steps</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+    <div class="trace-body" id="trace-body" hidden>
+      <ol class="steps">
+{{- range .Steps}}
+{{- if .Call}}
+        <li>
+          <div class="step call">
+            <span class="n"></span><span class="t">{{.T}}</span>
+            <span class="k">Bash</span>
+            <span class="p">{{.Path}} <span class="note">· {{.CallNote}}</span></span>
+            <span class="d"></span><span class="ev"><span class="tag">{{.Ev}}</span></span>
+          </div>
+          <ol>
+{{- range .Children}}{{template "step" .}}{{end}}
+          </ol>
+        </li>
+{{- else}}{{template "step" .}}
+{{- end}}
+{{- end}}
+      </ol>
+{{- if .TraceMore}}
+      <div class="gap">&hellip; {{.TraceMore}} more steps not shown</div>
+{{- end}}
+    </div>
+  </section>
+
+{{- if .Reply}}
+
+  <!-- AGENT'S REPLY -->
+  <section class="card" aria-labelledby="h-reply">
+    <div class="card-head">
+      <h2 id="h-reply">Agent's reply</h2>
+      {{- if .ReplyTime}}
+      <span class="hint">{{.ReplyTime}}</span>
+      {{- end}}
+    </div>
+    <div class="reply">
+      <div class="body{{if .ReplyLong}} clamped{{end}}" id="reply-body">
+{{- range .Reply}}
+        <p>{{.}}</p>
+{{- end}}
+      </div>
+{{- if .ReplyLong}}
+      <button class="linkbtn" id="reply-toggle" type="button" aria-expanded="false" aria-controls="reply-body">more</button>
+{{- end}}
+    </div>
+  </section>
+{{- end}}
+{{end}}

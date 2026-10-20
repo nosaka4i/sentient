@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -32,6 +33,7 @@ const RefreshSeconds = 30
 type Source interface {
 	Status(ctx context.Context, from, to time.Time) (*query.Status, string, error)
 	Health(ctx context.Context) (*health.Report, error)
+	PromptDetail(ctx context.Context, id int64) (*query.PromptDetail, error)
 }
 
 // Server is the web UI.
@@ -39,6 +41,7 @@ type Server struct {
 	src    Source
 	socket string // shown when sentientd is unreachable
 	now    func() time.Time
+	home   string // the user's home, to show ~/… paths
 	log    *slog.Logger
 	pages  map[string]*template.Template
 	static http.Handler
@@ -49,8 +52,9 @@ func New(src Source, socket string, log *slog.Logger) (*Server, error) {
 	if log == nil {
 		log = slog.Default()
 	}
-	s := &Server{src: src, socket: socket, now: time.Now, log: log, pages: map[string]*template.Template{}}
-	for _, page := range []string{"dashboard", "health", "down"} {
+	home, _ := os.UserHomeDir()
+	s := &Server{src: src, socket: socket, now: time.Now, home: home, log: log, pages: map[string]*template.Template{}}
+	for _, page := range []string{"dashboard", "health", "prompt", "down"} {
 		t, err := template.ParseFS(assets.FS, "templates/layout.html", "templates/"+page+".html")
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", page, err)
@@ -70,6 +74,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.dashboard)
 	mux.HandleFunc("GET /health", s.health)
+	mux.HandleFunc("GET /prompt/{id}", s.prompt)
 	mux.Handle("GET /static/", s.static)
 	return localOnly(mux)
 }

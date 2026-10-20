@@ -23,8 +23,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Sentient_Status_FullMethodName = "/sentient.v1.Sentient/Status"
-	Sentient_Health_FullMethodName = "/sentient.v1.Sentient/Health"
+	Sentient_Status_FullMethodName       = "/sentient.v1.Sentient/Status"
+	Sentient_Health_FullMethodName       = "/sentient.v1.Sentient/Health"
+	Sentient_PromptDetail_FullMethodName = "/sentient.v1.Sentient/PromptDetail"
 )
 
 // SentientClient is the client API for Sentient service.
@@ -35,6 +36,8 @@ type SentientClient interface {
 	Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 	// Health returns sentient's own state (web /health, later `sen health`).
 	Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error)
+	// PromptDetail returns everything about one prompt (web /prompt/<id>).
+	PromptDetail(ctx context.Context, in *PromptDetailRequest, opts ...grpc.CallOption) (*PromptDetailResponse, error)
 }
 
 type sentientClient struct {
@@ -65,6 +68,16 @@ func (c *sentientClient) Health(ctx context.Context, in *HealthRequest, opts ...
 	return out, nil
 }
 
+func (c *sentientClient) PromptDetail(ctx context.Context, in *PromptDetailRequest, opts ...grpc.CallOption) (*PromptDetailResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PromptDetailResponse)
+	err := c.cc.Invoke(ctx, Sentient_PromptDetail_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SentientServer is the server API for Sentient service.
 // All implementations must embed UnimplementedSentientServer
 // for forward compatibility.
@@ -73,6 +86,8 @@ type SentientServer interface {
 	Status(context.Context, *StatusRequest) (*StatusResponse, error)
 	// Health returns sentient's own state (web /health, later `sen health`).
 	Health(context.Context, *HealthRequest) (*HealthResponse, error)
+	// PromptDetail returns everything about one prompt (web /prompt/<id>).
+	PromptDetail(context.Context, *PromptDetailRequest) (*PromptDetailResponse, error)
 	mustEmbedUnimplementedSentientServer()
 }
 
@@ -88,6 +103,9 @@ func (UnimplementedSentientServer) Status(context.Context, *StatusRequest) (*Sta
 }
 func (UnimplementedSentientServer) Health(context.Context, *HealthRequest) (*HealthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Health not implemented")
+}
+func (UnimplementedSentientServer) PromptDetail(context.Context, *PromptDetailRequest) (*PromptDetailResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PromptDetail not implemented")
 }
 func (UnimplementedSentientServer) mustEmbedUnimplementedSentientServer() {}
 func (UnimplementedSentientServer) testEmbeddedByValue()                  {}
@@ -146,6 +164,24 @@ func _Sentient_Health_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Sentient_PromptDetail_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PromptDetailRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SentientServer).PromptDetail(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Sentient_PromptDetail_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SentientServer).PromptDetail(ctx, req.(*PromptDetailRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Sentient_ServiceDesc is the grpc.ServiceDesc for Sentient service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -160,6 +196,10 @@ var Sentient_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Health",
 			Handler:    _Sentient_Health_Handler,
+		},
+		{
+			MethodName: "PromptDetail",
+			Handler:    _Sentient_PromptDetail_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
