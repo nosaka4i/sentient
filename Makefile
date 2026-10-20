@@ -5,7 +5,7 @@ VERSION  ?= 0.0.1
 LDFLAGS  := -X github.com/nosaka4i/sentient/internal/version.Version=$(VERSION)
 TOOLS    := .claudetmp/tools
 
-.PHONY: build test cover proto tools
+.PHONY: build test jstest cover vet fmt check proto tools
 
 build:
 	$(GO) build -ldflags "$(LDFLAGS)" -o bin/ ./cmd/sen ./cmd/sentientd
@@ -13,8 +13,22 @@ build:
 test:
 	$(GO) test ./...
 
+# Tests of the prompts page's script (needs node 20+; nothing to install).
+jstest:
+	node --test web/test/*.test.js
+
 cover:
 	$(GO) test -cover ./...
+
+vet:
+	$(GO) vet ./...
+
+# Fails, listing the files, if any isn't gofmt-formatted.
+fmt:
+	@out="$$(gofmt -l cmd internal)"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
+
+# Everything to run before calling a change done.
+check: fmt vet cover jstest
 
 # Regenerate internal/api/sentientpb from sentient.proto (generated code is
 # committed). Needs `make tools` once.

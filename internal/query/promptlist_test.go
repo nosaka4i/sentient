@@ -48,159 +48,120 @@ func seedPrompts(t *testing.T) (*store.Store, map[string]int64) {
 	return st, ids
 }
 
-func TestListPrompts(t *testing.T) {
+func promptIDs(rows []PromptRow) []int64 {
+	out := make([]int64, 0, len(rows))
+	for _, p := range rows {
+		out = append(out, p.ID)
+	}
+	return out
+}
+
+func sameIDs(got, want []int64) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestGetPromptWindow(t *testing.T) {
 	ctx := context.Background()
 	st, ids := seedPrompts(t)
-	now := time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
-
-	all, err := ListPrompts(ctx, st.DB, PromptFilter{}, now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if all.Total != 4 || len(all.Prompts) != 4 || all.Prompts[0].ID != ids["p4"] || all.Prompts[3].ID != ids["p1"] {
-		t.Fatalf("all: total %d, %d rows, first %d", all.Total, len(all.Prompts), all.Prompts[0].ID)
-	}
-	if len(all.Agents) != 2 || all.Agents[0] != "claude" || len(all.Repos) != 2 || all.Repos[0] != "a_b" || all.Repos[1] != "nosaka" {
-		t.Errorf("options: agents %v repos %v", all.Agents, all.Repos)
-	}
-	if all.HistoryBegins.IsZero() {
-		t.Error("HistoryBegins not set")
-	}
-
-	for _, tc := range []struct {
-		name string
-		f    PromptFilter
-		want []int64
-	}{
-		{"text, case-insensitive", PromptFilter{Text: "snooze"}, []int64{ids["p1"]}},
-		{"text with a percent is literal", PromptFilter{Text: "100%"}, []int64{ids["p4"]}},
-		{"agent", PromptFilter{Agent: "codex"}, []int64{ids["p4"], ids["p3"]}},
-		{"repo", PromptFilter{Repo: "nosaka"}, []int64{ids["p2"], ids["p1"]}},
-		{"repo with an underscore is literal", PromptFilter{Repo: "a_b"}, []int64{ids["p4"], ids["p3"]}},
-		{"repo that is only a suffix doesn't match", PromptFilter{Repo: "saka"}, nil},
-		{"flagged", PromptFilter{Flagged: true}, []int64{ids["p1"]}},
-		{"combined", PromptFilter{Agent: "claude", Text: "tests"}, []int64{ids["p2"]}},
-		{"no match", PromptFilter{Text: "zzz"}, nil},
-	} {
-		l, err := ListPrompts(ctx, st.DB, tc.f, now)
+	d := func(day, hour int) time.Time { return time.Date(2026, 10, day, hour, 0, 0, 0, time.UTC) }
+	get := func(req WindowRequest, now time.Time) *PromptWindow {
+		t.Helper()
+		w, err := GetPromptWindow(ctx, st.DB, req, now)
 		if err != nil {
-			t.Fatalf("%s: %v", tc.name, err)
+			t.Fatalf("%+v: %v", req, err)
 		}
-		var got []int64
-		for _, p := range l.Prompts {
-			got = append(got, p.ID)
-		}
-		if len(got) != len(tc.want) || int(l.Total) != len(tc.want) {
-			t.Errorf("%s: got %v (total %d), want %v", tc.name, got, l.Total, tc.want)
-			continue
-		}
-		for i := range got {
-			if got[i] != tc.want[i] {
-				t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
-				break
-			}
-		}
+		return w
 	}
 
-	// The limit cuts the rows but not the total.
-	l, _ := ListPrompts(ctx, st.DB, PromptFilter{Limit: 2}, now)
-	if l.Total != 4 || len(l.Prompts) != 2 {
-		t.Errorf("limit: total %d rows %d", l.Total, len(l.Prompts))
+	// A window that holds everything: newest first, sessions ordered by their newest prompt.
+	w := get(WindowRequest{Days: 3, MinPrompts: 1}, d(17, 12))
+	if want := []int64{ids["p4"], ids["p3"], ids["p2"], ids["p1"]}; !sameIDs(promptIDs(w.Prompts), want) {
+		t.Fatalf("prompts = %v, want %v", promptIDs(w.Prompts), want)
+	}
+	if w.Matching != 4 || w.More || w.Widened || !w.Oldest.Equal(d(17, 9)) || w.HistoryBegins.IsZero() {
+		t.Errorf("matching %d more %v widened %v oldest %v", w.Matching, w.More, w.Widened, w.Oldest)
+	}
+	if len(w.Sessions) != 2 || w.Sessions[0].ID != "9c1e0000" || w.Sessions[1].ID != "404dabcd" ||
+		w.Sessions[1].Prompts != 2 || w.Sessions[1].Flags != 1 || w.Sessions[1].Repo != "nosaka" {
+		t.Errorf("sessions = %+v", w.Sessions)
+	}
+	if len(w.Agents) != 2 || len(w.Repos) != 2 || len(w.Menu) != 2 || w.OlderSessions != 0 {
+		t.Errorf("options: %v %v %v older %d", w.Agents, w.Repos, w.Menu, w.OlderSessions)
+	}
+	// The row values come from the stored columns.
+	byID := map[int64]PromptRow{}
+	for _, p := range w.Prompts {
+		byID[p.ID] = p
+	}
+	if p := byID[ids["p2"]]; p.Duration != 20*time.Minute || p.Actions != 1 || p.Running || p.Repo != "nosaka" || p.SessionID != "404dabcd" || p.Agent != "claude" {
+		t.Errorf("p2 = %+v", p)
+	}
+	if p := byID[ids["p1"]]; p.Flags != 1 || p.Actions != 1 {
+		t.Errorf("p1 = %+v", p)
+	}
+
+	// Older than the window, but fewer prompts than MinPrompts: widened to the newest few.
+	w = get(WindowRequest{Days: 3, MinPrompts: 2}, d(20, 12))
+	if want := []int64{ids["p4"], ids["p3"]}; !sameIDs(promptIDs(w.Prompts), want) || !w.Widened || w.Matching != 2 {
+		t.Errorf("widened to 2: %v widened %v matching %d", promptIDs(w.Prompts), w.Widened, w.Matching)
+	}
+	// ... and when fewer than that exist at all, everything.
+	w = get(WindowRequest{Days: 3}, d(20, 12))
+	if len(w.Prompts) != 4 || !w.Widened {
+		t.Errorf("widened to all: %d prompts, widened %v", len(w.Prompts), w.Widened)
+	}
+	// Even an empty window yields the newest prompt when the minimum is 1.
+	w = get(WindowRequest{Days: 3, MinPrompts: 1}, d(20, 12))
+	if want := []int64{ids["p4"]}; !sameIDs(promptIDs(w.Prompts), want) || !w.Widened {
+		t.Errorf("empty window with min 1: %v widened %v", promptIDs(w.Prompts), w.Widened)
+	}
+
+	// All time, and paging older with Before.
+	if w = get(WindowRequest{Days: 0}, d(20, 12)); len(w.Prompts) != 4 || w.Widened {
+		t.Errorf("all time: %d prompts widened %v", len(w.Prompts), w.Widened)
+	}
+	w = get(WindowRequest{Days: 0, Before: d(17, 11)}, d(20, 12))
+	if want := []int64{ids["p2"], ids["p1"]}; !sameIDs(promptIDs(w.Prompts), want) || w.Matching != 2 {
+		t.Errorf("before 11:00: %v matching %d", promptIDs(w.Prompts), w.Matching)
+	}
+
+	// The limit cuts the list, not the count; More says so.
+	w = get(WindowRequest{Days: 0, Limit: 2}, d(20, 12))
+	if len(w.Prompts) != 2 || w.Matching != 4 || !w.More || !w.Oldest.Equal(d(17, 11)) {
+		t.Errorf("limit 2: %d prompts matching %d more %v oldest %v", len(w.Prompts), w.Matching, w.More, w.Oldest)
+	}
+
+	// One session: all its prompts, whatever the window says.
+	w = get(WindowRequest{Days: 3, SessionID: "404dabcd"}, d(25, 12))
+	if want := []int64{ids["p2"], ids["p1"]}; !sameIDs(promptIDs(w.Prompts), want) || w.Widened || len(w.Sessions) != 1 || w.Sessions[0].ID != "404dabcd" {
+		t.Errorf("session: %v widened %v sessions %+v", promptIDs(w.Prompts), w.Widened, w.Sessions)
+	}
+	if w = get(WindowRequest{SessionID: "nope"}, d(17, 12)); len(w.Prompts) != 0 || w.Matching != 0 {
+		t.Errorf("unknown session: %+v", w)
 	}
 }
 
-func TestListPromptsOneSession(t *testing.T) {
+func TestGetSessionSummary(t *testing.T) {
 	ctx := context.Background()
-	st, ids := seedPrompts(t)
-	now := time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
-
-	l, err := ListPrompts(ctx, st.DB, PromptFilter{SessionID: "404dabcd"}, now)
+	st, _ := seedPrompts(t)
+	s, err := GetSessionSummary(ctx, st.DB, "404dabcd")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if l.Total != 2 || len(l.Prompts) != 2 || l.Prompts[0].ID != ids["p2"] {
-		t.Errorf("session prompts: total %d rows %+v", l.Total, l.Prompts)
-	}
-	s := l.Session
-	if s == nil || s.ID != "404dabcd" || s.Agent != "claude" || s.Repo != "nosaka" || s.Prompts != 2 || s.Actions != 2 || s.Flags != 1 ||
+	if s.ID != "404dabcd" || s.Agent != "claude" || s.Repo != "nosaka" || s.Prompts != 2 || s.Actions != 2 || s.Flags != 1 ||
 		s.Started.Hour() != 9 || s.LastActivity.IsZero() {
 		t.Errorf("summary = %+v", s)
 	}
-	if len(l.Sessions) != 2 || l.Sessions[0].ID != "9c1e0000" || l.Sessions[0].Repo != "a_b" || l.OlderSessions != 0 {
-		t.Errorf("menu = %+v older %d", l.Sessions, l.OlderSessions)
-	}
-
-	// An unknown session matches nothing and has no summary.
-	l, err = ListPrompts(ctx, st.DB, PromptFilter{SessionID: "nope"}, now)
-	if err != nil || l.Total != 0 || l.Session != nil {
-		t.Errorf("unknown session: %+v, %v", l, err)
-	}
 	if _, err := GetSessionSummary(ctx, st.DB, "nope"); !errors.Is(err, ErrNotFound) {
-		t.Errorf("GetSessionSummary: err = %v, want ErrNotFound", err)
-	}
-}
-
-func TestListSessionGroups(t *testing.T) {
-	ctx := context.Background()
-	st, ids := seedPrompts(t)
-	now := time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
-
-	g, err := ListSessionGroups(ctx, st.DB, PromptFilter{}, 0, now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if g.TotalPrompts != 4 || g.TotalSessions != 2 || len(g.Groups) != 2 || g.HistoryBegins.IsZero() {
-		t.Fatalf("groups: %d prompts %d sessions %d groups", g.TotalPrompts, g.TotalSessions, len(g.Groups))
-	}
-	// Newest session first, newest prompt first within it.
-	a, b := g.Groups[0], g.Groups[1]
-	if a.Session.ID != "9c1e0000" || a.Matching != 2 || a.Session.Prompts != 2 || len(a.Prompts) != 2 || a.Prompts[0].ID != ids["p4"] {
-		t.Errorf("first group = %+v", a)
-	}
-	if b.Session.ID != "404dabcd" || b.Session.Repo != "nosaka" || b.Session.Flags != 1 || b.Prompts[0].ID != ids["p2"] {
-		t.Errorf("second group = %+v", b)
-	}
-	if len(g.Agents) != 2 || len(g.Repos) != 2 || len(g.Sessions) != 2 {
-		t.Errorf("options: %v %v %v", g.Agents, g.Repos, g.Sessions)
-	}
-
-	// Each session shows only its newest prompt(s); the match count stays whole.
-	g, _ = ListSessionGroups(ctx, st.DB, PromptFilter{}, 1, now)
-	if len(g.Groups[0].Prompts) != 1 || g.Groups[0].Matching != 2 || g.Groups[0].Prompts[0].ID != ids["p4"] {
-		t.Errorf("per-session cap: %+v", g.Groups[0])
-	}
-
-	for _, tc := range []struct {
-		name          string
-		f             PromptFilter
-		sessions      int
-		prompts       int64
-		firstSession  string
-		firstMatching int64
-	}{
-		{"text", PromptFilter{Text: "snooze"}, 1, 1, "404dabcd", 1},
-		{"agent", PromptFilter{Agent: "codex"}, 1, 2, "9c1e0000", 2},
-		{"repo", PromptFilter{Repo: "nosaka"}, 1, 2, "404dabcd", 2},
-		{"flagged", PromptFilter{Flagged: true}, 1, 1, "404dabcd", 1},
-		{"session id is ignored", PromptFilter{SessionID: "404dabcd"}, 2, 4, "9c1e0000", 2},
-	} {
-		g, err := ListSessionGroups(ctx, st.DB, tc.f, 0, now)
-		if err != nil {
-			t.Fatalf("%s: %v", tc.name, err)
-		}
-		if len(g.Groups) != tc.sessions || g.TotalPrompts != tc.prompts || g.Groups[0].Session.ID != tc.firstSession || g.Groups[0].Matching != tc.firstMatching {
-			t.Errorf("%s: %d groups, %d prompts, first %s (%d)", tc.name, len(g.Groups), g.TotalPrompts, g.Groups[0].Session.ID, g.Groups[0].Matching)
-		}
-	}
-
-	// The session limit cuts the groups, not the totals.
-	g, _ = ListSessionGroups(ctx, st.DB, PromptFilter{Limit: 1}, 0, now)
-	if len(g.Groups) != 1 || g.TotalSessions != 2 {
-		t.Errorf("limit: %d groups of %d", len(g.Groups), g.TotalSessions)
-	}
-	g, _ = ListSessionGroups(ctx, st.DB, PromptFilter{Text: "zzz"}, 0, now)
-	if len(g.Groups) != 0 || g.TotalPrompts != 0 {
-		t.Errorf("no match: %+v", g)
+		t.Errorf("err = %v, want ErrNotFound", err)
 	}
 }
 
@@ -240,60 +201,6 @@ func TestSessionDetailLoadsOnlyTheNewestPrompts(t *testing.T) {
 	}
 	if len(d.Subagents) != 1 || d.Subagents[0].PromptNumber != int64(n) {
 		t.Errorf("subagent = %+v, want prompt number %d", d.Subagents, n)
-	}
-}
-
-func TestListPromptsSort(t *testing.T) {
-	ctx := context.Background()
-	st, ids := seedPrompts(t)
-	now := time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
-	// seedPrompts: p1 09:00 (flagged, 1 action, 0m), p2 10:00 (1 action, 20m), p3 11:00, p4 11:30
-	order := func(f PromptFilter) []int64 {
-		t.Helper()
-		l, err := ListPrompts(ctx, st.DB, f, now)
-		if err != nil {
-			t.Fatalf("%+v: %v", f, err)
-		}
-		var out []int64
-		for _, p := range l.Prompts {
-			out = append(out, p.ID)
-		}
-		return out
-	}
-	same := func(got, want []int64) bool {
-		if len(got) != len(want) {
-			return false
-		}
-		for i := range got {
-			if got[i] != want[i] {
-				return false
-			}
-		}
-		return true
-	}
-	for _, tc := range []struct {
-		name string
-		f    PromptFilter
-		want []int64
-	}{
-		{"default is newest first", PromptFilter{}, []int64{ids["p4"], ids["p3"], ids["p2"], ids["p1"]}},
-		{"date, oldest first", PromptFilter{Sort: "date", Asc: true}, []int64{ids["p1"], ids["p2"], ids["p3"], ids["p4"]}},
-		// p2 ran 20 minutes, the others are quiet: longest first, ties newest first
-		{"duration", PromptFilter{Sort: "dur"}, []int64{ids["p2"], ids["p4"], ids["p3"], ids["p1"]}},
-		{"shortest", PromptFilter{Sort: "dur", Asc: true}, []int64{ids["p4"], ids["p3"], ids["p1"], ids["p2"]}},
-		// p1 and p2 each have one action
-		{"actions", PromptFilter{Sort: "acts"}, []int64{ids["p2"], ids["p1"], ids["p4"], ids["p3"]}},
-		{"flags", PromptFilter{Sort: "flags"}, []int64{ids["p1"], ids["p4"], ids["p3"], ids["p2"]}},
-		// "100% done_ish?" < "add a --json flag" < "Fix the Snooze crash" < "run the tests"
-		{"prompt A to Z", PromptFilter{Sort: "prompt", Asc: true}, []int64{ids["p4"], ids["p3"], ids["p1"], ids["p2"]}},
-		{"sorted within a session", PromptFilter{Sort: "dur", SessionID: "404dabcd"}, []int64{ids["p2"], ids["p1"]}},
-	} {
-		if got := order(tc.f); !same(got, tc.want) {
-			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
-		}
-	}
-	if !ValidSort("") || !ValidSort("dur") || ValidSort("nope") {
-		t.Error("ValidSort")
 	}
 }
 

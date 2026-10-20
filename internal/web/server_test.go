@@ -23,17 +23,13 @@ type fakeSource struct {
 	st       *query.Status
 	health   *health.Report
 	detail   *query.PromptDetail
-	list     *query.PromptList
-	groups   *query.SessionGroups
+	window   *query.PromptWindow
 	session  *query.SessionDetail
 	err      error
 	from, to time.Time
 	asked    int64 // the prompt id last requested
-	filter   query.PromptFilter
-	// the session grouping request last made
-	groupFilter query.PromptFilter
-	perSession  int
-	// the session id last requested
+	// the window request last made, and the session id last requested
+	windowReq    query.WindowRequest
 	askedSession string
 }
 
@@ -42,14 +38,9 @@ func (f *fakeSource) PromptDetail(ctx context.Context, id int64) (*query.PromptD
 	return f.detail, f.err
 }
 
-func (f *fakeSource) ListPrompts(ctx context.Context, flt query.PromptFilter) (*query.PromptList, error) {
-	f.filter = flt
-	return f.list, f.err
-}
-
-func (f *fakeSource) ListSessionGroups(ctx context.Context, flt query.PromptFilter, perSession int) (*query.SessionGroups, error) {
-	f.groupFilter, f.perSession = flt, perSession
-	return f.groups, f.err
+func (f *fakeSource) PromptWindow(ctx context.Context, req query.WindowRequest) (*query.PromptWindow, error) {
+	f.windowReq = req
+	return f.window, f.err
 }
 
 func (f *fakeSource) SessionDetail(ctx context.Context, id string) (*query.SessionDetail, error) {

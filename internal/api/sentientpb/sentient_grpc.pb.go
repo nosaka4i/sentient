@@ -23,12 +23,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Sentient_Status_FullMethodName            = "/sentient.v1.Sentient/Status"
-	Sentient_Health_FullMethodName            = "/sentient.v1.Sentient/Health"
-	Sentient_PromptDetail_FullMethodName      = "/sentient.v1.Sentient/PromptDetail"
-	Sentient_ListPrompts_FullMethodName       = "/sentient.v1.Sentient/ListPrompts"
-	Sentient_ListSessionGroups_FullMethodName = "/sentient.v1.Sentient/ListSessionGroups"
-	Sentient_SessionDetail_FullMethodName     = "/sentient.v1.Sentient/SessionDetail"
+	Sentient_Status_FullMethodName        = "/sentient.v1.Sentient/Status"
+	Sentient_Health_FullMethodName        = "/sentient.v1.Sentient/Health"
+	Sentient_PromptDetail_FullMethodName  = "/sentient.v1.Sentient/PromptDetail"
+	Sentient_PromptWindow_FullMethodName  = "/sentient.v1.Sentient/PromptWindow"
+	Sentient_SessionDetail_FullMethodName = "/sentient.v1.Sentient/SessionDetail"
 )
 
 // SentientClient is the client API for Sentient service.
@@ -41,11 +40,9 @@ type SentientClient interface {
 	Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error)
 	// PromptDetail returns everything about one prompt (web /prompt/<id>).
 	PromptDetail(ctx context.Context, in *PromptDetailRequest, opts ...grpc.CallOption) (*PromptDetailResponse, error)
-	// ListPrompts returns prompts newest first, filtered (web /prompts).
-	ListPrompts(ctx context.Context, in *ListPromptsRequest, opts ...grpc.CallOption) (*ListPromptsResponse, error)
-	// ListSessionGroups returns sessions with their newest matching prompts
-	// (web /prompts, all sessions).
-	ListSessionGroups(ctx context.Context, in *ListSessionGroupsRequest, opts ...grpc.CallOption) (*ListSessionGroupsResponse, error)
+	// PromptWindow returns the prompts of a time window, or of one session,
+	// with their sessions (web /prompts, filtered in the browser).
+	PromptWindow(ctx context.Context, in *PromptWindowRequest, opts ...grpc.CallOption) (*PromptWindowResponse, error)
 	// SessionDetail returns one session and its prompts (web /session/<id>).
 	SessionDetail(ctx context.Context, in *SessionDetailRequest, opts ...grpc.CallOption) (*SessionDetailResponse, error)
 }
@@ -88,20 +85,10 @@ func (c *sentientClient) PromptDetail(ctx context.Context, in *PromptDetailReque
 	return out, nil
 }
 
-func (c *sentientClient) ListPrompts(ctx context.Context, in *ListPromptsRequest, opts ...grpc.CallOption) (*ListPromptsResponse, error) {
+func (c *sentientClient) PromptWindow(ctx context.Context, in *PromptWindowRequest, opts ...grpc.CallOption) (*PromptWindowResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListPromptsResponse)
-	err := c.cc.Invoke(ctx, Sentient_ListPrompts_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *sentientClient) ListSessionGroups(ctx context.Context, in *ListSessionGroupsRequest, opts ...grpc.CallOption) (*ListSessionGroupsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListSessionGroupsResponse)
-	err := c.cc.Invoke(ctx, Sentient_ListSessionGroups_FullMethodName, in, out, cOpts...)
+	out := new(PromptWindowResponse)
+	err := c.cc.Invoke(ctx, Sentient_PromptWindow_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -128,11 +115,9 @@ type SentientServer interface {
 	Health(context.Context, *HealthRequest) (*HealthResponse, error)
 	// PromptDetail returns everything about one prompt (web /prompt/<id>).
 	PromptDetail(context.Context, *PromptDetailRequest) (*PromptDetailResponse, error)
-	// ListPrompts returns prompts newest first, filtered (web /prompts).
-	ListPrompts(context.Context, *ListPromptsRequest) (*ListPromptsResponse, error)
-	// ListSessionGroups returns sessions with their newest matching prompts
-	// (web /prompts, all sessions).
-	ListSessionGroups(context.Context, *ListSessionGroupsRequest) (*ListSessionGroupsResponse, error)
+	// PromptWindow returns the prompts of a time window, or of one session,
+	// with their sessions (web /prompts, filtered in the browser).
+	PromptWindow(context.Context, *PromptWindowRequest) (*PromptWindowResponse, error)
 	// SessionDetail returns one session and its prompts (web /session/<id>).
 	SessionDetail(context.Context, *SessionDetailRequest) (*SessionDetailResponse, error)
 	mustEmbedUnimplementedSentientServer()
@@ -154,11 +139,8 @@ func (UnimplementedSentientServer) Health(context.Context, *HealthRequest) (*Hea
 func (UnimplementedSentientServer) PromptDetail(context.Context, *PromptDetailRequest) (*PromptDetailResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PromptDetail not implemented")
 }
-func (UnimplementedSentientServer) ListPrompts(context.Context, *ListPromptsRequest) (*ListPromptsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListPrompts not implemented")
-}
-func (UnimplementedSentientServer) ListSessionGroups(context.Context, *ListSessionGroupsRequest) (*ListSessionGroupsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListSessionGroups not implemented")
+func (UnimplementedSentientServer) PromptWindow(context.Context, *PromptWindowRequest) (*PromptWindowResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PromptWindow not implemented")
 }
 func (UnimplementedSentientServer) SessionDetail(context.Context, *SessionDetailRequest) (*SessionDetailResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SessionDetail not implemented")
@@ -238,38 +220,20 @@ func _Sentient_PromptDetail_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Sentient_ListPrompts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListPromptsRequest)
+func _Sentient_PromptWindow_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PromptWindowRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SentientServer).ListPrompts(ctx, in)
+		return srv.(SentientServer).PromptWindow(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Sentient_ListPrompts_FullMethodName,
+		FullMethod: Sentient_PromptWindow_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SentientServer).ListPrompts(ctx, req.(*ListPromptsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Sentient_ListSessionGroups_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListSessionGroupsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SentientServer).ListSessionGroups(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Sentient_ListSessionGroups_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SentientServer).ListSessionGroups(ctx, req.(*ListSessionGroupsRequest))
+		return srv.(SentientServer).PromptWindow(ctx, req.(*PromptWindowRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -312,12 +276,8 @@ var Sentient_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Sentient_PromptDetail_Handler,
 		},
 		{
-			MethodName: "ListPrompts",
-			Handler:    _Sentient_ListPrompts_Handler,
-		},
-		{
-			MethodName: "ListSessionGroups",
-			Handler:    _Sentient_ListSessionGroups_Handler,
+			MethodName: "PromptWindow",
+			Handler:    _Sentient_PromptWindow_Handler,
 		},
 		{
 			MethodName: "SessionDetail",

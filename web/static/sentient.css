@@ -509,15 +509,6 @@ pre.diff .d { color: var(--del); background: var(--low-tint); }
 .filters .shown a { color: var(--high); }
 a.chip { text-decoration: none; }
 
-.prompts tr.day th { background: var(--surface-2); color: var(--text-2); padding: 8px 12px; border-top: 1px solid var(--border); }
-.prompts tbody:first-of-type tr.day th { border-top: 0; }
-.prompts tr.day th { font-weight: 500; text-align: left; text-transform: none; letter-spacing: 0; font-size: 13px; }
-.prompts tr.day th > * + * { margin-left: 10px; }
-.prompts tr.day .sid { font-family: var(--mono); font-weight: 600; color: var(--accent); }
-.prompts tr.day .sid:hover { text-decoration: underline; }
-.prompts tr.day .agent-ic { vertical-align: -3px; }
-.prompts tr.day .repo { color: var(--text); font-weight: 600; }
-.prompts tr.day .dmeta { color: var(--text-3); font-weight: 500; letter-spacing: 0.02em; text-transform: none; margin-left: 10px; }
 .prompts th.n, .prompts td.n { width: 36px; padding-right: 0; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-3); }
 .prompts td.acts { font-variant-numeric: tabular-nums; }
 .pasted { font-family: var(--mono); font-size: 12px; color: var(--text-3); background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; margin-right: 4px; }
@@ -533,9 +524,18 @@ a.chip { text-decoration: none; }
 .sumline a.open:hover { text-decoration: underline; }
 .filters select option:disabled { color: var(--text-3); }
 
-/* sortable column heads (links) and the flat list */
+/* time window bar, list loading state */
+.windowbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 12.5px; color: var(--text-3); }
+.windowbar b { color: var(--text-2); font-weight: 600; }
+.windowbar .wopts { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; }
+.windowbar .chip { padding: 2px 10px; font-size: 12px; }
+.empty .chip { margin-left: 8px; padding: 2px 10px; font-size: 12px; }
+#view.loading { opacity: .5; transition: opacity .15s; }
+
+/* sortable column heads and the flat list */
 .prompts th.sortable { padding: 0; }
-.prompts th .sort { display: inline-flex; align-items: center; gap: 5px; padding: 10px 12px; color: var(--text-3); white-space: nowrap; }
+.prompts th .sort { appearance: none; border: 0; background: none; font: inherit; font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px; padding: 10px 12px; color: var(--text-3); white-space: nowrap; }
 .prompts th .sort:hover { color: var(--text); }
 .prompts th[aria-sort="ascending"] .sort, .prompts th[aria-sort="descending"] .sort { color: var(--text); }
 .prompts th[aria-sort="ascending"] .sort::after { content: "\25B2"; font-size: 8px; }
@@ -545,9 +545,6 @@ a.chip { text-decoration: none; }
 .prompts td.sesscell .sid:hover { text-decoration: underline; }
 .prompts td.sesscell .repo { color: var(--text); margin-left: 6px; }
 .prompts td.sesscell .agent-ic { margin-left: 6px; }
-.sortnote { padding: 8px 16px; font-size: 12px; color: var(--text-3); border-bottom: 1px solid var(--border); }
-.sortnote b { color: var(--text-2); font-weight: 600; }
-.sortnote a { color: var(--high); }
 .sortsel { display: none !important; } /* phones have no column heads: the Sort menu stands in */
 
 .session-block { margin-bottom: 28px; }
@@ -573,12 +570,9 @@ a.chip { text-decoration: none; }
   .filters label.sel .lt { display: none; }
   .filters select { width: 100%; min-width: 0; }
   .filters .shown { flex-basis: 100%; margin-left: 0; }
-  .prompts tbody tr.day { display: block; padding: 0; border-bottom: 1px solid var(--border); }
-  .prompts tr.day th { display: block; padding: 8px 16px; border-bottom: 0; white-space: normal; }
   .prompts th.n, .prompts td.n { display: none; }
   .prompts td.time { display: inline; width: auto; font-size: 12.5px; }
   .sortsel { display: inline-flex !important; }
-  .sortnote { padding: 8px 12px; }
   .prompts td.sesscell { display: none; }
   .sumline { padding: 10px 12px; }
   .sumline a.open { margin-left: 0; flex-basis: 100%; margin-top: 4px; }

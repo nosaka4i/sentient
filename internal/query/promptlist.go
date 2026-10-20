@@ -7,90 +7,13 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/nosaka4i/sentient/internal/dbtime"
 )
 
-// PromptFilter narrows the prompt list. Zero fields match everything.
-type PromptFilter struct {
-	Text      string // substring of the prompt text, case-insensitive
-	Agent     string // exact agent name
-	Repo      string // repo (or cwd) basename
-	Flagged   bool   // only prompts with open alerts
-	SessionID string // only this session's prompts (the agent's session id)
-	Limit     int    // 0 = DefaultListLimit, capped at MaxListLimit
-	// Sort is the column to order by: "date" (the default), "dur", "acts",
-	// "flags" or "prompt". Newest/highest first unless Asc.
-	Sort string
-	Asc  bool
-}
-
-// SortKeys are the columns the prompt list can be sorted by.
-var SortKeys = []string{"date", "dur", "acts", "flags", "prompt"}
-
-// ValidSort reports whether key names a sortable column ("" counts: date).
-func ValidSort(key string) bool {
-	if key == "" {
-		return true
-	}
-	for _, k := range SortKeys {
-		if k == key {
-			return true
-		}
-	}
-	return false
-}
-
-// order is the ORDER BY for the list (aliases p and s). Ties go to the
-// newest prompt, so the order is always total.
-func (f PromptFilter) order() string {
-	dir := "DESC"
-	if f.Asc {
-		dir = "ASC"
-	}
-	var key string
-	switch f.Sort {
-	case "prompt":
-		key = `lower(p.text)`
-	case "acts":
-		key = `p.action_count`
-	case "flags":
-		key = openFlags
-	case "dur":
-		// from the prompt's start to its last log record (stored by the ingester)
-		key = `(julianday(COALESCE(p.last_activity_at, p.started_at)) - julianday(p.started_at))`
-	default:
-		return "p.started_at " + dir + ", p.id " + dir
-	}
-	return key + " " + dir + ", p.started_at DESC, p.id DESC"
-}
-
-// DefaultListLimit and MaxListLimit bound how many prompts the list returns.
-const (
-	DefaultListLimit = 50
-	MaxListLimit     = 1000
-)
-
 // SessionMenuSize is how many recent sessions the Session menu offers.
 const SessionMenuSize = 30
-
-// PromptList is the data behind the prompts page for one session or filter.
-type PromptList struct {
-	HistoryBegins time.Time
-	Total         int64 // prompts matching the filter
-	Prompts       []PromptRow
-	Agents        []string // every agent seen
-	Repos         []string // every repo seen
-	// Session summarizes the session the filter named (nil otherwise, or if
-	// there is no such session).
-	Session *SessionSummary
-	// Sessions is the Session menu: the most recent sessions; OlderSessions
-	// counts the ones left out.
-	Sessions      []SessionOption
-	OlderSessions int64
-}
 
 // SessionSummary is a session in a line: who, where, when, how much.
 type SessionSummary struct {
@@ -109,72 +32,6 @@ type SessionOption struct {
 
 // repoOf is the SQL expression for a session's repo path.
 const repoOf = `COALESCE(s.repo_root, s.cwd, '')`
-
-// cond builds the WHERE condition (on aliases p and s) and its args.
-func (f PromptFilter) cond() (string, []any) {
-	where, args := []string{"1 = 1"}, []any{}
-	if t := strings.TrimSpace(f.Text); t != "" {
-		where = append(where, `instr(lower(p.text), lower(?)) > 0`)
-		args = append(args, t)
-	}
-	if f.Agent != "" {
-		where = append(where, `s.agent = ?`)
-		args = append(args, f.Agent)
-	}
-	if f.Repo != "" {
-		// the path ends in /<repo> (or is exactly it); a literal suffix test,
-		// so a repo named a_b doesn't match as a pattern
-		where = append(where, `(`+repoOf+` = ? OR substr(`+repoOf+`, -(length(?) + 1)) = '/' || ?)`)
-		args = append(args, f.Repo, f.Repo, f.Repo)
-	}
-	if f.SessionID != "" {
-		where = append(where, `s.agent_session_id = ?`)
-		args = append(args, f.SessionID)
-	}
-	if f.Flagged {
-		where = append(where, `EXISTS (SELECT 1 FROM alerts al JOIN actions a ON a.id = al.action_id WHERE a.prompt_id = p.id AND al.status = 'open')`)
-	}
-	return strings.Join(where, " AND "), args
-}
-
-// ListPrompts returns the newest prompts matching f, newest first, with the
-// total that match and the values to offer in the filters.
-func ListPrompts(ctx context.Context, db *sql.DB, f PromptFilter, now time.Time) (*PromptList, error) {
-	l := &PromptList{}
-	var err error
-	if l.HistoryBegins, err = HistoryBegins(ctx, db); err != nil {
-		return nil, err
-	}
-	cond, args := f.cond()
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM prompts p JOIN sessions s ON s.id = p.session_id WHERE `+cond, args...).Scan(&l.Total); err != nil {
-		return nil, fmt.Errorf("prompt total: %w", err)
-	}
-	limit := f.Limit
-	if limit <= 0 {
-		limit = DefaultListLimit
-	}
-	if limit > MaxListLimit {
-		limit = MaxListLimit
-	}
-	if l.Prompts, err = loadPrompts(ctx, db, cond, args, f.order()+` LIMIT ?`, limit, now); err != nil {
-		return nil, err
-	}
-	if l.Agents, l.Repos, err = filterOptions(ctx, db); err != nil {
-		return nil, err
-	}
-	if l.Sessions, l.OlderSessions, err = sessionOptions(ctx, db); err != nil {
-		return nil, err
-	}
-	if f.SessionID != "" {
-		switch l.Session, err = GetSessionSummary(ctx, db, f.SessionID); {
-		case errors.Is(err, ErrNotFound):
-			l.Session, err = nil, nil
-		case err != nil:
-			return nil, err
-		}
-	}
-	return l, nil
-}
 
 // filterOptions lists the agents and repos to offer in the filters.
 func filterOptions(ctx context.Context, db *sql.DB) (agents, repos []string, err error) {

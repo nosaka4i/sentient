@@ -14,63 +14,75 @@ import (
 	"github.com/nosaka4i/sentient/internal/query"
 )
 
-// ListPrompts implements sentientpb.SentientServer.
-func (s *Server) ListPrompts(ctx context.Context, req *sentientpb.ListPromptsRequest) (*sentientpb.ListPromptsResponse, error) {
-	if req.GetLimit() < 0 || req.GetLimit() > query.MaxListLimit {
-		return nil, status.Errorf(codes.InvalidArgument, "limit must be 0..%d", query.MaxListLimit)
+// maxWindowDays bounds a window request (a year is far past any use).
+const maxWindowDays = 3650
+
+// PromptWindow implements sentientpb.SentientServer.
+func (s *Server) PromptWindow(ctx context.Context, req *sentientpb.PromptWindowRequest) (*sentientpb.PromptWindowResponse, error) {
+	if req.GetDays() < 0 || req.GetDays() > maxWindowDays || req.GetLimit() < 0 || req.GetLimit() > query.MaxWindowPrompts ||
+		req.GetMinPrompts() < 0 || req.GetMinPrompts() > query.MaxWindowPrompts {
+		return nil, status.Errorf(codes.InvalidArgument, "days must be 0..%d, limit and min_prompts 0..%d", maxWindowDays, query.MaxWindowPrompts)
 	}
-	if !query.ValidSort(req.GetSort()) {
-		return nil, status.Errorf(codes.InvalidArgument, "sort must be one of %v", query.SortKeys)
+	wr := query.WindowRequest{
+		Days: int(req.GetDays()), SessionID: req.GetSessionId(), Limit: int(req.GetLimit()), MinPrompts: int(req.GetMinPrompts()),
 	}
-	l, err := query.ListPrompts(ctx, s.db, query.PromptFilter{
-		Text: req.GetText(), Agent: req.GetAgent(), Repo: req.GetRepo(), Flagged: req.GetFlagged(),
-		SessionID: req.GetSessionId(), Limit: int(req.GetLimit()), Sort: req.GetSort(), Asc: req.GetAscending(),
-	}, time.Now())
+	if req.GetBefore() != nil {
+		wr.Before = req.GetBefore().AsTime()
+	}
+	w, err := query.GetPromptWindow(ctx, s.db, wr, time.Now())
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "list prompts: %v", err)
+		return nil, status.Errorf(codes.Internal, "prompt window: %v", err)
 	}
-	r := &sentientpb.ListPromptsResponse{
-		Total: l.Total, Agents: l.Agents, Repos: l.Repos, OlderSessions: l.OlderSessions,
-		Sessions: sessionOptionsToProto(l.Sessions),
+	r := &sentientpb.PromptWindowResponse{
+		Matching: w.Matching, More: w.More, Widened: w.Widened, Agents: w.Agents, Repos: w.Repos,
+		Menu: sessionOptionsToProto(w.Menu), OlderSessions: w.OlderSessions,
 	}
-	if !l.HistoryBegins.IsZero() {
-		r.HistoryBegins = timestamppb.New(l.HistoryBegins)
+	if !w.HistoryBegins.IsZero() {
+		r.HistoryBegins = timestamppb.New(w.HistoryBegins)
 	}
-	if l.Session != nil {
-		r.Session = sessionSummaryToProto(*l.Session)
+	if !w.Oldest.IsZero() {
+		r.Oldest = timestamppb.New(w.Oldest)
 	}
-	for _, p := range l.Prompts {
+	for _, p := range w.Prompts {
 		r.Prompts = append(r.Prompts, promptToProto(p))
+	}
+	for _, sum := range w.Sessions {
+		r.Sessions = append(r.Sessions, sessionSummaryToProto(sum))
 	}
 	return r, nil
 }
 
-// ListSessionGroups implements sentientpb.SentientServer.
-func (s *Server) ListSessionGroups(ctx context.Context, req *sentientpb.ListSessionGroupsRequest) (*sentientpb.ListSessionGroupsResponse, error) {
-	if req.GetSessionLimit() < 0 || req.GetSessionLimit() > query.MaxSessionLimit || req.GetPerSession() < 0 || req.GetPerSession() > 50 {
-		return nil, status.Errorf(codes.InvalidArgument, "session_limit must be 0..%d and per_session 0..50", query.MaxSessionLimit)
+// PromptWindow fetches the prompts of a time window or one session.
+func (c *Client) PromptWindow(ctx context.Context, req query.WindowRequest) (*query.PromptWindow, error) {
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	pr := &sentientpb.PromptWindowRequest{
+		Days: int32(req.Days), SessionId: req.SessionID, Limit: int32(req.Limit), MinPrompts: int32(req.MinPrompts),
 	}
-	g, err := query.ListSessionGroups(ctx, s.db, query.PromptFilter{
-		Text: req.GetText(), Agent: req.GetAgent(), Repo: req.GetRepo(), Flagged: req.GetFlagged(), Limit: int(req.GetSessionLimit()),
-	}, int(req.GetPerSession()), time.Now())
+	if !req.Before.IsZero() {
+		pr.Before = timestamppb.New(req.Before)
+	}
+	resp, err := c.c.PromptWindow(ctx, pr)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "list session groups: %v", err)
+		return nil, c.callErr(err)
 	}
-	r := &sentientpb.ListSessionGroupsResponse{
-		TotalPrompts: g.TotalPrompts, TotalSessions: g.TotalSessions, Agents: g.Agents, Repos: g.Repos,
-		Sessions: sessionOptionsToProto(g.Sessions), OlderSessions: g.OlderSessions,
+	w := &query.PromptWindow{
+		Matching: resp.GetMatching(), More: resp.GetMore(), Widened: resp.GetWidened(), Agents: resp.GetAgents(), Repos: resp.GetRepos(),
+		Menu: sessionOptionsFromProto(resp.GetMenu()), OlderSessions: resp.GetOlderSessions(),
 	}
-	if !g.HistoryBegins.IsZero() {
-		r.HistoryBegins = timestamppb.New(g.HistoryBegins)
+	if resp.GetHistoryBegins() != nil {
+		w.HistoryBegins = resp.GetHistoryBegins().AsTime()
 	}
-	for _, grp := range g.Groups {
-		pg := &sentientpb.SessionGroup{Session: sessionSummaryToProto(grp.Session), Matching: grp.Matching}
-		for _, p := range grp.Prompts {
-			pg.Prompts = append(pg.Prompts, promptToProto(p))
-		}
-		r.Groups = append(r.Groups, pg)
+	if resp.GetOldest() != nil {
+		w.Oldest = resp.GetOldest().AsTime()
 	}
-	return r, nil
+	for _, p := range resp.GetPrompts() {
+		w.Prompts = append(w.Prompts, promptFromProto(p))
+	}
+	for _, sum := range resp.GetSessions() {
+		w.Sessions = append(w.Sessions, sessionSummaryFromProto(sum))
+	}
+	return w, nil
 }
 
 func sessionSummaryToProto(s query.SessionSummary) *sentientpb.SessionSummary {
@@ -149,64 +161,6 @@ func (s *Server) SessionDetail(ctx context.Context, req *sentientpb.SessionDetai
 		})
 	}
 	return r, nil
-}
-
-// ListPrompts fetches the prompts matching f, newest first.
-func (c *Client) ListPrompts(ctx context.Context, f query.PromptFilter) (*query.PromptList, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	resp, err := c.c.ListPrompts(ctx, &sentientpb.ListPromptsRequest{
-		Text: f.Text, Agent: f.Agent, Repo: f.Repo, Flagged: f.Flagged, SessionId: f.SessionID, Limit: int32(f.Limit),
-		Sort: f.Sort, Ascending: f.Asc,
-	})
-	if err != nil {
-		return nil, c.callErr(err)
-	}
-	l := &query.PromptList{
-		Total: resp.GetTotal(), Agents: resp.GetAgents(), Repos: resp.GetRepos(),
-		Sessions: sessionOptionsFromProto(resp.GetSessions()), OlderSessions: resp.GetOlderSessions(),
-	}
-	if resp.GetHistoryBegins() != nil {
-		l.HistoryBegins = resp.GetHistoryBegins().AsTime()
-	}
-	if resp.GetSession() != nil {
-		s := sessionSummaryFromProto(resp.GetSession())
-		l.Session = &s
-	}
-	for _, p := range resp.GetPrompts() {
-		l.Prompts = append(l.Prompts, promptFromProto(p))
-	}
-	return l, nil
-}
-
-// ListSessionGroups fetches the sessions with a prompt matching f, newest
-// first, each with its newest perSession matching prompts. f.Limit is the
-// number of sessions.
-func (c *Client) ListSessionGroups(ctx context.Context, f query.PromptFilter, perSession int) (*query.SessionGroups, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	resp, err := c.c.ListSessionGroups(ctx, &sentientpb.ListSessionGroupsRequest{
-		Text: f.Text, Agent: f.Agent, Repo: f.Repo, Flagged: f.Flagged,
-		SessionLimit: int32(f.Limit), PerSession: int32(perSession),
-	})
-	if err != nil {
-		return nil, c.callErr(err)
-	}
-	g := &query.SessionGroups{
-		TotalPrompts: resp.GetTotalPrompts(), TotalSessions: resp.GetTotalSessions(), Agents: resp.GetAgents(), Repos: resp.GetRepos(),
-		Sessions: sessionOptionsFromProto(resp.GetSessions()), OlderSessions: resp.GetOlderSessions(),
-	}
-	if resp.GetHistoryBegins() != nil {
-		g.HistoryBegins = resp.GetHistoryBegins().AsTime()
-	}
-	for _, pg := range resp.GetGroups() {
-		grp := query.SessionGroup{Session: sessionSummaryFromProto(pg.GetSession()), Matching: pg.GetMatching()}
-		for _, p := range pg.GetPrompts() {
-			grp.Prompts = append(grp.Prompts, promptFromProto(p))
-		}
-		g.Groups = append(g.Groups, grp)
-	}
-	return g, nil
 }
 
 // SessionDetail fetches one session by the agent's session id, or ErrNotFound.

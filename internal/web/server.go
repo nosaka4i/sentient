@@ -34,8 +34,7 @@ type Source interface {
 	Status(ctx context.Context, from, to time.Time) (*query.Status, string, error)
 	Health(ctx context.Context) (*health.Report, error)
 	PromptDetail(ctx context.Context, id int64) (*query.PromptDetail, error)
-	ListPrompts(ctx context.Context, f query.PromptFilter) (*query.PromptList, error)
-	ListSessionGroups(ctx context.Context, f query.PromptFilter, perSession int) (*query.SessionGroups, error)
+	PromptWindow(ctx context.Context, req query.WindowRequest) (*query.PromptWindow, error)
 	SessionDetail(ctx context.Context, sessionID string) (*query.SessionDetail, error)
 }
 
@@ -68,7 +67,9 @@ func New(src Source, socket string, log *slog.Logger) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.static = http.StripPrefix("/static/", http.FileServer(http.FS(static)))
+	if s.static, err = newStaticHandler(static); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
@@ -79,9 +80,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /health", s.health)
 	mux.HandleFunc("GET /prompt/{id}", s.prompt)
 	mux.HandleFunc("GET /prompts", s.prompts)
+	mux.HandleFunc("GET /prompts/data", s.promptsData)
 	mux.HandleFunc("GET /session/{id}", s.session)
 	mux.Handle("GET /static/", s.static)
-	return localOnly(mux)
+	return localOnly(gzipped(mux))
 }
 
 // localOnly rejects requests whose Host isn't a loopback name, so a web

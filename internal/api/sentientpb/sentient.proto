@@ -17,24 +17,11 @@ service Sentient {
   rpc Health(HealthRequest) returns (HealthResponse);
   // PromptDetail returns everything about one prompt (web /prompt/<id>).
   rpc PromptDetail(PromptDetailRequest) returns (PromptDetailResponse);
-  // ListPrompts returns prompts newest first, filtered (web /prompts).
-  rpc ListPrompts(ListPromptsRequest) returns (ListPromptsResponse);
-  // ListSessionGroups returns sessions with their newest matching prompts
-  // (web /prompts, all sessions).
-  rpc ListSessionGroups(ListSessionGroupsRequest) returns (ListSessionGroupsResponse);
+  // PromptWindow returns the prompts of a time window, or of one session,
+  // with their sessions (web /prompts, filtered in the browser).
+  rpc PromptWindow(PromptWindowRequest) returns (PromptWindowResponse);
   // SessionDetail returns one session and its prompts (web /session/<id>).
   rpc SessionDetail(SessionDetailRequest) returns (SessionDetailResponse);
-}
-
-message ListPromptsRequest {
-  string text = 1;   // substring of the prompt text, case-insensitive
-  string agent = 2;  // exact agent name
-  string repo = 3;   // repo (or cwd) basename
-  bool flagged = 4;  // only prompts with open alerts
-  int32 limit = 5;   // 0 = server default (50), max 1000
-  string session_id = 6; // only this session's prompts (the agent's session id)
-  string sort = 7;       // date (default), dur, acts, flags or prompt
-  bool ascending = 8;    // lowest/oldest/A-Z first; default is newest/highest first
 }
 
 message SessionSummary {
@@ -55,41 +42,28 @@ message SessionOption {
   string repo = 3;
 }
 
-message ListPromptsResponse {
+message PromptWindowRequest {
+  int32 days = 1; // the last N days; 0 = all time
+  google.protobuf.Timestamp before = 2; // only prompts that started before this (paging older)
+  string session_id = 3; // one session's prompts instead of a time window
+  int32 limit = 4;       // 0 = 5000 (the maximum)
+  // A window with fewer prompts than this is widened to the newest this many,
+  // so a quiet week doesn't look empty. 0 = 100.
+  int32 min_prompts = 5;
+}
+
+message PromptWindowResponse {
   google.protobuf.Timestamp history_begins = 1;
-  int64 total = 2;              // prompts matching the filter
-  repeated Prompt prompts = 3;  // the newest `limit` of them
-  repeated string agents = 4;   // every agent seen, for the filter
-  repeated string repos = 5;    // every repo seen, for the filter
-  SessionSummary session = 6;   // set when the request named a session
-  repeated SessionOption sessions = 7; // recent sessions, for the Session menu
-  int64 older_sessions = 8;     // sessions not in `sessions`
-}
-
-message ListSessionGroupsRequest {
-  string text = 1;
-  string agent = 2;
-  string repo = 3;
-  bool flagged = 4;
-  int32 session_limit = 5; // 0 = server default (10), max 200
-  int32 per_session = 6;   // prompts per session, 0 = 3
-}
-
-message SessionGroup {
-  SessionSummary session = 1; // `prompts` is the session's total
-  int64 matching = 2;         // its prompts matching the filter
-  repeated Prompt prompts = 3; // the newest few of those
-}
-
-message ListSessionGroupsResponse {
-  google.protobuf.Timestamp history_begins = 1;
-  int64 total_prompts = 2;   // prompts matching the filter, all sessions
-  int64 total_sessions = 3;  // sessions with a matching prompt
-  repeated SessionGroup groups = 4; // newest session first
-  repeated string agents = 5;
-  repeated string repos = 6;
-  repeated SessionOption sessions = 7;
-  int64 older_sessions = 8;
+  repeated Prompt prompts = 2;          // newest first
+  repeated SessionSummary sessions = 3; // the sessions of those prompts
+  int64 matching = 4;                   // prompts in the window or session, before the limit
+  bool more = 5;                        // older ones exist beyond these
+  google.protobuf.Timestamp oldest = 6; // when the oldest returned prompt started
+  bool widened = 7;                     // the window was widened to reach min_prompts
+  repeated string agents = 8;           // every agent seen, for the filters
+  repeated string repos = 9;            // every repo seen
+  repeated SessionOption menu = 10;     // recent sessions, for the Session menu
+  int64 older_sessions = 11;            // sessions left out of the menu
 }
 
 message SessionDetailRequest {

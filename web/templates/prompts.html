@@ -1,163 +1,67 @@
-{{define "prompt-cells"}}
-            <td class="state">{{if .Running}}<span class="running-dot" role="img" aria-label="running" title="Still running"></span>{{end}}</td>
-            <td class="prompt"><a href="{{.Href}}" title="{{.Title}}">{{if .Pasted}}<span class="pasted">pasted {{.Pasted}} lines</span> {{end}}{{.Text}}</a></td>
-            <td class="date metaline"><time datetime="{{.ISO}}">{{.Date}}</time><span class="m-only"> · {{.Duration}} · {{.Actions}} actions{{if .Flags}} · <span class="flag">{{.Flags}} flag{{if ne .Flags 1}}s{{end}}</span>{{end}}{{if .Running}}<span class="running-label">running</span>{{end}}</span></td>
-            <td class="dur">{{.Duration}}</td>
-            <td class="acts"><span class="acts" title="{{.Actions}} actions{{if .Running}} so far{{end}}">{{.Actions}}</span></td>
-            <td class="flags">{{if .Flags}}<span class="flag" title="{{.Flags}} attention item{{if ne .Flags 1}}s{{end}}">{{.Flags}}</span>{{end}}</td>
-{{- end}}
-
-{{/* The flat list adds the prompt's session between the prompt and the date. */}}
-{{define "flat-cells"}}
-            <td class="state">{{if .Running}}<span class="running-dot" role="img" aria-label="running" title="Still running"></span>{{end}}</td>
-            <td class="prompt"><a href="{{.Href}}" title="{{.Title}}">{{if .Pasted}}<span class="pasted">pasted {{.Pasted}} lines</span> {{end}}{{.Text}}</a></td>
-            <td class="sesscell"><a class="sid" href="{{.SessionHref}}" title="Open session {{.SessionShort}}">{{.SessionShort}}</a>{{template "agent-icon" .Agent}}{{if .Repo}}<span class="repo">{{.Repo}}</span>{{end}}</td>
-            <td class="date metaline"><time datetime="{{.ISO}}">{{.Date}}</time><span class="m-only"> · {{.SessionShort}}{{if .Repo}} · {{.Repo}}{{end}} · {{.Duration}} · {{.Actions}} actions{{if .Flags}} · <span class="flag">{{.Flags}} flag{{if ne .Flags 1}}s{{end}}</span>{{end}}{{if .Running}}<span class="running-label">running</span>{{end}}</span></td>
-            <td class="dur">{{.Duration}}</td>
-            <td class="acts"><span class="acts" title="{{.Actions}} actions{{if .Running}} so far{{end}}">{{.Actions}}</span></td>
-            <td class="flags">{{if .Flags}}<span class="flag" title="{{.Flags}} attention item{{if ne .Flags 1}}s{{end}}">{{.Flags}}</span>{{end}}</td>
-{{- end}}
-
-{{/* Column heads are links: click to sort, again to reverse. */}}
-{{define "prompts-head"}}
-        <thead>
-          <tr>
-            <th><span class="visually-hidden" style="position:absolute;left:-9999px">State</span></th>
-{{- range .Heads}}
-{{- if and $.Flat (eq .Key "date")}}
-            <th>Session</th>
-{{- end}}
-            <th class="sortable" aria-sort="{{.Aria}}"><a class="sort" href="{{.Href}}">{{.Label}}</a></th>
-{{- end}}
-          </tr>
-        </thead>
-{{- end}}
-
+{{/* The prompts page is a shell: static/prompts.js fills it from the JSON in "scripts". */}}
 {{define "content"}}
   <a class="back" href="/">&larr; Dashboard</a>
 
   <div class="page-title">
-    <h1>Prompts <span class="count">{{.Total}}</span></h1>
-    <p class="sub">Grouped by session, newest first. Pick a session to focus on it, or click a column to sort</p>
+    <h1>Prompts <span class="count" id="total"></span></h1>
+    <p class="sub">Every prompt, newest first. Click a column to sort, click a session id to open that session, widen the time window for older prompts</p>
   </div>
 
   <section class="card" aria-label="All prompts">
-    <form class="filters" role="search" method="get" action="/prompts">
+    <form class="filters" role="search" onsubmit="return false">
       <div class="search">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-        <input type="search" name="q" value="{{.Query}}" placeholder="Search prompt text" aria-label="Search prompt text" autocomplete="off">
+        <input type="search" id="q" placeholder="Search prompt text" aria-label="Search prompt text" autocomplete="off">
       </div>
       <label class="sel"><span class="lt">Agent</span>
-        <select name="agent" aria-label="Agent" data-autosubmit>
-          <option value="">All agents</option>
-{{- range .Agents}}
-          <option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Value}}</option>
-{{- end}}
-        </select>
+        <select id="f-agent" aria-label="Agent"><option value="">All agents</option></select>
       </label>
       <label class="sel"><span class="lt">Repo</span>
-        <select name="repo" aria-label="Repo" data-autosubmit>
-          <option value="">All repos</option>
-{{- range .Repos}}
-          <option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Value}}</option>
-{{- end}}
-        </select>
+        <select id="f-repo" aria-label="Repo"><option value="">All repos</option></select>
       </label>
       <label class="sel"><span class="lt">Session</span>
-        <select name="session" aria-label="Session" data-autosubmit>
-          <option value="">All sessions</option>
-{{- range .Sessions}}
-          <option{{if .Value}} value="{{.Value}}"{{end}}{{if .Selected}} selected{{end}}{{if .Disabled}} disabled{{end}}>{{.Label}}</option>
-{{- end}}
-        </select>
+        <select id="f-session" aria-label="Session"><option value="">All sessions</option></select>
       </label>
       <label class="sel sortsel"><span class="lt">Sort</span>
-        <select name="sort" aria-label="Sort by" data-autosubmit>
-{{- range .SortOptions}}
-          <option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>
-{{- end}}
+        <select id="f-sort" aria-label="Sort by">
+          <option value="date:desc">Newest first</option>
+          <option value="date:asc">Oldest first</option>
+          <option value="dur:desc">Longest</option>
+          <option value="dur:asc">Shortest</option>
+          <option value="acts:desc">Most actions</option>
+          <option value="acts:asc">Fewest actions</option>
+          <option value="flags:desc">Most flags</option>
+          <option value="flags:asc">Fewest flags</option>
+          <option value="prompt:asc">Prompt A&ndash;Z</option>
+          <option value="prompt:desc">Prompt Z&ndash;A</option>
         </select>
       </label>
-      {{- if .Flagged}}
-      <input type="hidden" name="flagged" value="1">
-      {{- end}}
-      <a class="chip" href="{{.FlaggedHref}}" aria-pressed="{{if .Flagged}}true{{else}}false{{end}}" title="Only prompts with attention items">Flagged only</a>
-      <span class="shown">{{.Shown}}{{if .Clear}} · <a href="{{.Clear}}">clear filters</a>{{end}}</span>
+      <button class="chip" id="f-flag" type="button" aria-pressed="false" title="Only prompts with attention items">Flagged only</button>
+      <span class="shown" id="shown"></span>
     </form>
-{{- if .One}}
 
-    <div class="sumline">
-      {{- if .Summary.Repo}}
-      <span class="repo">{{.Summary.Repo}}</span>
-      {{- end}}
-      {{- if .Summary.Range}}
-      <span>{{.Summary.Range}}</span>
-      {{- end}}
-      <span>{{.Summary.Prompts}} prompt{{if ne .Summary.Prompts 1}}s{{end}}</span>
-      <span>{{.Summary.Actions}} actions</span>
-      {{- if .Summary.Flags}}
-      <span><span class="flag">{{.Summary.Flags}} flag{{if ne .Summary.Flags 1}}s{{end}}</span></span>
-      {{- end}}
-      <a class="open" href="{{.Summary.Href}}">Open session {{.Summary.Short}} &rarr;</a>
+    <div class="windowbar" id="windowbar">
+      <span>Showing <b id="wlabel"></b> <span id="wcount"></span></span>
+      <span class="wopts" role="group" aria-label="Time window">
+        <button class="chip" type="button" data-days="3" aria-pressed="false">3 days</button>
+        <button class="chip" type="button" data-days="7" aria-pressed="false">7 days</button>
+        <button class="chip" type="button" data-days="30" aria-pressed="false">30 days</button>
+        <button class="chip" type="button" data-days="0" aria-pressed="false">All time</button>
+      </span>
     </div>
-{{- if .Rows}}
-    <div class="table-scroll">
-      <table class="prompts">
-{{- template "prompts-head" .}}
-        <tbody>
-{{- range .Rows}}
-          <tr data-href="{{.Href}}">{{template "prompt-cells" .}}
-          </tr>
-{{- end}}
-        </tbody>
-      </table>
-    </div>
-{{- else}}
-    <div class="empty" style="display:block">No prompts in this session match these filters.</div>
-{{- end}}
-{{- else if .Flat}}
 
-    <div class="sortnote" style="display:block">Sorted by <b>{{.SortNote}}</b> across all sessions &middot; <a href="{{.ResetSort}}">back to grouped by session</a></div>
-{{- if .FlatRows}}
-    <div class="table-scroll">
-      <table class="prompts">
-{{- template "prompts-head" .}}
-        <tbody>
-{{- range .FlatRows}}
-          <tr data-href="{{.Href}}">{{template "flat-cells" .}}
-          </tr>
-{{- end}}
-        </tbody>
-      </table>
-    </div>
-{{- else}}
-    <div class="empty" style="display:block">No prompts match these filters.</div>
-{{- end}}
-{{- else if .Groups}}
+    <div id="view" aria-live="polite"></div>
+    <div class="empty" id="empty"></div>
+    <noscript><div class="empty" style="display:block">The prompts list needs JavaScript to filter and sort. Enable it for this page.</div></noscript>
 
-    <div class="table-scroll">
-      <table class="prompts">
-{{- template "prompts-head" .}}
-{{- range .Groups}}
-        <tbody>
-          <tr class="day"><th colspan="6" scope="rowgroup"><a class="sid" href="{{.SessionHref}}" title="Open session {{.ID}}">{{.Short}}</a>{{template "agent-icon" .Agent}}{{if .Repo}}<span class="repo">{{.Repo}}</span>{{end}}<span class="dmeta">{{.Range}} · {{.CountText}}{{if .SeeAll}} · <a class="sid" href="{{.SeeAll}}">newest {{len .Rows}} shown, see all &rarr;</a>{{end}}</span></th></tr>
-{{- range .Rows}}
-          <tr data-href="{{.Href}}">{{template "prompt-cells" .}}
-          </tr>
-{{- end}}
-        </tbody>
-{{- end}}
-      </table>
+    <div class="more-row" id="more" hidden>
+      <button class="chip" type="button" id="more-btn">Show more</button>
+      <span class="left" id="more-text"></span>
     </div>
-{{- else}}
-    <div class="empty" style="display:block">{{if .Filtered}}No prompts match these filters.{{else}}No prompts yet. They show up here as soon as an agent starts working.{{end}}</div>
-{{- end}}
-{{- if .MoreHref}}
-
-    <div class="more-row">
-      <a class="chip" href="{{.MoreHref}}">Show more</a>
-      <span class="left">{{.MoreText}}</span>
-    </div>
-{{- end}}
   </section>
+{{end}}
+
+{{define "scripts"}}
+<script id="prompts-data" type="application/json">{{.Data}}</script>
+<script src="/static/prompts.js"></script>
 {{end}}

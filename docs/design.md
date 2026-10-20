@@ -95,11 +95,26 @@ The goal is a rich web UI; the CLI comes first and shares its foundation.
   compiled and embedded with `go:embed`; no Node at runtime.
 - **Live:** new events are pushed to the browser (SSE or WebSocket).
 - **Remote access** via SSH tunnel or Tailscale, including phones.
-- **Look:** dashboard mockup `.mocks/dashboard-19.html` (empty states:
-  `.mocks/dashboard-no-review-01/02.html`) is the current baseline — dark-first with light mode, single-hue palette built
+- **Look:** dashboard mockup `.mocks/dashboard-21.html` (empty states:
+  `dashboard-no-review-03/04`) is the current baseline — dark-first with light mode, single-hue palette built
   on nosaka's cyan (`#04d9ff`; `#007e96` in light mode): severity by
   lightness/fill (high solid cyan, medium cyan outline/tint, low grey).
   No amber; no timeline.
+- **Server-rendered pages** (`html/template`, no framework): dashboard,
+  health, prompt, session. **The prompts page is the exception:** it is a
+  shell plus `static/prompts.js`. The server returns a *window* of prompts as
+  compact JSON (`/prompts/data`: the last N days, default 3, widened to the
+  newest 100 if quiet; or one session; always at most 5,000, older pages via
+  `before`), and the browser searches, filters, sorts and pages on that data.
+  It is one flat list, newest first, with a Session column linking to each
+  session's page (a per-session view is the session page, or `?session=`);
+  an earlier grouped-by-session layout was dropped because looking across
+  sessions for patterns is the point of this page. Spec:
+  `.mocks/prompts-08.html` (the grouped layout; the built page is the flat
+  list, as in `prompts-11.html`). Per-prompt duration and
+  action count are stored columns (`prompts.last_activity_at`,
+  `action_count`) so a window is cheap to build. Search beyond the loaded
+  window needs the server (backlog: FTS5). Script tests: `make jstest`.
 
 ### Linux collector: Tetragon
 
