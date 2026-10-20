@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sentient — your coding agent shouldn't be a black box</title>
+<meta name="description" content="Sentient is an open source monitor for coding agents. It captures every action your agent takes, from file changes to shell commands and network connections, so you can reconstruct exactly what happened." />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="stylesheet" href="assets/site.css" />
+<link rel="canonical" href="https://nosaka.ai/sentient/" />
+</head>
+<body>
+
+<div class="wrap">
+  <nav class="nav">
+    <a class="brand" href="#"><span class="brand-dot"></span>Sentient</a>
+    <div class="nav-links">
+      <a class="opt" href="#how">How it works</a>
+      <a class="opt" href="#features">Features</a>
+      <a href="docs/">Docs</a>
+      <a href="https://github.com/nosaka4i/sentient">GitHub</a>
+      <a class="nav-dl" href="https://github.com/nosaka4i/sentient/releases">Download</a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <div>
+      <span class="badge">Open source · Linux</span>
+      <h1>Your coding agent shouldn't be a black box.</h1>
+      <p class="sub">A simple prompt can turn into hundreds of actions from a coding agent, most of which you never see. Sentient captures each action so you can reconstruct exactly what happened, and when.</p>
+      <div class="cta-row">
+        <a class="btn" href="https://github.com/nosaka4i/sentient/releases">Download</a>
+        <a class="btn ghost" href="docs/">Read the docs</a>
+        <a class="btn ghost" href="https://github.com/nosaka4i/sentient">GitHub</a>
+      </div>
+    </div>
+
+    <img class="shot" src="assets/dashboard.png" alt="Sentient dashboard" />
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">The problem</p>
+    <h2>There's no reliable record of what your agent actually did.</h2>
+    <p class="section-lede">Agents change files through shell commands and scripts that never show up as edits in the chat, and the commands you do see can be quite cryptic. Sentient keeps an audit trail of what actually happened and surfaces the risky operations.</p>
+    <pre class="cmd"><code>sed -i -e '357,362d' -e '356a\      &lt;div class="sevbar" role="img" aria-label="1 high, 2 medium, 1 low" title="1 high · 2 medium · 1 low"&gt;&lt;span class="h"&gt;&lt;/span&gt;&lt;span class="m"&gt;&lt;/span&gt;&lt;span class="l"&gt;&lt;/span&gt;&lt;/div&gt;' -e '348,351d' -e '150a .card-head .sevbar { margin: 0 0 0 auto; width: 160px; }' dashboard-14.html &amp;&amp; sed -n '146,152p' dashboard-14.html &amp;&amp; sed -n '/&lt;!-- NEEDS ATTENTION --&gt;/,/&lt;ul/p' dashboard-14.html</code></pre>
+    <p class="cmd-caption">A real command from a coding agent session. Which lines did it delete?</p>
+    <div class="stats">
+      <div class="stat"><div class="n">5.4k</div><div class="l">shell commands in 19 sessions</div></div>
+      <div class="stat"><div class="n">132</div><div class="l">median command length in characters</div></div>
+      <div class="stat"><div class="n">10k+</div><div class="l">longest command length in characters</div></div>
+      <div class="stat"><div class="n">~678</div><div class="l">commands that modified files</div></div>
+    </div>
+    <p class="footnote">From one developer's own coding agent history.</p>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <p class="eyebrow">How it works</p>
+    <h2>Ground truth from the kernel.</h2>
+    <p class="section-lede">Sentient captures all actions in an independent, tamper-evident record.</p>
+    <div class="cards">
+      <div class="card">
+        <div class="num">01 · CAPTURE</div>
+        <h3>Kernel-level events</h3>
+        <p>File, process and network events are captured with eBPF through Tetragon. The agent runs as a regular user and can't edit or switch off the record.</p>      </div>
+      <div class="card">
+        <div class="num">02 · CORRELATE</div>
+        <h3>Agent session logs</h3>
+        <p>Session logs supply the context: which prompt led to each action, and the reason the agent gave.</p>      </div>
+      <div class="card">
+        <div class="num">03 · FLAG</div>
+        <h3>Deterministic rules</h3>
+        <p>Summaries, diffs and severity come from plain rules, not another model. Risky changes, like edits outside the repo, rise to the top.</p>      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">Dashboard</p>
+    <h2>Everything in one place.</h2>
+    <p class="section-lede">Run <code>sen serve</code> for a local dashboard. Drill into any flagged change to see the diff, the command and the prompt behind it.</p>
+    <img class="shot" src="assets/alert.png" alt="Sentient alert detail" />
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <p class="eyebrow">Features</p>
+    <h2>Know what your agent did, without reading every command.</h2>
+    <p class="section-lede">Keep delegating to your coding agent. Sentient shows you what it did.</p>
+    <div class="cards features">
+      <div class="card">
+        <div class="ficon">◎</div>
+        <h3>Every action, in a timeline view</h3>
+        <p>Files read, created, changed and deleted. Commands run, processes touched, network connections made and git actions.</p>
+      </div>
+      <div class="card">
+        <div class="ficon">▲</div>
+        <h3>Risky operations flagged</h3>
+        <p>Edits outside the repo, deleted files, <code>sudo</code> and changes to shell profiles rise to the top, ranked high, medium or low.</p>
+      </div>
+      <div class="card">
+        <div class="ficon">⌥</div>
+        <h3>Cryptic commands untangled</h3>
+        <p>Long pipelines and inline scripts are broken down into what they actually touched.</p>
+      </div>
+      <div class="card">
+        <div class="ficon">↳</div>
+        <h3>Every action traced to a prompt</h3>
+        <p>See which prompt and session led to each change, so you know why it happened.</p>
+      </div>
+      <div class="card">
+        <div class="ficon">±</div>
+        <h3>Diffs for every change</h3>
+        <p>See exactly which lines were added and removed in each file, including files outside the repo.</p>
+      </div>
+      <div class="card">
+        <div class="ficon">▣</div>
+        <h3>Terminal or browser</h3>
+        <p><code>sen status</code> for a quick summary. A web dashboard you can open from your phone.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">Principles</p>
+    <h2>Sentient is built on solid foundations of trust.</h2>
+    <div class="principles">
+      <div class="principle"><strong>Open source</strong><span>MIT licensed. Read every line.</span></div>
+      <div class="principle"><strong>Local only</strong><span>Your data stays on your machine.</span></div>
+      <div class="principle"><strong>Read-only</strong><span>Sentient never modifies your projects.</span></div>
+      <div class="principle"><strong>No telemetry</strong><span>Nothing is sent anywhere.</span></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">Architecture</p>
+    <h2>Major components.</h2>
+    <div class="arch">
+      <div class="card"><code>sentientd</code><p style="margin-top:8px">The monitor. Runs as root under systemd, so the agent can't stop it or tamper with its records.</p></div>
+      <div class="card"><code>sen</code><p style="margin-top:8px">The CLI. Runs as you and asks the monitor what happened. <code>sen status</code> gives the summary.</p></div>
+      <div class="card"><code>sen serve</code><p style="margin-top:8px">The dashboard, on localhost only. Reach it from your phone over an SSH tunnel or Tailscale.</p></div>
+    </div>  </div>
+</section>
+
+<section class="install">
+  <div class="wrap">
+    <p class="eyebrow">Try it</p>
+    <h2>Download or build from source.</h2>
+    <p class="section-lede">Linux only for now. Prebuilt binaries will be on the <a href="https://github.com/nosaka4i/sentient/releases">releases page</a>. To build, you need Go 1.26.</p>
+<pre>git clone https://github.com/nosaka4i/sentient
+cd sentient
+make build      # bin/sen, bin/sentientd
+# then install sentientd as a systemd service (see the guide)</pre>
+    <p><a href="docs/#build">Build and install guide &rarr;</a></p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-row">
+    <span>Sentient · MIT License</span>
+    <span><a href="docs/">Docs</a> &nbsp;·&nbsp; <a href="https://github.com/nosaka4i/sentient/releases">Releases</a> &nbsp;·&nbsp; <a href="https://github.com/nosaka4i/sentient">GitHub</a> &nbsp;·&nbsp; <a href="https://nosaka.ai/open-source/">More from nosaka.ai</a></span>
+  </div>
+</footer>
+
+</body>
+</html>

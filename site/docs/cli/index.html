@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>sen CLI reference — Sentient docs</title>
+<meta name="description" content="Reference for sen, the Sentient command line tool: sen status, sen serve, sen version, flags and environment variables." />
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg" />
+<link rel="stylesheet" href="../../assets/site.css" />
+<link rel="canonical" href="https://nosaka.ai/sentient/docs/cli/" />
+</head>
+<body class="docs">
+
+<header class="topbar">
+  <div class="topbar-row">
+    <a class="brand" href="../../"><span class="brand-dot"></span>Sentient <small>docs</small></a>
+    <div class="top-links">
+      <a class="opt" href="../../">Home</a>
+      <a href="https://github.com/nosaka4i/sentient">GitHub</a>
+      <a class="dl" href="https://github.com/nosaka4i/sentient/releases">Download</a>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <nav>
+      <h4>Start</h4>
+      <a href="../#start">Getting started</a>
+      <a href="../#architecture">Architecture</a>
+      <a href="../#platforms">Supported platforms</a>
+      <h4>Install</h4>
+      <a href="../#build">Build from source</a>
+      <a href="../#install">Install the daemon</a>
+      <a href="../#sudo">Recommended setup</a>
+      <h4>Reference</h4>
+      <a class="active" href="../cli/">CLI</a>
+      <a href="../sentientd/">sentientd options</a>
+      <a href="../api/">API</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <p class="crumbs"><a href="../">Docs</a> / Reference</p>
+    <h1>sen CLI reference</h1>
+    <p class="lede"><code>sen</code> is the Sentient command line tool. It runs as you and asks <code>sentientd</code> what your coding agent did. It never touches your projects.</p>
+
+    <h2 id="commands">Commands</h2>
+    <div class="table-wrap">
+    <table>
+      <tr><th>Command</th><th>What it does</th></tr>
+      <tr><td><a href="#status"><code>sen status</code></a></td><td>What needs your attention, then the last 24 hours of activity and recent prompts.</td></tr>
+      <tr><td><a href="#serve"><code>sen serve</code></a></td><td>Serves the web dashboard on localhost.</td></tr>
+      <tr><td><a href="#version"><code>sen version</code></a></td><td>Prints the version.</td></tr>
+      <tr><td><code>sen alert &lt;#&gt;</code> <span class="pill plan">Planned</span></td><td>Details for one attention item.</td></tr>
+      <tr><td><code>sen session &lt;id&gt;</code> <span class="pill plan">Planned</span></td><td>The prompts in one session.</td></tr>
+    </table>
+    </div>
+
+    <h2 id="status">sen status</h2>
+    <p>Alerts first, then a summary of activity in the window, then the window's prompts. It reads what <code>sentientd</code> has stored, current to the second.</p>
+<pre><code>$ sen status
+Monitored from Oct 6 09:12 (1d 6h ago)
+
+NEEDS ATTENTION (4)
+#    DATE          AGENT    REPO     SEVERITY   RESOURCE   ACTION    PATH
+43   Oct 7 14:52   claude   nosaka   high       file       update    ~/.zshrc
+41   Oct 7 14:33   claude   nosaka   medium     file       update    ios/Config.plist
+...
+
+LAST 24H
+RESOURCE    ACTION    COUNT   SUMMARY
+file        read      214     38 outside repo
+file        update    9       +248 −61
+command     execute   41      2 failed
+network     connect   5       github.com, registry.npmjs.org, localhost:3000</code></pre>
+    <p>Columns are separated by tabs. When piped, the output is raw tab-separated text, so <code>cut</code> and <code>awk</code> work on it.</p>
+    <h3>Flags</h3>
+    <div class="table-wrap">
+    <table>
+      <tr><th>Flag</th><th>Default</th><th>Description</th></tr>
+      <tr><td><code>--socket</code></td><td><code>$SENTIENT_SOCKET</code> or <code>/run/sentient/sentientd.sock</code></td><td>The <code>sentientd</code> socket.</td></tr>
+    </table>
+    </div>
+
+    <h2 id="serve">sen serve</h2>
+    <p>Serves the web dashboard. It listens on loopback only.</p>
+<pre><code>sen serve                       <span class="c"># http://127.0.0.1:7357</span>
+sen serve --addr 127.0.0.1:8080</code></pre>
+    <h3>Flags</h3>
+    <div class="table-wrap">
+    <table>
+      <tr><th>Flag</th><th>Default</th><th>Description</th></tr>
+      <tr><td><code>--addr</code></td><td><code>127.0.0.1:7357</code></td><td>Loopback address to listen on.</td></tr>
+      <tr><td><code>--socket</code></td><td><code>$SENTIENT_SOCKET</code> or <code>/run/sentient/sentientd.sock</code></td><td>The <code>sentientd</code> socket.</td></tr>
+    </table>
+    </div>
+    <h3>From another machine</h3>
+    <p>Use an SSH tunnel, then open <code>http://127.0.0.1:7357</code> locally. Tailscale works too.</p>
+<pre><code>ssh -N -L 7357:127.0.0.1:7357 &lt;host&gt;</code></pre>
+
+    <h2 id="version">sen version</h2>
+    <p>Prints the <code>sen</code> version.</p>
+<pre><code>$ sen version
+sen 0.1.0</code></pre>
+
+    <h2 id="env">Environment</h2>
+    <div class="table-wrap">
+    <table>
+      <tr><th>Variable</th><th>Description</th></tr>
+      <tr><td><code>SENTIENT_SOCKET</code></td><td>Path to the <code>sentientd</code> socket. <code>--socket</code> takes precedence.</td></tr>
+    </table>
+    </div>
+
+    <div class="pager">
+      <a href="../#sudo">&larr; Recommended setup</a>
+      <a href="../sentientd/">sentientd options &rarr;</a>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

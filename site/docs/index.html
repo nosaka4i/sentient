@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Getting started — Sentient docs</title>
+<meta name="description" content="Install and set up Sentient, the open source monitor for coding agents: architecture, supported platforms, building from source and installing the daemon." />
+<link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+<link rel="stylesheet" href="../assets/site.css" />
+<link rel="canonical" href="https://nosaka.ai/sentient/docs/" />
+</head>
+<body class="docs">
+
+<header class="topbar">
+  <div class="topbar-row">
+    <a class="brand" href="../"><span class="brand-dot"></span>Sentient <small>docs</small></a>
+    <div class="top-links">
+      <a class="opt" href="../">Home</a>
+      <a href="https://github.com/nosaka4i/sentient">GitHub</a>
+      <a class="dl" href="https://github.com/nosaka4i/sentient/releases">Download</a>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <nav>
+      <h4>Start</h4>
+      <a class="active" href="#start">Getting started</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#platforms">Supported platforms</a>
+      <h4>Install</h4>
+      <a href="#build">Build from source</a>
+      <a href="#install">Install the daemon</a>
+      <a href="#sudo">Recommended setup</a>
+      <h4>Reference</h4>
+      <a href="cli/">CLI</a>
+      <a href="sentientd/">sentientd options</a>
+      <a href="api/">API</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <h1 id="start">Getting started</h1>
+    <p class="lede">Sentient monitors coding agent activity on your machine. It has two parts: <code>sentientd</code>, a monitor that runs as root, and <code>sen</code>, the CLI you use to see what happened.</p>
+    <p>The quickest path on Linux:</p>
+<pre><code><span class="c"># 1. download a release, or build from source (below)</span>
+<span class="c"># 2. install and start the daemon</span>
+sudo systemctl enable --now sentientd
+<span class="c"># 3. check what your agent has done</span>
+sen status
+sen serve        <span class="c"># dashboard on http://127.0.0.1:7357</span></code></pre>
+
+    <h2 id="architecture">Architecture</h2>
+    <p>Two independent sources feed <code>sentientd</code>: kernel events from Tetragon, and the agent's own session logs. <code>sentientd</code> correlates them, applies the rules and stores the result. <code>sen</code> and the dashboard read it through a local API.</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 860 470" role="img" aria-label="Sentient architecture: the coding agent's system calls are captured by Tetragon through eBPF, and its session logs are read directly. Both feed sentientd, which stores records in sentient.db and serves a gRPC API over a Unix socket to sen and sen serve.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="ah-hot" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+
+        <!-- zones -->
+        <rect class="zone" x="10" y="10" width="210" height="250" rx="12"/>
+        <text class="z" x="24" y="32">YOUR ACCOUNT</text>
+        <rect class="zone" x="250" y="10" width="370" height="450" rx="12"/>
+        <text class="z" x="264" y="32">ROOT</text>
+        <rect class="zone" x="650" y="10" width="200" height="450" rx="12"/>
+        <text class="z" x="664" y="32">YOU</text>
+
+        <!-- coding agent -->
+        <rect class="box" x="30" y="50" width="170" height="64" rx="8"/>
+        <text class="t" x="46" y="77">Coding agent</text>
+        <text class="s" x="46" y="98">e.g. Claude Code</text>
+
+        <!-- session logs -->
+        <rect class="box" x="30" y="170" width="170" height="64" rx="8"/>
+        <text class="t" x="46" y="197">Session logs</text>
+        <text class="m" x="46" y="218">~/.claude/projects</text>
+
+        <!-- kernel -->
+        <rect class="box" x="30" y="370" width="170" height="64" rx="8"/>
+        <text class="t" x="46" y="397">Linux kernel</text>
+        <text class="s" x="46" y="418">files, processes, network</text>
+
+        <!-- tetragon -->
+        <rect class="box" x="270" y="370" width="150" height="64" rx="8"/>
+        <text class="t" x="286" y="397">Tetragon</text>
+        <text class="s" x="286" y="418">eBPF, own service</text>
+
+        <!-- sentientd -->
+        <rect class="box core" x="440" y="50" width="160" height="300" rx="8"/>
+        <text class="t" x="456" y="77">sentientd</text>
+        <text class="s" x="456" y="96">monitor, systemd</text>
+        <rect class="row" x="452" y="112" width="136" height="38" rx="5"/>
+        <text class="s" x="464" y="136">ingester</text>
+        <rect class="row" x="452" y="158" width="136" height="38" rx="5"/>
+        <text class="s" x="464" y="182">correlator</text>
+        <rect class="row" x="452" y="204" width="136" height="38" rx="5"/>
+        <text class="s" x="464" y="228">rules</text>
+        <rect class="row" x="452" y="250" width="136" height="38" rx="5"/>
+        <text class="s" x="464" y="274">local API</text>
+        <text class="m" x="456" y="318">no network port</text>
+
+        <!-- store -->
+        <rect class="box" x="440" y="384" width="160" height="56" rx="8"/>
+        <text class="t" x="456" y="408">sentient.db</text>
+        <text class="s" x="456" y="427">SQLite, hash-chained</text>
+
+        <!-- sen -->
+        <rect class="box" x="670" y="50" width="160" height="64" rx="8"/>
+        <text class="t" x="686" y="77">sen</text>
+        <text class="m" x="686" y="98">sen status</text>
+
+        <!-- sen serve -->
+        <rect class="box" x="670" y="170" width="160" height="64" rx="8"/>
+        <text class="t" x="686" y="197">sen serve</text>
+        <text class="m" x="686" y="218">127.0.0.1:7357</text>
+
+        <!-- browser -->
+        <rect class="box" x="670" y="300" width="160" height="64" rx="8"/>
+        <text class="t" x="686" y="327">Browser</text>
+        <text class="s" x="686" y="348">local, SSH tunnel, phone</text>
+
+        <!-- arrows -->
+        <path class="arrow" d="M115,114 L115,168"/>
+        <text class="lbl" x="122" y="146">writes</text>
+        <path class="arrow" d="M38,114 C0,180 0,330 38,368"/>
+        <text class="lbl" x="18" y="300" transform="rotate(-90 18 300)">system calls</text>
+        <path class="arrow" d="M200,402 L268,402"/>
+        <text class="lbl" x="214" y="394">eBPF</text>
+        <path class="arrow hot" d="M345,370 C345,250 390,150 450,131"/>
+        <text class="lbl" x="300" y="262">kernel events</text>
+        <text class="lbl" x="300" y="277">(gRPC)</text>
+        <path class="arrow hot" d="M200,202 C300,202 360,140 450,128"/>
+        <text class="lbl" x="250" y="190">read directly</text>
+        <path class="arrow" d="M520,350 L520,382"/>
+        <path class="arrow" d="M600,269 C640,269 640,82 668,82"/>
+        <text class="lbl" x="606" y="160" transform="rotate(-90 606 160)">gRPC · Unix socket</text>
+        <path class="arrow" d="M600,269 C640,269 640,202 668,202"/>
+        <path class="arrow" d="M750,234 L750,298"/>
+      </svg>
+    </div>
+    <p class="legend">Cyan arrows are the two capture paths. The agent runs in your account and can't reach anything inside the root zone.</p>
+
+    <h2 id="platforms">Supported platforms</h2>
+    <div class="table-wrap">
+    <table>
+      <tr><th>Platform</th><th>Status</th><th>Capture</th></tr>
+      <tr><td><strong>Linux</strong></td><td><span class="pill ok">Supported</span></td><td>Agent session logs today. Kernel capture through Tetragon (eBPF) is next.</td></tr>
+      <tr><td><strong>macOS</strong></td><td><span class="pill plan">Planned</span></td><td>Apple's built-in <code>eslogger</code>, then Endpoint Security once the entitlement is granted.</td></tr>
+      <tr><td><strong>Windows</strong></td><td><span class="pill no">Not yet</span></td><td>Not on the roadmap yet. It would need its own capture method, such as ETW.</td></tr>
+    </table>
+    </div>
+    <p>Supported agents: <strong>Claude Code</strong>. Others will follow.</p>
+
+    <h2 id="build">Build from source</h2>
+    <p>Prebuilt binaries will be on the <a href="https://github.com/nosaka4i/sentient/releases">releases page</a>. To build your own, you need Go 1.26 and <code>make</code>.</p>
+
+    <input class="os-radio" type="radio" name="os" id="os-linux" checked />
+    <input class="os-radio" type="radio" name="os" id="os-mac" />
+    <input class="os-radio" type="radio" name="os" id="os-win" />
+    <div class="tabs">
+      <label for="os-linux">Linux</label>
+      <label for="os-mac">macOS</label>
+      <label for="os-win">Windows</label>
+    </div>
+
+    <div class="panel panel-linux">
+<pre><code>git clone https://github.com/nosaka4i/sentient
+cd sentient
+make build                      <span class="c"># bin/sen, bin/sentientd</span>
+VERSION=0.1.0 make build        <span class="c"># optional: stamp a version</span></code></pre>
+      <p>Then <a href="#install">install the daemon</a>.</p>
+    </div>
+
+    <div class="panel panel-mac">
+      <div class="note placeholder"><strong>Planned.</strong> macOS support isn't built yet. These steps are a preview and will change.</div>
+<pre><code>brew install go
+git clone https://github.com/nosaka4i/sentient
+cd sentient
+make build</code></pre>
+      <p>On macOS, <code>sentientd</code> will run as a launchd daemon and capture through <code>eslogger</code>.</p>
+    </div>
+
+    <div class="panel panel-win">
+      <div class="note placeholder"><strong>Not yet supported.</strong> Sentient doesn't run on Windows. You can use it inside WSL 2, which is Linux, by following the Linux steps.</div>
+    </div>
+
+    <h2 id="install">Install the daemon</h2>
+    <p>Manual steps for v0.1. A package or <code>sen install</code> may come later.</p>
+<pre><code>sudo install -d -m 0755 /opt/sentient/bin
+sudo install -d -m 0700 /opt/sentient/data
+sudo install -m 0755 bin/sentientd bin/sen /opt/sentient/bin/
+sudo groupadd --system sentient            <span class="c"># who may use the socket</span>
+sudo usermod -aG sentient "$USER"          <span class="c"># log in again to pick it up</span>
+sudo install -m 0644 deploy/sentientd.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now sentientd
+sudo ln -s /opt/sentient/bin/sen /usr/local/bin/sen</code></pre>
+    <p>By default <code>sentientd</code> reads <code>~/.claude/projects</code> for <code>/root</code> and every home under <code>/home</code>. To limit it, pass <code>--home</code> in the unit file.</p>
+
+    <h2 id="sudo">Recommended setup</h2>
+    <p>Run coding agents in an account without root or passwordless <code>sudo</code>. <code>sentientd</code> runs as root, so an agent in a regular account can't stop it or edit its records. If the agent's account has passwordless <code>sudo</code>, the dashboard's <code>/health</code> page warns about it. To remove it:</p>
+<pre><code>sudo grep -rn NOPASSWD /etc/sudoers /etc/sudoers.d/   <span class="c"># find the rule</span>
+sudo visudo -f /etc/sudoers.d/&lt;file&gt;                  <span class="c"># remove NOPASSWD</span>
+sudo -l -U &lt;account&gt;                                  <span class="c"># check: no NOPASSWD left</span></code></pre>
+    <p>A sandbox or a separate account for agents works too.</p>
+
+    <h2>Reference</h2>
+    <p><a href="cli/">CLI</a> · <a href="sentientd/">sentientd options</a> · <a href="api/">API</a></p>
+  </main>
+</div>
+
+</body>
+</html>

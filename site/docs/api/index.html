@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>API reference — Sentient docs</title>
+<meta name="description" content="Reference for the Sentient local gRPC API: connecting over the Unix socket, and the Status, Health, ListPrompts, PromptDetail, ListSessionGroups and SessionDetail methods." />
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg" />
+<link rel="stylesheet" href="../../assets/site.css" />
+<link rel="canonical" href="https://nosaka.ai/sentient/docs/api/" />
+</head>
+<body class="docs">
+
+<header class="topbar">
+  <div class="topbar-row">
+    <a class="brand" href="../../"><span class="brand-dot"></span>Sentient <small>docs</small></a>
+    <div class="top-links">
+      <a class="opt" href="../../">Home</a>
+      <a href="https://github.com/nosaka4i/sentient">GitHub</a>
+      <a class="dl" href="https://github.com/nosaka4i/sentient/releases">Download</a>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <nav>
+      <h4>Start</h4>
+      <a href="../#start">Getting started</a>
+      <a href="../#architecture">Architecture</a>
+      <a href="../#platforms">Supported platforms</a>
+      <h4>Install</h4>
+      <a href="../#build">Build from source</a>
+      <a href="../#install">Install the daemon</a>
+      <a href="../#sudo">Recommended setup</a>
+      <h4>Reference</h4>
+      <a href="../cli/">CLI</a>
+      <a href="../sentientd/">sentientd options</a>
+      <a class="active" href="../api/">API</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <p class="crumbs"><a href="../">Docs</a> / Reference</p>
+    <h1>API reference</h1>
+    <p class="lede"><code>sentientd</code> serves a local gRPC API over its Unix socket. <code>sen</code> and the dashboard are its clients, and you can build your own.</p>
+    <p>The API is read-only and has no network port. The definition is <a href="https://github.com/nosaka4i/sentient/blob/main/internal/api/sentientpb/sentient.proto"><code>sentient.proto</code></a>, package <code>sentient.v1</code>, service <code>Sentient</code>.</p>
+    <div class="note placeholder"><strong>Placeholder.</strong> The API is still changing and isn't stable. Field-level docs will be generated from <code>sentient.proto</code> when it settles.</div>
+
+    <h2 id="connect">Connecting</h2>
+    <p>Connect to <code>unix:///run/sentient/sentientd.sock</code>. Your account must be in the <code>sentient</code> group.</p>
+<pre><code>grpcurl -plaintext -unix /run/sentient/sentientd.sock \
+  -import-path internal/api/sentientpb -proto sentient.proto \
+  sentient.v1.Sentient/Health</code></pre>
+
+    <h2 id="methods">Methods</h2>
+    <div class="rpc" id="Status"><div class="rpc-sig"><b>Status</b>(StatusRequest) → StatusResponse</div><p>The data behind <code>sen status</code> and the dashboard home.</p></div>
+    <div class="rpc" id="Health"><div class="rpc-sig"><b>Health</b>(HealthRequest) → HealthResponse</div><p>Sentient's own state, shown on <code>/health</code>.</p></div>
+    <div class="rpc" id="ListPrompts"><div class="rpc-sig"><b>ListPrompts</b>(ListPromptsRequest) → ListPromptsResponse</div><p>Prompts, newest first.</p></div>
+    <div class="table-wrap">
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+      <tr><td><code>text</code></td><td><code>string</code></td><td>Substring of the prompt text, case-insensitive.</td></tr>
+      <tr><td><code>agent</code></td><td><code>string</code></td><td>Exact agent name.</td></tr>
+      <tr><td><code>repo</code></td><td><code>string</code></td><td>Repo (or working directory) basename.</td></tr>
+      <tr><td><code>flagged</code></td><td><code>bool</code></td><td>Only prompts with open alerts.</td></tr>
+      <tr><td><code>limit</code></td><td><code>int32</code></td><td>0 means the server default (50). Maximum 1000.</td></tr>
+      <tr><td><code>session_id</code></td><td><code>string</code></td><td>Only this session's prompts.</td></tr>
+    </table>
+    </div>
+    <div class="rpc" id="PromptDetail"><div class="rpc-sig"><b>PromptDetail</b>(PromptDetailRequest) → PromptDetailResponse</div><p>Everything about one prompt.</p></div>
+    <div class="rpc" id="ListSessionGroups"><div class="rpc-sig"><b>ListSessionGroups</b>(ListSessionGroupsRequest) → ListSessionGroupsResponse</div><p>Sessions, each with its newest matching prompts.</p></div>
+    <div class="rpc" id="SessionDetail"><div class="rpc-sig"><b>SessionDetail</b>(SessionDetailRequest) → SessionDetailResponse</div><p>One session and its prompts.</p></div>
+
+    <div class="pager">
+      <a href="../sentientd/">&larr; sentientd options</a>
+      <span></span>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>
