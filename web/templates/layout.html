@@ -35,6 +35,10 @@
     </a>
     {{if .Since}}<div class="since">Monitored from <time datetime="{{.Since.ISO}}">{{.Since.Date}}</time> ({{.Since.Ago}})</div>{{end}}
     <div class="top-right">
+      <nav class="nav" aria-label="Pages">
+        <a href="/sessions"{{if eq .Nav "sessions"}} aria-current="page"{{end}}>Sessions</a>
+        <a href="/prompts"{{if eq .Nav "prompts"}} aria-current="page"{{end}}>Prompts</a>
+      </nav>
       <a class="icon-btn" href="/health"{{if eq .Nav "health"}} aria-current="page"{{end}} aria-label="Health" title="Health: sentient's own status">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
       </a>

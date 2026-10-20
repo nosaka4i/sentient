@@ -155,7 +155,7 @@ func (s *Server) prompts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := promptsPage{
-		page: page{Title: "prompts", Version: version.Version, Sub: true, Since: sinceOf(win.HistoryBegins, now)},
+		page: page{Title: "prompts", Nav: "prompts", Version: version.Version, Sub: true, Since: sinceOf(win.HistoryBegins, now)},
 		Data: template.JS(data),
 	}
 	s.render(w, http.StatusOK, "prompts", p)

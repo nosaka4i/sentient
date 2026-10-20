@@ -22,6 +22,26 @@ service Sentient {
   rpc PromptWindow(PromptWindowRequest) returns (PromptWindowResponse);
   // SessionDetail returns one session and its prompts (web /session/<id>).
   rpc SessionDetail(SessionDetailRequest) returns (SessionDetailResponse);
+  // SessionList returns the sessions active in a time window (web /sessions).
+  rpc SessionList(SessionListRequest) returns (SessionListResponse);
+}
+
+message SessionListRequest {
+  int32 days = 1; // sessions active in the last N days; 0 = all time
+}
+
+message SessionListRow {
+  SessionSummary summary = 1;
+  string first_prompt = 2;
+  bool running = 3;
+}
+
+message SessionListResponse {
+  google.protobuf.Timestamp history_begins = 1;
+  repeated SessionListRow sessions = 2; // most recently active first
+  int64 total = 3;                      // sessions with prompts, in any window
+  repeated string agents = 4;
+  repeated string repos = 5;
 }
 
 message SessionSummary {

@@ -53,6 +53,36 @@ func TestPromptWindowRoundTrip(t *testing.T) {
 	}
 }
 
+func TestSessionListRoundTrip(t *testing.T) {
+	sock := startServer(t)
+	c, err := Dial(sock, "test client")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	ctx := context.Background()
+
+	// the seeded session is from 2026, so all time has it and "the last day" doesn't
+	l, err := c.SessionList(ctx, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.Total != 1 || len(l.Sessions) != 1 || l.HistoryBegins.IsZero() || len(l.Agents) != 1 || len(l.Repos) != 1 {
+		t.Fatalf("list = %+v", l)
+	}
+	if s := l.Sessions[0]; s.ID != "s" || s.Agent != "claude" || s.Repo != "w" || s.Prompts != 1 || s.FirstPrompt != "hi" || s.Running {
+		t.Errorf("session = %+v", s)
+	}
+	if day, err := c.SessionList(ctx, 1); err != nil || len(day.Sessions) != 0 || day.Total != 1 {
+		t.Errorf("last day = %+v, %v", day, err)
+	}
+	for _, days := range []int32{-1, maxWindowDays + 1} {
+		if _, err := NewServer(nil).SessionList(ctx, &sentientpb.SessionListRequest{Days: days}); status.Code(err) != codes.InvalidArgument {
+			t.Errorf("days %d: %v", days, err)
+		}
+	}
+}
+
 func TestPromptWindowRejectsBadRequests(t *testing.T) {
 	srv := NewServer(nil)
 	for _, req := range []*sentientpb.PromptWindowRequest{

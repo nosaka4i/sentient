@@ -28,6 +28,7 @@ const (
 	Sentient_PromptDetail_FullMethodName  = "/sentient.v1.Sentient/PromptDetail"
 	Sentient_PromptWindow_FullMethodName  = "/sentient.v1.Sentient/PromptWindow"
 	Sentient_SessionDetail_FullMethodName = "/sentient.v1.Sentient/SessionDetail"
+	Sentient_SessionList_FullMethodName   = "/sentient.v1.Sentient/SessionList"
 )
 
 // SentientClient is the client API for Sentient service.
@@ -45,6 +46,8 @@ type SentientClient interface {
 	PromptWindow(ctx context.Context, in *PromptWindowRequest, opts ...grpc.CallOption) (*PromptWindowResponse, error)
 	// SessionDetail returns one session and its prompts (web /session/<id>).
 	SessionDetail(ctx context.Context, in *SessionDetailRequest, opts ...grpc.CallOption) (*SessionDetailResponse, error)
+	// SessionList returns the sessions active in a time window (web /sessions).
+	SessionList(ctx context.Context, in *SessionListRequest, opts ...grpc.CallOption) (*SessionListResponse, error)
 }
 
 type sentientClient struct {
@@ -105,6 +108,16 @@ func (c *sentientClient) SessionDetail(ctx context.Context, in *SessionDetailReq
 	return out, nil
 }
 
+func (c *sentientClient) SessionList(ctx context.Context, in *SessionListRequest, opts ...grpc.CallOption) (*SessionListResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SessionListResponse)
+	err := c.cc.Invoke(ctx, Sentient_SessionList_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SentientServer is the server API for Sentient service.
 // All implementations must embed UnimplementedSentientServer
 // for forward compatibility.
@@ -120,6 +133,8 @@ type SentientServer interface {
 	PromptWindow(context.Context, *PromptWindowRequest) (*PromptWindowResponse, error)
 	// SessionDetail returns one session and its prompts (web /session/<id>).
 	SessionDetail(context.Context, *SessionDetailRequest) (*SessionDetailResponse, error)
+	// SessionList returns the sessions active in a time window (web /sessions).
+	SessionList(context.Context, *SessionListRequest) (*SessionListResponse, error)
 	mustEmbedUnimplementedSentientServer()
 }
 
@@ -144,6 +159,9 @@ func (UnimplementedSentientServer) PromptWindow(context.Context, *PromptWindowRe
 }
 func (UnimplementedSentientServer) SessionDetail(context.Context, *SessionDetailRequest) (*SessionDetailResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SessionDetail not implemented")
+}
+func (UnimplementedSentientServer) SessionList(context.Context, *SessionListRequest) (*SessionListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SessionList not implemented")
 }
 func (UnimplementedSentientServer) mustEmbedUnimplementedSentientServer() {}
 func (UnimplementedSentientServer) testEmbeddedByValue()                  {}
@@ -256,6 +274,24 @@ func _Sentient_SessionDetail_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Sentient_SessionList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SessionListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SentientServer).SessionList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Sentient_SessionList_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SentientServer).SessionList(ctx, req.(*SessionListRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Sentient_ServiceDesc is the grpc.ServiceDesc for Sentient service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -282,6 +318,10 @@ var Sentient_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SessionDetail",
 			Handler:    _Sentient_SessionDetail_Handler,
+		},
+		{
+			MethodName: "SessionList",
+			Handler:    _Sentient_SessionList_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

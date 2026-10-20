@@ -36,6 +36,7 @@ type Source interface {
 	PromptDetail(ctx context.Context, id int64) (*query.PromptDetail, error)
 	PromptWindow(ctx context.Context, req query.WindowRequest) (*query.PromptWindow, error)
 	SessionDetail(ctx context.Context, sessionID string) (*query.SessionDetail, error)
+	SessionList(ctx context.Context, days int) (*query.SessionList, error)
 }
 
 // Server is the web UI.
@@ -56,7 +57,7 @@ func New(src Source, socket string, log *slog.Logger) (*Server, error) {
 	}
 	home, _ := os.UserHomeDir()
 	s := &Server{src: src, socket: socket, now: time.Now, home: home, log: log, pages: map[string]*template.Template{}}
-	for _, page := range []string{"dashboard", "health", "prompt", "prompts", "session", "down"} {
+	for _, page := range []string{"dashboard", "health", "prompt", "prompts", "session", "sessions", "down"} {
 		t, err := template.ParseFS(assets.FS, "templates/layout.html", "templates/"+page+".html")
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", page, err)
@@ -82,6 +83,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /prompts", s.prompts)
 	mux.HandleFunc("GET /prompts/data", s.promptsData)
 	mux.HandleFunc("GET /session/{id}", s.session)
+	mux.HandleFunc("GET /sessions", s.sessions)
 	mux.Handle("GET /static/", s.static)
 	return localOnly(gzipped(mux))
 }
@@ -114,7 +116,7 @@ type page struct {
 	Refresh int
 	Live    bool
 	Since   *since
-	Nav     string // current header link ("health")
+	Nav     string // current header link ("sessions", "prompts", "health")
 	Sub     bool   // a sub-page (back link, tighter top spacing)
 }
 

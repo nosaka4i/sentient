@@ -25,6 +25,8 @@ type fakeSource struct {
 	detail   *query.PromptDetail
 	window   *query.PromptWindow
 	session  *query.SessionDetail
+	list     *query.SessionList
+	listDays int // the days the sessions list was last asked for
 	err      error
 	from, to time.Time
 	asked    int64 // the prompt id last requested
@@ -46,6 +48,11 @@ func (f *fakeSource) PromptWindow(ctx context.Context, req query.WindowRequest) 
 func (f *fakeSource) SessionDetail(ctx context.Context, id string) (*query.SessionDetail, error) {
 	f.askedSession = id
 	return f.session, f.err
+}
+
+func (f *fakeSource) SessionList(ctx context.Context, days int) (*query.SessionList, error) {
+	f.listDays = days
+	return f.list, f.err
 }
 
 func (f *fakeSource) Status(ctx context.Context, from, to time.Time) (*query.Status, string, error) {

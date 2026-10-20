@@ -112,6 +112,10 @@ header.top .wrap {
 .since { color: var(--text-3); font-size: 13px; }
 .since time { color: var(--text-2); }
 .top-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.nav { display: flex; align-items: center; gap: 4px; }
+.nav a { color: var(--text-2); font-size: 13.5px; padding: 5px 10px; border-radius: 8px; }
+.nav a:hover { background: var(--hover); color: var(--text); }
+.nav a[aria-current="page"] { color: var(--text); background: var(--hover); }
 .live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-3); }
 .live .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
 .icon-btn {
@@ -546,6 +550,20 @@ a.chip { text-decoration: none; }
 .prompts td.sesscell .repo { color: var(--text); margin-left: 6px; }
 .prompts td.sesscell .agent-ic { margin-left: 6px; }
 .sortsel { display: none !important; } /* phones have no column heads: the Sort menu stands in */
+.prompts th a.sort { text-decoration: none; }
+
+/* sessions list */
+.sessions td.sess { white-space: nowrap; }
+.sessions td.sess .sid { font-family: var(--mono); font-weight: 600; color: var(--accent); }
+.sessions td.sess .sid:hover { text-decoration: underline; }
+.sessions td.sess .repo { color: var(--text); font-weight: 600; margin-left: 6px; }
+.sessions td.sess .agent-ic { margin-left: 6px; }
+.sessions td.first { white-space: normal; color: var(--text); width: 100%; min-width: 220px; }
+.sessions td.first .nolast { color: var(--text-3); }
+.sessions td.n, .sessions td.fl { font-variant-numeric: tabular-nums; }
+.sessions th.num, .sessions td.num { text-align: right; }
+.sessions th.num .sort { justify-content: flex-end; }
+.sessions .m-only { display: none; }
 
 .session-block { margin-bottom: 28px; }
 .session-block .eyebrow { margin: 0 0 8px; font-size: 12px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
@@ -574,6 +592,14 @@ a.chip { text-decoration: none; }
   .prompts td.time { display: inline; width: auto; font-size: 12.5px; }
   .sortsel { display: inline-flex !important; }
   .prompts td.sesscell { display: none; }
+  .sessions thead { display: none; }
+  .sessions td.when, .sessions td.fl, .sessions td.state { display: none; }
+  .sessions tbody tr { display: block; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  .sessions tbody tr:last-child { border-bottom: 0; }
+  .sessions td { display: block; padding: 0; border: 0; }
+  .sessions td.sess { margin-bottom: 2px; }
+  .sessions td.first { min-width: 0; }
+  .sessions .m-only { display: block; color: var(--text-3); font-size: 12.5px; margin-top: 3px; }
   .sumline { padding: 10px 12px; }
   .sumline a.open { margin-left: 0; flex-basis: 100%; margin-top: 4px; }
   .more-row { padding: 14px 12px; }

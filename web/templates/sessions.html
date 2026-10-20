@@ -1,0 +1,99 @@
+{{define "content"}}
+  <a class="back" href="/">&larr; Dashboard</a>
+
+  <div class="page-title">
+    <h1>Sessions <span class="count">{{.Total}}</span></h1>
+    <p class="sub">One row per agent session, most recently active first. Click a session to open it, or a column to sort</p>
+  </div>
+
+  <section class="card" aria-label="All sessions">
+    <form class="filters" role="search" action="/sessions" method="get" id="filters">
+      {{- if ne .State.Days 7}}<input type="hidden" name="days" value="{{.State.Days}}">{{end}}
+      {{- if .State.Flagged}}<input type="hidden" name="flagged" value="1">{{end}}
+      <div class="search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input type="search" name="q" value="{{.State.Q}}" placeholder="Search repo or first prompt" aria-label="Search sessions" autocomplete="off">
+      </div>
+      <label class="sel"><span class="lt">Agent</span>
+        <select name="agent" aria-label="Agent">
+          <option value="">All agents</option>
+          {{- range .Agents}}
+          <option value="{{.}}"{{if eq . $.State.Agent}} selected{{end}}>{{.}}</option>
+          {{- end}}
+        </select>
+      </label>
+      <label class="sel"><span class="lt">Repo</span>
+        <select name="repo" aria-label="Repo">
+          <option value="">All repos</option>
+          {{- range .Repos}}
+          <option value="{{.}}"{{if eq . $.State.Repo}} selected{{end}}>{{.}}</option>
+          {{- end}}
+        </select>
+      </label>
+      <label class="sel sortsel"><span class="lt">Sort</span>
+        <select name="sort" aria-label="Sort by">
+          {{- range .SortMenu}}
+          <option value="{{.Value}}"{{if .On}} selected{{end}}>{{.Label}}</option>
+          {{- end}}
+        </select>
+      </label>
+      <a class="chip" href="{{.FlagHref}}" aria-pressed="{{if .State.Flagged}}true{{else}}false{{end}}" title="Only sessions with attention items">Flagged only</a>
+      <span class="shown">{{.Shown}} of {{.Window}} shown</span>
+      <noscript><button class="chip" type="submit">Apply</button></noscript>
+    </form>
+
+    <div class="windowbar">
+      <span>Sessions active in <b>{{.WindowLabel}}</b></span>
+      <span class="wopts" role="group" aria-label="Time window">
+        {{- range .Windows}}
+        <a class="chip" href="{{.Href}}" aria-pressed="{{if .On}}true{{else}}false{{end}}">{{.Label}}</a>
+        {{- end}}
+      </span>
+    </div>
+
+{{- if .Rows}}
+    <div class="table-scroll">
+      <table class="prompts sessions">
+        <thead><tr>
+          <th><span style="position:absolute;left:-9999px">State</span></th>
+          {{- with index .Heads "sess"}}<th class="sortable" aria-sort="{{.Aria}}"><a class="sort" href="{{.Href}}">Session</a></th>{{end}}
+          <th>First prompt</th>
+          {{- with index .Heads "last"}}<th class="sortable" aria-sort="{{.Aria}}"><a class="sort" href="{{.Href}}">Last active</a></th>{{end}}
+          {{- with index .Heads "prompts"}}<th class="sortable num" aria-sort="{{.Aria}}"><a class="sort" href="{{.Href}}">Prompts</a></th>{{end}}
+          {{- with index .Heads "acts"}}<th class="sortable num" aria-sort="{{.Aria}}"><a class="sort" href="{{.Href}}">Actions</a></th>{{end}}
+          {{- with index .Heads "flags"}}<th class="sortable num" aria-sort="{{.Aria}}"><a class="sort" href="{{.Href}}">Flags</a></th>{{end}}
+        </tr></thead>
+        <tbody>
+{{- range .Rows}}
+          <tr data-href="{{.Href}}">
+            <td class="state">{{if .Running}}<span class="running-dot" role="img" aria-label="running" title="Still running"></span>{{end}}</td>
+            <td class="sess"><a class="sid" href="{{.Href}}" title="Open session {{.ID}}">{{.Short}}</a>{{template "agent-icon" .Agent}}{{if .Repo}}<span class="repo">{{.Repo}}</span>{{end}}</td>
+            <td class="first">{{if .First}}{{if .Pasted}}<span class="pasted">pasted {{.Pasted}} lines</span> {{end}}{{.First}}{{else}}<span class="nolast">no prompt text</span>{{end}}<span class="m-only">{{.Last}} &middot; {{.Prompts}} prompt{{if ne .Prompts "1"}}s{{end}} &middot; {{.Actions}} actions{{if .FlagCount}} &middot; <span class="flag">{{.FlagCount}} flag{{if ne .FlagCount 1}}s{{end}}</span>{{end}}{{if .Running}}<span class="running-label">running</span>{{end}}</span></td>
+            <td class="when"><time datetime="{{.ISO}}">{{.Last}}</time></td>
+            <td class="n num">{{.Prompts}}</td>
+            <td class="n num">{{.Actions}}</td>
+            <td class="fl num">{{if .FlagCount}}<span class="flag" title="{{.FlagCount}} attention item{{if ne .FlagCount 1}}s{{end}}">{{.Flags}}</span>{{end}}</td>
+          </tr>
+{{- end}}
+        </tbody>
+      </table>
+    </div>
+{{- else if .NoSessionsAtAll}}
+    <div class="empty" style="display:block">No sessions yet. They show up here as soon as an agent starts working.</div>
+{{- else if .NothingInWindow}}
+    <div class="empty" style="display:block">No sessions active in {{.WindowLabel}}.{{if ne .State.Days 0}}<a class="chip" href="{{.AllTimeHref}}">Show all time</a>{{end}}</div>
+{{- else}}
+    <div class="empty" style="display:block">No sessions match these filters.<a class="chip" href="{{.ClearFiltersHref}}">Clear filters</a></div>
+{{- end}}
+{{- if .Older}}
+    <div class="more-row">
+      <span class="left">{{.Older}} older session{{if ne .Older 1}}s{{end}} not in this window</span>
+      <a class="chip" href="{{.AllTimeHref}}">All time</a>
+    </div>
+{{- end}}
+  </section>
+{{end}}
+
+{{define "scripts"}}
+<script src="/static/sessions.js"></script>
+{{end}}

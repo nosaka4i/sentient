@@ -85,6 +85,47 @@ func (c *Client) PromptWindow(ctx context.Context, req query.WindowRequest) (*qu
 	return w, nil
 }
 
+// SessionList implements sentientpb.SentientServer.
+func (s *Server) SessionList(ctx context.Context, req *sentientpb.SessionListRequest) (*sentientpb.SessionListResponse, error) {
+	if req.GetDays() < 0 || req.GetDays() > maxWindowDays {
+		return nil, status.Errorf(codes.InvalidArgument, "days must be 0..%d", maxWindowDays)
+	}
+	l, err := query.ListSessions(ctx, s.db, int(req.GetDays()), time.Now())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "session list: %v", err)
+	}
+	r := &sentientpb.SessionListResponse{Total: l.Total, Agents: l.Agents, Repos: l.Repos}
+	if !l.HistoryBegins.IsZero() {
+		r.HistoryBegins = timestamppb.New(l.HistoryBegins)
+	}
+	for _, row := range l.Sessions {
+		r.Sessions = append(r.Sessions, &sentientpb.SessionListRow{
+			Summary: sessionSummaryToProto(row.SessionSummary), FirstPrompt: row.FirstPrompt, Running: row.Running,
+		})
+	}
+	return r, nil
+}
+
+// SessionList fetches the sessions active in the last days days (0 = all time).
+func (c *Client) SessionList(ctx context.Context, days int) (*query.SessionList, error) {
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	resp, err := c.c.SessionList(ctx, &sentientpb.SessionListRequest{Days: int32(days)})
+	if err != nil {
+		return nil, c.callErr(err)
+	}
+	l := &query.SessionList{Total: resp.GetTotal(), Agents: resp.GetAgents(), Repos: resp.GetRepos()}
+	if resp.GetHistoryBegins() != nil {
+		l.HistoryBegins = resp.GetHistoryBegins().AsTime()
+	}
+	for _, row := range resp.GetSessions() {
+		l.Sessions = append(l.Sessions, query.SessionRow{
+			SessionSummary: sessionSummaryFromProto(row.GetSummary()), FirstPrompt: row.GetFirstPrompt(), Running: row.GetRunning(),
+		})
+	}
+	return l, nil
+}
+
 func sessionSummaryToProto(s query.SessionSummary) *sentientpb.SessionSummary {
 	p := &sentientpb.SessionSummary{
 		SessionId: s.ID, Agent: s.Agent, Repo: s.Repo, Prompts: s.Prompts, Actions: s.Actions, Flags: s.Flags,
