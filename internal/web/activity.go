@@ -28,7 +28,7 @@ const DefaultActivityDays = 1
 var activityWindows = []struct {
 	Days  int
 	Label string
-}{{1, "Last 24h"}, {7, "7 days"}, {30, "30 days"}}
+}{{1, "Last 24h"}, {7, "7 days"}, {30, "30 days"}, {0, "All time"}}
 
 // whatHeads names the second column of the event list by resource.
 var whatHeads = map[string]string{
@@ -190,7 +190,9 @@ func newActivityPage(a *query.Activity, st activityState, now time.Time) activit
 		Total:      a.EventsTotal,
 		FailedOnly: st.FailedOnly,
 	}
-	if !a.From.IsZero() {
+	if a.From.IsZero() {
+		p.Range = "All time"
+	} else {
 		p.Range = "Rolling window, " + render.Date(a.From, now) + " → now"
 	}
 	for _, w := range activityWindows {

@@ -77,7 +77,7 @@ func promptDetailToProto(d *query.PromptDetail) *sentientpb.PromptDetailResponse
 	for _, s := range d.Steps {
 		r.Steps = append(r.Steps, &sentientpb.Step{
 			N: s.N, Offset: durationpb.New(s.Offset), Resource: s.Resource, Action: s.Action, Path: s.Path,
-			Failed: s.Failed, Evidence: s.Evidence, CallId: s.CallID, CallCommand: s.CallCommand, Builtin: s.Builtin,
+			Failed: s.Failed, Evidence: s.Evidence, CallId: s.CallID, CallCommand: s.CallCommand, Builtin: s.Builtin, ActionId: s.ActionID,
 		})
 	}
 	return r
@@ -120,7 +120,7 @@ func promptDetailFromProto(r *sentientpb.PromptDetailResponse) *query.PromptDeta
 		d.Steps = append(d.Steps, query.Step{
 			N: s.GetN(), Offset: s.GetOffset().AsDuration(), Resource: s.GetResource(), Action: s.GetAction(),
 			Path: s.GetPath(), Failed: s.GetFailed(), Evidence: s.GetEvidence(), CallID: s.GetCallId(),
-			CallCommand: s.GetCallCommand(), Builtin: s.GetBuiltin(),
+			CallCommand: s.GetCallCommand(), Builtin: s.GetBuiltin(), ActionID: s.GetActionId(),
 		})
 	}
 	return d

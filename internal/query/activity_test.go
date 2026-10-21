@@ -197,6 +197,34 @@ func TestActivitySearch(t *testing.T) {
 	}
 }
 
+func TestActivityAllTime(t *testing.T) {
+	st, _ := seedPrompts(t)
+	ctx := context.Background()
+	// months after the seeded data: a 30-day window is quiet, all time still has everything
+	late := time.Date(2027, 3, 1, 0, 0, 0, 0, time.UTC)
+	quiet, err := GetActivity(ctx, st.DB, ActivityRequest{Days: 30}, late)
+	if err != nil || quiet.Resource != "" || quiet.From.IsZero() {
+		t.Fatalf("30 days later: %+v, %v", quiet, err)
+	}
+	all, err := GetActivity(ctx, st.DB, ActivityRequest{Days: 0}, late)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !all.From.IsZero() || !all.To.Equal(late) {
+		t.Errorf("all time window = %v to %v", all.From, all.To)
+	}
+	counts := map[string]int64{}
+	for _, r := range all.Rows {
+		counts[r.Resource+" "+r.Action] = r.Count
+	}
+	if counts["prompt request"] != 4 || counts["file update"] != 1 || counts["command execute"] != 1 {
+		t.Errorf("all-time counts = %v", counts)
+	}
+	if all.Resource != "command" || len(all.Events) != 1 {
+		t.Errorf("all-time events = %s/%s, %d", all.Resource, all.Action, len(all.Events))
+	}
+}
+
 func TestFileReadsOutsideTheRepo(t *testing.T) {
 	st, ids := seedPrompts(t)
 	ctx := context.Background()

@@ -1,0 +1,50 @@
+{{define "content"}}
+  <a class="back" href="/">&larr; Dashboard</a>
+
+  <div class="page-head alerts-head">
+    <h1>Alerts <span class="count n-open">{{.Counts.Open}}</span></h1>
+  </div>
+
+  <div class="filters afilters" role="group" aria-label="Filter alerts">
+    <div class="fgroup">
+      <span class="flbl">Status</span>
+      {{- range .Status}}
+      <a class="chip" href="{{.Href}}" aria-pressed="{{if .On}}true{{else}}false{{end}}">{{.Label}}</a>
+      {{- end}}
+    </div>
+    <div class="fgroup">
+      <span class="flbl">Severity</span>
+      {{- range .Severity}}
+      <a class="chip" href="{{.Href}}" aria-pressed="{{if .On}}true{{else}}false{{end}}">{{.Label}}</a>
+      {{- end}}
+    </div>
+  </div>
+
+  <section class="card" id="list" aria-label="Alerts, newest first">
+{{- range .Days}}
+    <div class="day">
+      <h2 class="dayh">{{.Label}}<span class="d">{{.Date}}</span></h2>
+      <ul class="alerts">
+{{- range .Rows}}
+        <li>
+          <div class="alert {{.SevClass}}{{if .Reviewed}} reviewed{{end}}">
+            <a class="hit" href="{{.Href}}" aria-label="Open alert: {{.Title}}"></a>
+            <span class="sev sev-{{.SevClass}}">{{.SevLabel}}</span>
+            <span class="path">{{.Title}}</span>
+            <span class="what">{{if .Resource}}<span class="ra"><span class="r">{{.Resource}}</span><span class="sep">/</span>{{.Action}}</span>{{end}}{{if .PromptHref}} · <a class="plink" href="{{.PromptHref}}">{{.PromptText}}</a>{{end}}{{if .ReviewedAt}} · <span class="rev">{{.ReviewedAt}}</span>{{end}}</span>
+            <span class="meta"><time datetime="{{.ISO}}">{{.Time}}</time><br><span class="dotsep"></span>{{.Where}}</span>
+            <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </div>
+        </li>
+{{- end}}
+      </ul>
+    </div>
+{{- else}}
+    <div class="empty" style="display:block">
+{{- if .Filtered}}No alerts match these filters.<a class="chip" href="{{.ClearHref}}">Show open alerts</a>
+{{- else}}<span style="color:var(--high);margin-right:6px">&check;</span>Nothing needs your attention
+{{- end}}
+    </div>
+{{- end}}
+  </section>
+{{end}}

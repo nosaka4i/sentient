@@ -30,6 +30,9 @@ const (
 	Sentient_SessionDetail_FullMethodName = "/sentient.v1.Sentient/SessionDetail"
 	Sentient_SessionList_FullMethodName   = "/sentient.v1.Sentient/SessionList"
 	Sentient_ActivityList_FullMethodName  = "/sentient.v1.Sentient/ActivityList"
+	Sentient_AlertList_FullMethodName     = "/sentient.v1.Sentient/AlertList"
+	Sentient_AlertDetail_FullMethodName   = "/sentient.v1.Sentient/AlertDetail"
+	Sentient_ReviewAlert_FullMethodName   = "/sentient.v1.Sentient/ReviewAlert"
 )
 
 // SentientClient is the client API for Sentient service.
@@ -52,6 +55,13 @@ type SentientClient interface {
 	// ActivityList returns the counts of every resource/action kind in a window
 	// and the events of one kind (web /activity).
 	ActivityList(ctx context.Context, in *ActivityListRequest, opts ...grpc.CallOption) (*ActivityListResponse, error)
+	// AlertList returns alerts (newest first) and the counts of all alerts.
+	AlertList(ctx context.Context, in *AlertListRequest, opts ...grpc.CallOption) (*AlertListResponse, error)
+	// AlertDetail returns one alert with the agent's record of its action.
+	AlertDetail(ctx context.Context, in *AlertDetailRequest, opts ...grpc.CallOption) (*AlertDetailResponse, error)
+	// ReviewAlert marks an alert reviewed, or open again: the one write the
+	// UI makes.
+	ReviewAlert(ctx context.Context, in *ReviewAlertRequest, opts ...grpc.CallOption) (*ReviewAlertResponse, error)
 }
 
 type sentientClient struct {
@@ -132,6 +142,36 @@ func (c *sentientClient) ActivityList(ctx context.Context, in *ActivityListReque
 	return out, nil
 }
 
+func (c *sentientClient) AlertList(ctx context.Context, in *AlertListRequest, opts ...grpc.CallOption) (*AlertListResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AlertListResponse)
+	err := c.cc.Invoke(ctx, Sentient_AlertList_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sentientClient) AlertDetail(ctx context.Context, in *AlertDetailRequest, opts ...grpc.CallOption) (*AlertDetailResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AlertDetailResponse)
+	err := c.cc.Invoke(ctx, Sentient_AlertDetail_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sentientClient) ReviewAlert(ctx context.Context, in *ReviewAlertRequest, opts ...grpc.CallOption) (*ReviewAlertResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReviewAlertResponse)
+	err := c.cc.Invoke(ctx, Sentient_ReviewAlert_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SentientServer is the server API for Sentient service.
 // All implementations must embed UnimplementedSentientServer
 // for forward compatibility.
@@ -152,6 +192,13 @@ type SentientServer interface {
 	// ActivityList returns the counts of every resource/action kind in a window
 	// and the events of one kind (web /activity).
 	ActivityList(context.Context, *ActivityListRequest) (*ActivityListResponse, error)
+	// AlertList returns alerts (newest first) and the counts of all alerts.
+	AlertList(context.Context, *AlertListRequest) (*AlertListResponse, error)
+	// AlertDetail returns one alert with the agent's record of its action.
+	AlertDetail(context.Context, *AlertDetailRequest) (*AlertDetailResponse, error)
+	// ReviewAlert marks an alert reviewed, or open again: the one write the
+	// UI makes.
+	ReviewAlert(context.Context, *ReviewAlertRequest) (*ReviewAlertResponse, error)
 	mustEmbedUnimplementedSentientServer()
 }
 
@@ -182,6 +229,15 @@ func (UnimplementedSentientServer) SessionList(context.Context, *SessionListRequ
 }
 func (UnimplementedSentientServer) ActivityList(context.Context, *ActivityListRequest) (*ActivityListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ActivityList not implemented")
+}
+func (UnimplementedSentientServer) AlertList(context.Context, *AlertListRequest) (*AlertListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AlertList not implemented")
+}
+func (UnimplementedSentientServer) AlertDetail(context.Context, *AlertDetailRequest) (*AlertDetailResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AlertDetail not implemented")
+}
+func (UnimplementedSentientServer) ReviewAlert(context.Context, *ReviewAlertRequest) (*ReviewAlertResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReviewAlert not implemented")
 }
 func (UnimplementedSentientServer) mustEmbedUnimplementedSentientServer() {}
 func (UnimplementedSentientServer) testEmbeddedByValue()                  {}
@@ -330,6 +386,60 @@ func _Sentient_ActivityList_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Sentient_AlertList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AlertListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SentientServer).AlertList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Sentient_AlertList_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SentientServer).AlertList(ctx, req.(*AlertListRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Sentient_AlertDetail_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AlertDetailRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SentientServer).AlertDetail(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Sentient_AlertDetail_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SentientServer).AlertDetail(ctx, req.(*AlertDetailRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Sentient_ReviewAlert_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReviewAlertRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SentientServer).ReviewAlert(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Sentient_ReviewAlert_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SentientServer).ReviewAlert(ctx, req.(*ReviewAlertRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Sentient_ServiceDesc is the grpc.ServiceDesc for Sentient service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -364,6 +474,18 @@ var Sentient_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ActivityList",
 			Handler:    _Sentient_ActivityList_Handler,
+		},
+		{
+			MethodName: "AlertList",
+			Handler:    _Sentient_AlertList_Handler,
+		},
+		{
+			MethodName: "AlertDetail",
+			Handler:    _Sentient_AlertDetail_Handler,
+		},
+		{
+			MethodName: "ReviewAlert",
+			Handler:    _Sentient_ReviewAlert_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

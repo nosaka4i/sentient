@@ -632,6 +632,51 @@ a.chip { text-decoration: none; }
 .list-foot { padding: 10px 16px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--text-3); }
 @media (max-width: 380px) { .grp { flex-basis: calc(var(--n) * 150px); } }
 
+/* alerts list and detail */
+.page-head.alerts-head { display: block; margin-bottom: 18px; } /* a stack, not the Activity page's heading-and-buttons row */
+.alerts-head h1 { margin: 0 0 4px; }
+.alerts-head h1 .count { color: var(--high); margin-left: 6px; font-variant-numeric: tabular-nums; }
+.afilters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 24px; margin-bottom: 16px; }
+.fgroup { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.fgroup .flbl { font-size: 12px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin-right: 4px; }
+.fgroup a.chip { text-decoration: none; }
+.dayh { margin: 0; padding: 10px 16px; background: var(--surface-2); border-top: 1px solid var(--border); font-size: 12px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); }
+.dayh .d { color: var(--text-3); font-weight: 500; letter-spacing: 0.04em; margin-left: 6px; }
+.day:first-child .dayh { border-top: 0; }
+.alert .hit { position: absolute; inset: 0; z-index: 0; }
+.alert .hit:focus-visible { outline-offset: -2px; }
+.alert .what .plink { position: relative; z-index: 1; color: var(--accent); }
+.alert .what .plink:hover { text-decoration: underline; }
+.alert.reviewed::before { display: none; }
+.alert.reviewed .sev { opacity: .55; }
+.alert.reviewed .path, .alert.reviewed .what .ra { color: var(--text-2); }
+.rev { display: inline-flex; align-items: center; gap: 4px; color: var(--text-3); white-space: nowrap; }
+.headline { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.headline h1 { margin: 0; overflow-wrap: anywhere; }
+.headline .sev { font-size: 12.5px; padding: 3px 10px; }
+.state-open { display: inline-flex; align-items: center; gap: 6px; color: var(--text); font-weight: 600; font-size: 12.5px; }
+.state-open .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--high); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 28px; }
+.actions form { margin: 0; }
+.btn { appearance: none; font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; border: 1px solid var(--border-strong); background: transparent; color: var(--text); padding: 7px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+.btn:hover { background: var(--hover); }
+.btn.primary { background: var(--high); color: var(--high-fg); border-color: var(--high); }
+.btn.primary:hover { filter: brightness(1.08); background: var(--high); }
+.btn[disabled] { opacity: .55; cursor: not-allowed; }
+.btn .soon { font-size: 11px; font-weight: 600; color: var(--text-3); }
+.change-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px 4px; flex-wrap: wrap; }
+.change-head .fpath { font-family: var(--mono); font-size: 14px; color: var(--text); overflow-wrap: anywhere; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.change-head .stat { margin-left: auto; font-family: var(--mono); font-size: 12.5px; }
+.card .commit { padding: 0 16px 8px; font-size: 12.5px; color: var(--text-3); }
+.alert-detail pre.diff { margin-left: 16px; }
+.fold-sum { padding: 0 16px 12px; margin: 0; font-size: 13px; color: var(--text-2); }
+details.rawrec { padding: 0 16px 14px; }
+details.rawrec summary { cursor: pointer; font-size: 13px; color: var(--high); }
+pre.raw { margin: 8px 0 0; padding: 12px; max-height: 360px; overflow: auto; font-family: var(--mono); font-size: 12px; background: var(--surface-2); border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.steps .gap { padding: 8px 16px; font-size: 12.5px; color: var(--text-3); }
+.step.flagged { background: var(--high-tint); }
+.tag.hi { color: var(--high); }
+
 .session-block { margin-bottom: 28px; }
 .session-block .eyebrow { margin: 0 0 8px; font-size: 12px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
 .session-block h1 { margin: 0 0 8px; font-size: clamp(21px, 3.2vw, 27px); line-height: 1.3; letter-spacing: -0.015em; font-weight: 600; font-family: var(--mono); }

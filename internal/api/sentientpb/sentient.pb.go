@@ -27,6 +27,514 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type Alert struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	At            *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=at,proto3" json:"at,omitempty"`
+	Severity      string                 `protobuf:"bytes,3,opt,name=severity,proto3" json:"severity,omitempty"` // high | medium | low
+	Rule          string                 `protobuf:"bytes,4,opt,name=rule,proto3" json:"rule,omitempty"`
+	Status        string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"` // open | reviewed
+	ReviewedAt    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=reviewed_at,json=reviewedAt,proto3" json:"reviewed_at,omitempty"`
+	ActionId      int64                  `protobuf:"varint,7,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"` // 0 when the alert has no action (a monitor gap)
+	Resource      string                 `protobuf:"bytes,8,opt,name=resource,proto3" json:"resource,omitempty"`
+	Action        string                 `protobuf:"bytes,9,opt,name=action,proto3" json:"action,omitempty"`
+	Path          string                 `protobuf:"bytes,10,opt,name=path,proto3" json:"path,omitempty"`
+	Summary       string                 `protobuf:"bytes,11,opt,name=summary,proto3" json:"summary,omitempty"`
+	PromptId      int64                  `protobuf:"varint,12,opt,name=prompt_id,json=promptId,proto3" json:"prompt_id,omitempty"`
+	PromptText    string                 `protobuf:"bytes,13,opt,name=prompt_text,json=promptText,proto3" json:"prompt_text,omitempty"`
+	Agent         string                 `protobuf:"bytes,14,opt,name=agent,proto3" json:"agent,omitempty"`
+	Repo          string                 `protobuf:"bytes,15,opt,name=repo,proto3" json:"repo,omitempty"`
+	SessionId     string                 `protobuf:"bytes,16,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Alert) Reset() {
+	*x = Alert{}
+	mi := &file_sentient_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Alert) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Alert) ProtoMessage() {}
+
+func (x *Alert) ProtoReflect() protoreflect.Message {
+	mi := &file_sentient_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Alert.ProtoReflect.Descriptor instead.
+func (*Alert) Descriptor() ([]byte, []int) {
+	return file_sentient_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *Alert) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *Alert) GetAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.At
+	}
+	return nil
+}
+
+func (x *Alert) GetSeverity() string {
+	if x != nil {
+		return x.Severity
+	}
+	return ""
+}
+
+func (x *Alert) GetRule() string {
+	if x != nil {
+		return x.Rule
+	}
+	return ""
+}
+
+func (x *Alert) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *Alert) GetReviewedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ReviewedAt
+	}
+	return nil
+}
+
+func (x *Alert) GetActionId() int64 {
+	if x != nil {
+		return x.ActionId
+	}
+	return 0
+}
+
+func (x *Alert) GetResource() string {
+	if x != nil {
+		return x.Resource
+	}
+	return ""
+}
+
+func (x *Alert) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *Alert) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *Alert) GetSummary() string {
+	if x != nil {
+		return x.Summary
+	}
+	return ""
+}
+
+func (x *Alert) GetPromptId() int64 {
+	if x != nil {
+		return x.PromptId
+	}
+	return 0
+}
+
+func (x *Alert) GetPromptText() string {
+	if x != nil {
+		return x.PromptText
+	}
+	return ""
+}
+
+func (x *Alert) GetAgent() string {
+	if x != nil {
+		return x.Agent
+	}
+	return ""
+}
+
+func (x *Alert) GetRepo() string {
+	if x != nil {
+		return x.Repo
+	}
+	return ""
+}
+
+func (x *Alert) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+type AlertListRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`     // open | reviewed | empty for both
+	Severity      string                 `protobuf:"bytes,2,opt,name=severity,proto3" json:"severity,omitempty"` // high | medium | low | empty for all
+	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`      // 0 = 2000
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AlertListRequest) Reset() {
+	*x = AlertListRequest{}
+	mi := &file_sentient_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AlertListRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AlertListRequest) ProtoMessage() {}
+
+func (x *AlertListRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sentient_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AlertListRequest.ProtoReflect.Descriptor instead.
+func (*AlertListRequest) Descriptor() ([]byte, []int) {
+	return file_sentient_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *AlertListRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AlertListRequest) GetSeverity() string {
+	if x != nil {
+		return x.Severity
+	}
+	return ""
+}
+
+func (x *AlertListRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type AlertListResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	HistoryBegins *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=history_begins,json=historyBegins,proto3" json:"history_begins,omitempty"`
+	Open          int64                  `protobuf:"varint,2,opt,name=open,proto3" json:"open,omitempty"` // counts cover all alerts, whatever the filter
+	Reviewed      int64                  `protobuf:"varint,3,opt,name=reviewed,proto3" json:"reviewed,omitempty"`
+	OpenHigh      int64                  `protobuf:"varint,4,opt,name=open_high,json=openHigh,proto3" json:"open_high,omitempty"`
+	OpenMedium    int64                  `protobuf:"varint,5,opt,name=open_medium,json=openMedium,proto3" json:"open_medium,omitempty"`
+	OpenLow       int64                  `protobuf:"varint,6,opt,name=open_low,json=openLow,proto3" json:"open_low,omitempty"`
+	Alerts        []*Alert               `protobuf:"bytes,7,rep,name=alerts,proto3" json:"alerts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AlertListResponse) Reset() {
+	*x = AlertListResponse{}
+	mi := &file_sentient_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AlertListResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AlertListResponse) ProtoMessage() {}
+
+func (x *AlertListResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sentient_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AlertListResponse.ProtoReflect.Descriptor instead.
+func (*AlertListResponse) Descriptor() ([]byte, []int) {
+	return file_sentient_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *AlertListResponse) GetHistoryBegins() *timestamppb.Timestamp {
+	if x != nil {
+		return x.HistoryBegins
+	}
+	return nil
+}
+
+func (x *AlertListResponse) GetOpen() int64 {
+	if x != nil {
+		return x.Open
+	}
+	return 0
+}
+
+func (x *AlertListResponse) GetReviewed() int64 {
+	if x != nil {
+		return x.Reviewed
+	}
+	return 0
+}
+
+func (x *AlertListResponse) GetOpenHigh() int64 {
+	if x != nil {
+		return x.OpenHigh
+	}
+	return 0
+}
+
+func (x *AlertListResponse) GetOpenMedium() int64 {
+	if x != nil {
+		return x.OpenMedium
+	}
+	return 0
+}
+
+func (x *AlertListResponse) GetOpenLow() int64 {
+	if x != nil {
+		return x.OpenLow
+	}
+	return 0
+}
+
+func (x *AlertListResponse) GetAlerts() []*Alert {
+	if x != nil {
+		return x.Alerts
+	}
+	return nil
+}
+
+type AlertDetailRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AlertDetailRequest) Reset() {
+	*x = AlertDetailRequest{}
+	mi := &file_sentient_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AlertDetailRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AlertDetailRequest) ProtoMessage() {}
+
+func (x *AlertDetailRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sentient_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AlertDetailRequest.ProtoReflect.Descriptor instead.
+func (*AlertDetailRequest) Descriptor() ([]byte, []int) {
+	return file_sentient_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *AlertDetailRequest) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+type AlertDetailResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	HistoryBegins *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=history_begins,json=historyBegins,proto3" json:"history_begins,omitempty"`
+	Alert         *Alert                 `protobuf:"bytes,2,opt,name=alert,proto3" json:"alert,omitempty"`
+	RawRecord     string                 `protobuf:"bytes,3,opt,name=raw_record,json=rawRecord,proto3" json:"raw_record,omitempty"` // the agent's log record behind the action, capped
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AlertDetailResponse) Reset() {
+	*x = AlertDetailResponse{}
+	mi := &file_sentient_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AlertDetailResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AlertDetailResponse) ProtoMessage() {}
+
+func (x *AlertDetailResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sentient_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AlertDetailResponse.ProtoReflect.Descriptor instead.
+func (*AlertDetailResponse) Descriptor() ([]byte, []int) {
+	return file_sentient_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *AlertDetailResponse) GetHistoryBegins() *timestamppb.Timestamp {
+	if x != nil {
+		return x.HistoryBegins
+	}
+	return nil
+}
+
+func (x *AlertDetailResponse) GetAlert() *Alert {
+	if x != nil {
+		return x.Alert
+	}
+	return nil
+}
+
+func (x *AlertDetailResponse) GetRawRecord() string {
+	if x != nil {
+		return x.RawRecord
+	}
+	return ""
+}
+
+type ReviewAlertRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Reviewed      bool                   `protobuf:"varint,2,opt,name=reviewed,proto3" json:"reviewed,omitempty"` // true = mark reviewed, false = open again
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReviewAlertRequest) Reset() {
+	*x = ReviewAlertRequest{}
+	mi := &file_sentient_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReviewAlertRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReviewAlertRequest) ProtoMessage() {}
+
+func (x *ReviewAlertRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sentient_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReviewAlertRequest.ProtoReflect.Descriptor instead.
+func (*ReviewAlertRequest) Descriptor() ([]byte, []int) {
+	return file_sentient_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ReviewAlertRequest) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *ReviewAlertRequest) GetReviewed() bool {
+	if x != nil {
+		return x.Reviewed
+	}
+	return false
+}
+
+type ReviewAlertResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReviewAlertResponse) Reset() {
+	*x = ReviewAlertResponse{}
+	mi := &file_sentient_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReviewAlertResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReviewAlertResponse) ProtoMessage() {}
+
+func (x *ReviewAlertResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sentient_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReviewAlertResponse.ProtoReflect.Descriptor instead.
+func (*ReviewAlertResponse) Descriptor() ([]byte, []int) {
+	return file_sentient_proto_rawDescGZIP(), []int{6}
+}
+
 type ActivityListRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Days          int32                  `protobuf:"varint,1,opt,name=days,proto3" json:"days,omitempty"`        // the window is the last N days (>= 1)
@@ -41,7 +549,7 @@ type ActivityListRequest struct {
 
 func (x *ActivityListRequest) Reset() {
 	*x = ActivityListRequest{}
-	mi := &file_sentient_proto_msgTypes[0]
+	mi := &file_sentient_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -53,7 +561,7 @@ func (x *ActivityListRequest) String() string {
 func (*ActivityListRequest) ProtoMessage() {}
 
 func (x *ActivityListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[0]
+	mi := &file_sentient_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -66,7 +574,7 @@ func (x *ActivityListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActivityListRequest.ProtoReflect.Descriptor instead.
 func (*ActivityListRequest) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{0}
+	return file_sentient_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ActivityListRequest) GetDays() int32 {
@@ -129,7 +637,7 @@ type ActivityEvent struct {
 
 func (x *ActivityEvent) Reset() {
 	*x = ActivityEvent{}
-	mi := &file_sentient_proto_msgTypes[1]
+	mi := &file_sentient_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -141,7 +649,7 @@ func (x *ActivityEvent) String() string {
 func (*ActivityEvent) ProtoMessage() {}
 
 func (x *ActivityEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[1]
+	mi := &file_sentient_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -154,7 +662,7 @@ func (x *ActivityEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActivityEvent.ProtoReflect.Descriptor instead.
 func (*ActivityEvent) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{1}
+	return file_sentient_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ActivityEvent) GetAt() *timestamppb.Timestamp {
@@ -243,7 +751,7 @@ type ActivityListResponse struct {
 
 func (x *ActivityListResponse) Reset() {
 	*x = ActivityListResponse{}
-	mi := &file_sentient_proto_msgTypes[2]
+	mi := &file_sentient_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -255,7 +763,7 @@ func (x *ActivityListResponse) String() string {
 func (*ActivityListResponse) ProtoMessage() {}
 
 func (x *ActivityListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[2]
+	mi := &file_sentient_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -268,7 +776,7 @@ func (x *ActivityListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActivityListResponse.ProtoReflect.Descriptor instead.
 func (*ActivityListResponse) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{2}
+	return file_sentient_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ActivityListResponse) GetHistoryBegins() *timestamppb.Timestamp {
@@ -336,7 +844,7 @@ type SessionListRequest struct {
 
 func (x *SessionListRequest) Reset() {
 	*x = SessionListRequest{}
-	mi := &file_sentient_proto_msgTypes[3]
+	mi := &file_sentient_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -348,7 +856,7 @@ func (x *SessionListRequest) String() string {
 func (*SessionListRequest) ProtoMessage() {}
 
 func (x *SessionListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[3]
+	mi := &file_sentient_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -361,7 +869,7 @@ func (x *SessionListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionListRequest.ProtoReflect.Descriptor instead.
 func (*SessionListRequest) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{3}
+	return file_sentient_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *SessionListRequest) GetDays() int32 {
@@ -382,7 +890,7 @@ type SessionListRow struct {
 
 func (x *SessionListRow) Reset() {
 	*x = SessionListRow{}
-	mi := &file_sentient_proto_msgTypes[4]
+	mi := &file_sentient_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -394,7 +902,7 @@ func (x *SessionListRow) String() string {
 func (*SessionListRow) ProtoMessage() {}
 
 func (x *SessionListRow) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[4]
+	mi := &file_sentient_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -407,7 +915,7 @@ func (x *SessionListRow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionListRow.ProtoReflect.Descriptor instead.
 func (*SessionListRow) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{4}
+	return file_sentient_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *SessionListRow) GetSummary() *SessionSummary {
@@ -444,7 +952,7 @@ type SessionListResponse struct {
 
 func (x *SessionListResponse) Reset() {
 	*x = SessionListResponse{}
-	mi := &file_sentient_proto_msgTypes[5]
+	mi := &file_sentient_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -456,7 +964,7 @@ func (x *SessionListResponse) String() string {
 func (*SessionListResponse) ProtoMessage() {}
 
 func (x *SessionListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[5]
+	mi := &file_sentient_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -469,7 +977,7 @@ func (x *SessionListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionListResponse.ProtoReflect.Descriptor instead.
 func (*SessionListResponse) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{5}
+	return file_sentient_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *SessionListResponse) GetHistoryBegins() *timestamppb.Timestamp {
@@ -523,7 +1031,7 @@ type SessionSummary struct {
 
 func (x *SessionSummary) Reset() {
 	*x = SessionSummary{}
-	mi := &file_sentient_proto_msgTypes[6]
+	mi := &file_sentient_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -535,7 +1043,7 @@ func (x *SessionSummary) String() string {
 func (*SessionSummary) ProtoMessage() {}
 
 func (x *SessionSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[6]
+	mi := &file_sentient_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -548,7 +1056,7 @@ func (x *SessionSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionSummary.ProtoReflect.Descriptor instead.
 func (*SessionSummary) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{6}
+	return file_sentient_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *SessionSummary) GetSessionId() string {
@@ -619,7 +1127,7 @@ type SessionOption struct {
 
 func (x *SessionOption) Reset() {
 	*x = SessionOption{}
-	mi := &file_sentient_proto_msgTypes[7]
+	mi := &file_sentient_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -631,7 +1139,7 @@ func (x *SessionOption) String() string {
 func (*SessionOption) ProtoMessage() {}
 
 func (x *SessionOption) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[7]
+	mi := &file_sentient_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -644,7 +1152,7 @@ func (x *SessionOption) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionOption.ProtoReflect.Descriptor instead.
 func (*SessionOption) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{7}
+	return file_sentient_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *SessionOption) GetSessionId() string {
@@ -683,7 +1191,7 @@ type PromptWindowRequest struct {
 
 func (x *PromptWindowRequest) Reset() {
 	*x = PromptWindowRequest{}
-	mi := &file_sentient_proto_msgTypes[8]
+	mi := &file_sentient_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -695,7 +1203,7 @@ func (x *PromptWindowRequest) String() string {
 func (*PromptWindowRequest) ProtoMessage() {}
 
 func (x *PromptWindowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[8]
+	mi := &file_sentient_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -708,7 +1216,7 @@ func (x *PromptWindowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PromptWindowRequest.ProtoReflect.Descriptor instead.
 func (*PromptWindowRequest) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{8}
+	return file_sentient_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *PromptWindowRequest) GetDays() int32 {
@@ -765,7 +1273,7 @@ type PromptWindowResponse struct {
 
 func (x *PromptWindowResponse) Reset() {
 	*x = PromptWindowResponse{}
-	mi := &file_sentient_proto_msgTypes[9]
+	mi := &file_sentient_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -777,7 +1285,7 @@ func (x *PromptWindowResponse) String() string {
 func (*PromptWindowResponse) ProtoMessage() {}
 
 func (x *PromptWindowResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[9]
+	mi := &file_sentient_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -790,7 +1298,7 @@ func (x *PromptWindowResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PromptWindowResponse.ProtoReflect.Descriptor instead.
 func (*PromptWindowResponse) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{9}
+	return file_sentient_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *PromptWindowResponse) GetHistoryBegins() *timestamppb.Timestamp {
@@ -879,7 +1387,7 @@ type SessionDetailRequest struct {
 
 func (x *SessionDetailRequest) Reset() {
 	*x = SessionDetailRequest{}
-	mi := &file_sentient_proto_msgTypes[10]
+	mi := &file_sentient_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -891,7 +1399,7 @@ func (x *SessionDetailRequest) String() string {
 func (*SessionDetailRequest) ProtoMessage() {}
 
 func (x *SessionDetailRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[10]
+	mi := &file_sentient_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -904,7 +1412,7 @@ func (x *SessionDetailRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionDetailRequest.ProtoReflect.Descriptor instead.
 func (*SessionDetailRequest) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{10}
+	return file_sentient_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *SessionDetailRequest) GetSessionId() string {
@@ -926,7 +1434,7 @@ type Subagent struct {
 
 func (x *Subagent) Reset() {
 	*x = Subagent{}
-	mi := &file_sentient_proto_msgTypes[11]
+	mi := &file_sentient_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -938,7 +1446,7 @@ func (x *Subagent) String() string {
 func (*Subagent) ProtoMessage() {}
 
 func (x *Subagent) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[11]
+	mi := &file_sentient_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -951,7 +1459,7 @@ func (x *Subagent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Subagent.ProtoReflect.Descriptor instead.
 func (*Subagent) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{11}
+	return file_sentient_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Subagent) GetKind() string {
@@ -1006,7 +1514,7 @@ type SessionDetailResponse struct {
 
 func (x *SessionDetailResponse) Reset() {
 	*x = SessionDetailResponse{}
-	mi := &file_sentient_proto_msgTypes[12]
+	mi := &file_sentient_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1018,7 +1526,7 @@ func (x *SessionDetailResponse) String() string {
 func (*SessionDetailResponse) ProtoMessage() {}
 
 func (x *SessionDetailResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[12]
+	mi := &file_sentient_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1031,7 +1539,7 @@ func (x *SessionDetailResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionDetailResponse.ProtoReflect.Descriptor instead.
 func (*SessionDetailResponse) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{12}
+	return file_sentient_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *SessionDetailResponse) GetHistoryBegins() *timestamppb.Timestamp {
@@ -1155,7 +1663,7 @@ type PromptDetailRequest struct {
 
 func (x *PromptDetailRequest) Reset() {
 	*x = PromptDetailRequest{}
-	mi := &file_sentient_proto_msgTypes[13]
+	mi := &file_sentient_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1167,7 +1675,7 @@ func (x *PromptDetailRequest) String() string {
 func (*PromptDetailRequest) ProtoMessage() {}
 
 func (x *PromptDetailRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[13]
+	mi := &file_sentient_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1180,7 +1688,7 @@ func (x *PromptDetailRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PromptDetailRequest.ProtoReflect.Descriptor instead.
 func (*PromptDetailRequest) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{13}
+	return file_sentient_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *PromptDetailRequest) GetId() int64 {
@@ -1201,7 +1709,7 @@ type DiffLine struct {
 
 func (x *DiffLine) Reset() {
 	*x = DiffLine{}
-	mi := &file_sentient_proto_msgTypes[14]
+	mi := &file_sentient_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1213,7 +1721,7 @@ func (x *DiffLine) String() string {
 func (*DiffLine) ProtoMessage() {}
 
 func (x *DiffLine) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[14]
+	mi := &file_sentient_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1226,7 +1734,7 @@ func (x *DiffLine) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiffLine.ProtoReflect.Descriptor instead.
 func (*DiffLine) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{14}
+	return file_sentient_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *DiffLine) GetKind() string {
@@ -1260,7 +1768,7 @@ type FileChange struct {
 
 func (x *FileChange) Reset() {
 	*x = FileChange{}
-	mi := &file_sentient_proto_msgTypes[15]
+	mi := &file_sentient_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1272,7 +1780,7 @@ func (x *FileChange) String() string {
 func (*FileChange) ProtoMessage() {}
 
 func (x *FileChange) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[15]
+	mi := &file_sentient_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1285,7 +1793,7 @@ func (x *FileChange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileChange.ProtoReflect.Descriptor instead.
 func (*FileChange) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{15}
+	return file_sentient_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *FileChange) GetPath() string {
@@ -1364,14 +1872,15 @@ type Step struct {
 	// of its steps, with the whole command line on the first.
 	CallId        string `protobuf:"bytes,8,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
 	CallCommand   string `protobuf:"bytes,9,opt,name=call_command,json=callCommand,proto3" json:"call_command,omitempty"`
-	Builtin       bool   `protobuf:"varint,10,opt,name=builtin,proto3" json:"builtin,omitempty"` // a shell builtin (never execs): evidence is log only
+	Builtin       bool   `protobuf:"varint,10,opt,name=builtin,proto3" json:"builtin,omitempty"`                   // a shell builtin (never execs): evidence is log only
+	ActionId      int64  `protobuf:"varint,11,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"` // the action row behind this step (0 for the prompt itself)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Step) Reset() {
 	*x = Step{}
-	mi := &file_sentient_proto_msgTypes[16]
+	mi := &file_sentient_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1383,7 +1892,7 @@ func (x *Step) String() string {
 func (*Step) ProtoMessage() {}
 
 func (x *Step) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[16]
+	mi := &file_sentient_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1396,7 +1905,7 @@ func (x *Step) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Step.ProtoReflect.Descriptor instead.
 func (*Step) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{16}
+	return file_sentient_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *Step) GetN() int64 {
@@ -1469,6 +1978,13 @@ func (x *Step) GetBuiltin() bool {
 	return false
 }
 
+func (x *Step) GetActionId() int64 {
+	if x != nil {
+		return x.ActionId
+	}
+	return 0
+}
+
 type PromptDetailResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	HistoryBegins *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=history_begins,json=historyBegins,proto3" json:"history_begins,omitempty"`
@@ -1485,7 +2001,7 @@ type PromptDetailResponse struct {
 
 func (x *PromptDetailResponse) Reset() {
 	*x = PromptDetailResponse{}
-	mi := &file_sentient_proto_msgTypes[17]
+	mi := &file_sentient_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1497,7 +2013,7 @@ func (x *PromptDetailResponse) String() string {
 func (*PromptDetailResponse) ProtoMessage() {}
 
 func (x *PromptDetailResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[17]
+	mi := &file_sentient_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1510,7 +2026,7 @@ func (x *PromptDetailResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PromptDetailResponse.ProtoReflect.Descriptor instead.
 func (*PromptDetailResponse) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{17}
+	return file_sentient_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *PromptDetailResponse) GetHistoryBegins() *timestamppb.Timestamp {
@@ -1577,7 +2093,7 @@ type HealthRequest struct {
 
 func (x *HealthRequest) Reset() {
 	*x = HealthRequest{}
-	mi := &file_sentient_proto_msgTypes[18]
+	mi := &file_sentient_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1589,7 +2105,7 @@ func (x *HealthRequest) String() string {
 func (*HealthRequest) ProtoMessage() {}
 
 func (x *HealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[18]
+	mi := &file_sentient_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1602,7 +2118,7 @@ func (x *HealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthRequest.ProtoReflect.Descriptor instead.
 func (*HealthRequest) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{18}
+	return file_sentient_proto_rawDescGZIP(), []int{25}
 }
 
 type NamedCount struct {
@@ -1615,7 +2131,7 @@ type NamedCount struct {
 
 func (x *NamedCount) Reset() {
 	*x = NamedCount{}
-	mi := &file_sentient_proto_msgTypes[19]
+	mi := &file_sentient_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1627,7 +2143,7 @@ func (x *NamedCount) String() string {
 func (*NamedCount) ProtoMessage() {}
 
 func (x *NamedCount) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[19]
+	mi := &file_sentient_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1640,7 +2156,7 @@ func (x *NamedCount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NamedCount.ProtoReflect.Descriptor instead.
 func (*NamedCount) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{19}
+	return file_sentient_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *NamedCount) GetName() string {
@@ -1675,7 +2191,7 @@ type HealthResponse struct {
 
 func (x *HealthResponse) Reset() {
 	*x = HealthResponse{}
-	mi := &file_sentient_proto_msgTypes[20]
+	mi := &file_sentient_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1687,7 +2203,7 @@ func (x *HealthResponse) String() string {
 func (*HealthResponse) ProtoMessage() {}
 
 func (x *HealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[20]
+	mi := &file_sentient_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1700,7 +2216,7 @@ func (x *HealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
 func (*HealthResponse) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{20}
+	return file_sentient_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *HealthResponse) GetCheckedAt() *timestamppb.Timestamp {
@@ -1787,7 +2303,7 @@ type StatusRequest struct {
 
 func (x *StatusRequest) Reset() {
 	*x = StatusRequest{}
-	mi := &file_sentient_proto_msgTypes[21]
+	mi := &file_sentient_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1799,7 +2315,7 @@ func (x *StatusRequest) String() string {
 func (*StatusRequest) ProtoMessage() {}
 
 func (x *StatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[21]
+	mi := &file_sentient_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1812,7 +2328,7 @@ func (x *StatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatusRequest.ProtoReflect.Descriptor instead.
 func (*StatusRequest) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{21}
+	return file_sentient_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *StatusRequest) GetFrom() *timestamppb.Timestamp {
@@ -1856,7 +2372,7 @@ type ActivityRow struct {
 
 func (x *ActivityRow) Reset() {
 	*x = ActivityRow{}
-	mi := &file_sentient_proto_msgTypes[22]
+	mi := &file_sentient_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1868,7 +2384,7 @@ func (x *ActivityRow) String() string {
 func (*ActivityRow) ProtoMessage() {}
 
 func (x *ActivityRow) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[22]
+	mi := &file_sentient_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1881,7 +2397,7 @@ func (x *ActivityRow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActivityRow.ProtoReflect.Descriptor instead.
 func (*ActivityRow) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{22}
+	return file_sentient_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ActivityRow) GetResource() string {
@@ -1972,7 +2488,7 @@ type Prompt struct {
 
 func (x *Prompt) Reset() {
 	*x = Prompt{}
-	mi := &file_sentient_proto_msgTypes[23]
+	mi := &file_sentient_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1984,7 +2500,7 @@ func (x *Prompt) String() string {
 func (*Prompt) ProtoMessage() {}
 
 func (x *Prompt) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[23]
+	mi := &file_sentient_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1997,7 +2513,7 @@ func (x *Prompt) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Prompt.ProtoReflect.Descriptor instead.
 func (*Prompt) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{23}
+	return file_sentient_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *Prompt) GetId() int64 {
@@ -2089,7 +2605,7 @@ type StatusResponse struct {
 
 func (x *StatusResponse) Reset() {
 	*x = StatusResponse{}
-	mi := &file_sentient_proto_msgTypes[24]
+	mi := &file_sentient_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2101,7 +2617,7 @@ func (x *StatusResponse) String() string {
 func (*StatusResponse) ProtoMessage() {}
 
 func (x *StatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[24]
+	mi := &file_sentient_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2114,7 +2630,7 @@ func (x *StatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatusResponse.ProtoReflect.Descriptor instead.
 func (*StatusResponse) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{24}
+	return file_sentient_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *StatusResponse) GetHistoryBegins() *timestamppb.Timestamp {
@@ -2175,7 +2691,7 @@ type HealthResponse_Daemon struct {
 
 func (x *HealthResponse_Daemon) Reset() {
 	*x = HealthResponse_Daemon{}
-	mi := &file_sentient_proto_msgTypes[25]
+	mi := &file_sentient_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2187,7 +2703,7 @@ func (x *HealthResponse_Daemon) String() string {
 func (*HealthResponse_Daemon) ProtoMessage() {}
 
 func (x *HealthResponse_Daemon) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[25]
+	mi := &file_sentient_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2200,7 +2716,7 @@ func (x *HealthResponse_Daemon) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse_Daemon.ProtoReflect.Descriptor instead.
 func (*HealthResponse_Daemon) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{20, 0}
+	return file_sentient_proto_rawDescGZIP(), []int{27, 0}
 }
 
 func (x *HealthResponse_Daemon) GetVersion() string {
@@ -2278,7 +2794,7 @@ type HealthResponse_API struct {
 
 func (x *HealthResponse_API) Reset() {
 	*x = HealthResponse_API{}
-	mi := &file_sentient_proto_msgTypes[26]
+	mi := &file_sentient_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2290,7 +2806,7 @@ func (x *HealthResponse_API) String() string {
 func (*HealthResponse_API) ProtoMessage() {}
 
 func (x *HealthResponse_API) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[26]
+	mi := &file_sentient_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2303,7 +2819,7 @@ func (x *HealthResponse_API) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse_API.ProtoReflect.Descriptor instead.
 func (*HealthResponse_API) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{20, 1}
+	return file_sentient_proto_rawDescGZIP(), []int{27, 1}
 }
 
 func (x *HealthResponse_API) GetSince() *timestamppb.Timestamp {
@@ -2396,7 +2912,7 @@ type HealthResponse_Storage struct {
 
 func (x *HealthResponse_Storage) Reset() {
 	*x = HealthResponse_Storage{}
-	mi := &file_sentient_proto_msgTypes[27]
+	mi := &file_sentient_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2408,7 +2924,7 @@ func (x *HealthResponse_Storage) String() string {
 func (*HealthResponse_Storage) ProtoMessage() {}
 
 func (x *HealthResponse_Storage) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[27]
+	mi := &file_sentient_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2421,7 +2937,7 @@ func (x *HealthResponse_Storage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse_Storage.ProtoReflect.Descriptor instead.
 func (*HealthResponse_Storage) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{20, 2}
+	return file_sentient_proto_rawDescGZIP(), []int{27, 2}
 }
 
 func (x *HealthResponse_Storage) GetDataDir() string {
@@ -2471,7 +2987,7 @@ type HealthResponse_IngestAgent struct {
 
 func (x *HealthResponse_IngestAgent) Reset() {
 	*x = HealthResponse_IngestAgent{}
-	mi := &file_sentient_proto_msgTypes[28]
+	mi := &file_sentient_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2483,7 +2999,7 @@ func (x *HealthResponse_IngestAgent) String() string {
 func (*HealthResponse_IngestAgent) ProtoMessage() {}
 
 func (x *HealthResponse_IngestAgent) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[28]
+	mi := &file_sentient_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2496,7 +3012,7 @@ func (x *HealthResponse_IngestAgent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse_IngestAgent.ProtoReflect.Descriptor instead.
 func (*HealthResponse_IngestAgent) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{20, 3}
+	return file_sentient_proto_rawDescGZIP(), []int{27, 3}
 }
 
 func (x *HealthResponse_IngestAgent) GetAgent() string {
@@ -2542,7 +3058,7 @@ type HealthResponse_Integrity struct {
 
 func (x *HealthResponse_Integrity) Reset() {
 	*x = HealthResponse_Integrity{}
-	mi := &file_sentient_proto_msgTypes[29]
+	mi := &file_sentient_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2554,7 +3070,7 @@ func (x *HealthResponse_Integrity) String() string {
 func (*HealthResponse_Integrity) ProtoMessage() {}
 
 func (x *HealthResponse_Integrity) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[29]
+	mi := &file_sentient_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2567,7 +3083,7 @@ func (x *HealthResponse_Integrity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse_Integrity.ProtoReflect.Descriptor instead.
 func (*HealthResponse_Integrity) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{20, 4}
+	return file_sentient_proto_rawDescGZIP(), []int{27, 4}
 }
 
 func (x *HealthResponse_Integrity) GetCheckedAt() *timestamppb.Timestamp {
@@ -2630,7 +3146,7 @@ type HealthResponse_Agent struct {
 
 func (x *HealthResponse_Agent) Reset() {
 	*x = HealthResponse_Agent{}
-	mi := &file_sentient_proto_msgTypes[30]
+	mi := &file_sentient_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2642,7 +3158,7 @@ func (x *HealthResponse_Agent) String() string {
 func (*HealthResponse_Agent) ProtoMessage() {}
 
 func (x *HealthResponse_Agent) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[30]
+	mi := &file_sentient_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2655,7 +3171,7 @@ func (x *HealthResponse_Agent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse_Agent.ProtoReflect.Descriptor instead.
 func (*HealthResponse_Agent) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{20, 5}
+	return file_sentient_proto_rawDescGZIP(), []int{27, 5}
 }
 
 func (x *HealthResponse_Agent) GetAgent() string {
@@ -2691,7 +3207,7 @@ type HealthResponse_LiveSession struct {
 
 func (x *HealthResponse_LiveSession) Reset() {
 	*x = HealthResponse_LiveSession{}
-	mi := &file_sentient_proto_msgTypes[31]
+	mi := &file_sentient_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2703,7 +3219,7 @@ func (x *HealthResponse_LiveSession) String() string {
 func (*HealthResponse_LiveSession) ProtoMessage() {}
 
 func (x *HealthResponse_LiveSession) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[31]
+	mi := &file_sentient_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2716,7 +3232,7 @@ func (x *HealthResponse_LiveSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse_LiveSession.ProtoReflect.Descriptor instead.
 func (*HealthResponse_LiveSession) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{20, 6}
+	return file_sentient_proto_rawDescGZIP(), []int{27, 6}
 }
 
 func (x *HealthResponse_LiveSession) GetSessionId() string {
@@ -2758,7 +3274,7 @@ type HealthResponse_Sudo struct {
 
 func (x *HealthResponse_Sudo) Reset() {
 	*x = HealthResponse_Sudo{}
-	mi := &file_sentient_proto_msgTypes[32]
+	mi := &file_sentient_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2770,7 +3286,7 @@ func (x *HealthResponse_Sudo) String() string {
 func (*HealthResponse_Sudo) ProtoMessage() {}
 
 func (x *HealthResponse_Sudo) ProtoReflect() protoreflect.Message {
-	mi := &file_sentient_proto_msgTypes[32]
+	mi := &file_sentient_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2783,7 +3299,7 @@ func (x *HealthResponse_Sudo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse_Sudo.ProtoReflect.Descriptor instead.
 func (*HealthResponse_Sudo) Descriptor() ([]byte, []int) {
-	return file_sentient_proto_rawDescGZIP(), []int{20, 7}
+	return file_sentient_proto_rawDescGZIP(), []int{27, 7}
 }
 
 func (x *HealthResponse_Sudo) GetChecked() bool {
@@ -2811,7 +3327,52 @@ var File_sentient_proto protoreflect.FileDescriptor
 
 const file_sentient_proto_rawDesc = "" +
 	"\n" +
-	"\x0esentient.proto\x12\vsentient.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xaa\x01\n" +
+	"\x0esentient.proto\x12\vsentient.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xce\x03\n" +
+	"\x05Alert\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12*\n" +
+	"\x02at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12\x1a\n" +
+	"\bseverity\x18\x03 \x01(\tR\bseverity\x12\x12\n" +
+	"\x04rule\x18\x04 \x01(\tR\x04rule\x12\x16\n" +
+	"\x06status\x18\x05 \x01(\tR\x06status\x12;\n" +
+	"\vreviewed_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"reviewedAt\x12\x1b\n" +
+	"\taction_id\x18\a \x01(\x03R\bactionId\x12\x1a\n" +
+	"\bresource\x18\b \x01(\tR\bresource\x12\x16\n" +
+	"\x06action\x18\t \x01(\tR\x06action\x12\x12\n" +
+	"\x04path\x18\n" +
+	" \x01(\tR\x04path\x12\x18\n" +
+	"\asummary\x18\v \x01(\tR\asummary\x12\x1b\n" +
+	"\tprompt_id\x18\f \x01(\x03R\bpromptId\x12\x1f\n" +
+	"\vprompt_text\x18\r \x01(\tR\n" +
+	"promptText\x12\x14\n" +
+	"\x05agent\x18\x0e \x01(\tR\x05agent\x12\x12\n" +
+	"\x04repo\x18\x0f \x01(\tR\x04repo\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x10 \x01(\tR\tsessionId\"\\\n" +
+	"\x10AlertListRequest\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12\x1a\n" +
+	"\bseverity\x18\x02 \x01(\tR\bseverity\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\"\x8b\x02\n" +
+	"\x11AlertListResponse\x12A\n" +
+	"\x0ehistory_begins\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\rhistoryBegins\x12\x12\n" +
+	"\x04open\x18\x02 \x01(\x03R\x04open\x12\x1a\n" +
+	"\breviewed\x18\x03 \x01(\x03R\breviewed\x12\x1b\n" +
+	"\topen_high\x18\x04 \x01(\x03R\bopenHigh\x12\x1f\n" +
+	"\vopen_medium\x18\x05 \x01(\x03R\n" +
+	"openMedium\x12\x19\n" +
+	"\bopen_low\x18\x06 \x01(\x03R\aopenLow\x12*\n" +
+	"\x06alerts\x18\a \x03(\v2\x12.sentient.v1.AlertR\x06alerts\"$\n" +
+	"\x12AlertDetailRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\"\xa1\x01\n" +
+	"\x13AlertDetailResponse\x12A\n" +
+	"\x0ehistory_begins\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\rhistoryBegins\x12(\n" +
+	"\x05alert\x18\x02 \x01(\v2\x12.sentient.v1.AlertR\x05alert\x12\x1d\n" +
+	"\n" +
+	"raw_record\x18\x03 \x01(\tR\trawRecord\"@\n" +
+	"\x12ReviewAlertRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1a\n" +
+	"\breviewed\x18\x02 \x01(\bR\breviewed\"\x15\n" +
+	"\x13ReviewAlertResponse\"\xaa\x01\n" +
 	"\x13ActivityListRequest\x12\x12\n" +
 	"\x04days\x18\x01 \x01(\x05R\x04days\x12\x1a\n" +
 	"\bresource\x18\x02 \x01(\tR\bresource\x12\x16\n" +
@@ -2934,7 +3495,7 @@ const file_sentient_proto_rawDesc = "" +
 	"\x02by\x18\x06 \x01(\tR\x02by\x12\x16\n" +
 	"\x06action\x18\a \x01(\tR\x06action\x120\n" +
 	"\x05first\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x05first\x12)\n" +
-	"\x04diff\x18\t \x03(\v2\x15.sentient.v1.DiffLineR\x04diff\"\x99\x02\n" +
+	"\x04diff\x18\t \x03(\v2\x15.sentient.v1.DiffLineR\x04diff\"\xb6\x02\n" +
 	"\x04Step\x12\f\n" +
 	"\x01n\x18\x01 \x01(\x03R\x01n\x121\n" +
 	"\x06offset\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\x06offset\x12\x1a\n" +
@@ -2946,7 +3507,8 @@ const file_sentient_proto_rawDesc = "" +
 	"\acall_id\x18\b \x01(\tR\x06callId\x12!\n" +
 	"\fcall_command\x18\t \x01(\tR\vcallCommand\x12\x18\n" +
 	"\abuiltin\x18\n" +
-	" \x01(\bR\abuiltin\"\xfe\x02\n" +
+	" \x01(\bR\abuiltin\x12\x1b\n" +
+	"\taction_id\x18\v \x01(\x03R\bactionId\"\xfe\x02\n" +
 	"\x14PromptDetailResponse\x12A\n" +
 	"\x0ehistory_begins\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\rhistoryBegins\x12+\n" +
 	"\x06prompt\x18\x02 \x01(\v2\x13.sentient.v1.PromptR\x06prompt\x124\n" +
@@ -3070,7 +3632,7 @@ const file_sentient_proto_rawDesc = "" +
 	"\x0funknown_records\x18\x03 \x01(\x03R\x0eunknownRecords\x12%\n" +
 	"\x0edaemon_version\x18\x04 \x01(\tR\rdaemonVersion\x12#\n" +
 	"\rprompts_total\x18\x05 \x01(\x03R\fpromptsTotal\x12-\n" +
-	"\aprompts\x18\x06 \x03(\v2\x13.sentient.v1.PromptR\aprompts2\xb9\x04\n" +
+	"\aprompts\x18\x06 \x03(\v2\x13.sentient.v1.PromptR\aprompts2\xa9\x06\n" +
 	"\bSentient\x12A\n" +
 	"\x06Status\x12\x1a.sentient.v1.StatusRequest\x1a\x1b.sentient.v1.StatusResponse\x12A\n" +
 	"\x06Health\x12\x1a.sentient.v1.HealthRequest\x1a\x1b.sentient.v1.HealthResponse\x12S\n" +
@@ -3078,7 +3640,10 @@ const file_sentient_proto_rawDesc = "" +
 	"\fPromptWindow\x12 .sentient.v1.PromptWindowRequest\x1a!.sentient.v1.PromptWindowResponse\x12V\n" +
 	"\rSessionDetail\x12!.sentient.v1.SessionDetailRequest\x1a\".sentient.v1.SessionDetailResponse\x12P\n" +
 	"\vSessionList\x12\x1f.sentient.v1.SessionListRequest\x1a .sentient.v1.SessionListResponse\x12S\n" +
-	"\fActivityList\x12 .sentient.v1.ActivityListRequest\x1a!.sentient.v1.ActivityListResponseB6Z4github.com/nosaka4i/sentient/internal/api/sentientpbb\x06proto3"
+	"\fActivityList\x12 .sentient.v1.ActivityListRequest\x1a!.sentient.v1.ActivityListResponse\x12J\n" +
+	"\tAlertList\x12\x1d.sentient.v1.AlertListRequest\x1a\x1e.sentient.v1.AlertListResponse\x12P\n" +
+	"\vAlertDetail\x12\x1f.sentient.v1.AlertDetailRequest\x1a .sentient.v1.AlertDetailResponse\x12P\n" +
+	"\vReviewAlert\x12\x1f.sentient.v1.ReviewAlertRequest\x1a .sentient.v1.ReviewAlertResponseB6Z4github.com/nosaka4i/sentient/internal/api/sentientpbb\x06proto3"
 
 var (
 	file_sentient_proto_rawDescOnce sync.Once
@@ -3092,127 +3657,146 @@ func file_sentient_proto_rawDescGZIP() []byte {
 	return file_sentient_proto_rawDescData
 }
 
-var file_sentient_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
+var file_sentient_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
 var file_sentient_proto_goTypes = []any{
-	(*ActivityListRequest)(nil),        // 0: sentient.v1.ActivityListRequest
-	(*ActivityEvent)(nil),              // 1: sentient.v1.ActivityEvent
-	(*ActivityListResponse)(nil),       // 2: sentient.v1.ActivityListResponse
-	(*SessionListRequest)(nil),         // 3: sentient.v1.SessionListRequest
-	(*SessionListRow)(nil),             // 4: sentient.v1.SessionListRow
-	(*SessionListResponse)(nil),        // 5: sentient.v1.SessionListResponse
-	(*SessionSummary)(nil),             // 6: sentient.v1.SessionSummary
-	(*SessionOption)(nil),              // 7: sentient.v1.SessionOption
-	(*PromptWindowRequest)(nil),        // 8: sentient.v1.PromptWindowRequest
-	(*PromptWindowResponse)(nil),       // 9: sentient.v1.PromptWindowResponse
-	(*SessionDetailRequest)(nil),       // 10: sentient.v1.SessionDetailRequest
-	(*Subagent)(nil),                   // 11: sentient.v1.Subagent
-	(*SessionDetailResponse)(nil),      // 12: sentient.v1.SessionDetailResponse
-	(*PromptDetailRequest)(nil),        // 13: sentient.v1.PromptDetailRequest
-	(*DiffLine)(nil),                   // 14: sentient.v1.DiffLine
-	(*FileChange)(nil),                 // 15: sentient.v1.FileChange
-	(*Step)(nil),                       // 16: sentient.v1.Step
-	(*PromptDetailResponse)(nil),       // 17: sentient.v1.PromptDetailResponse
-	(*HealthRequest)(nil),              // 18: sentient.v1.HealthRequest
-	(*NamedCount)(nil),                 // 19: sentient.v1.NamedCount
-	(*HealthResponse)(nil),             // 20: sentient.v1.HealthResponse
-	(*StatusRequest)(nil),              // 21: sentient.v1.StatusRequest
-	(*ActivityRow)(nil),                // 22: sentient.v1.ActivityRow
-	(*Prompt)(nil),                     // 23: sentient.v1.Prompt
-	(*StatusResponse)(nil),             // 24: sentient.v1.StatusResponse
-	(*HealthResponse_Daemon)(nil),      // 25: sentient.v1.HealthResponse.Daemon
-	(*HealthResponse_API)(nil),         // 26: sentient.v1.HealthResponse.API
-	(*HealthResponse_Storage)(nil),     // 27: sentient.v1.HealthResponse.Storage
-	(*HealthResponse_IngestAgent)(nil), // 28: sentient.v1.HealthResponse.IngestAgent
-	(*HealthResponse_Integrity)(nil),   // 29: sentient.v1.HealthResponse.Integrity
-	(*HealthResponse_Agent)(nil),       // 30: sentient.v1.HealthResponse.Agent
-	(*HealthResponse_LiveSession)(nil), // 31: sentient.v1.HealthResponse.LiveSession
-	(*HealthResponse_Sudo)(nil),        // 32: sentient.v1.HealthResponse.Sudo
-	(*timestamppb.Timestamp)(nil),      // 33: google.protobuf.Timestamp
-	(*durationpb.Duration)(nil),        // 34: google.protobuf.Duration
+	(*Alert)(nil),                      // 0: sentient.v1.Alert
+	(*AlertListRequest)(nil),           // 1: sentient.v1.AlertListRequest
+	(*AlertListResponse)(nil),          // 2: sentient.v1.AlertListResponse
+	(*AlertDetailRequest)(nil),         // 3: sentient.v1.AlertDetailRequest
+	(*AlertDetailResponse)(nil),        // 4: sentient.v1.AlertDetailResponse
+	(*ReviewAlertRequest)(nil),         // 5: sentient.v1.ReviewAlertRequest
+	(*ReviewAlertResponse)(nil),        // 6: sentient.v1.ReviewAlertResponse
+	(*ActivityListRequest)(nil),        // 7: sentient.v1.ActivityListRequest
+	(*ActivityEvent)(nil),              // 8: sentient.v1.ActivityEvent
+	(*ActivityListResponse)(nil),       // 9: sentient.v1.ActivityListResponse
+	(*SessionListRequest)(nil),         // 10: sentient.v1.SessionListRequest
+	(*SessionListRow)(nil),             // 11: sentient.v1.SessionListRow
+	(*SessionListResponse)(nil),        // 12: sentient.v1.SessionListResponse
+	(*SessionSummary)(nil),             // 13: sentient.v1.SessionSummary
+	(*SessionOption)(nil),              // 14: sentient.v1.SessionOption
+	(*PromptWindowRequest)(nil),        // 15: sentient.v1.PromptWindowRequest
+	(*PromptWindowResponse)(nil),       // 16: sentient.v1.PromptWindowResponse
+	(*SessionDetailRequest)(nil),       // 17: sentient.v1.SessionDetailRequest
+	(*Subagent)(nil),                   // 18: sentient.v1.Subagent
+	(*SessionDetailResponse)(nil),      // 19: sentient.v1.SessionDetailResponse
+	(*PromptDetailRequest)(nil),        // 20: sentient.v1.PromptDetailRequest
+	(*DiffLine)(nil),                   // 21: sentient.v1.DiffLine
+	(*FileChange)(nil),                 // 22: sentient.v1.FileChange
+	(*Step)(nil),                       // 23: sentient.v1.Step
+	(*PromptDetailResponse)(nil),       // 24: sentient.v1.PromptDetailResponse
+	(*HealthRequest)(nil),              // 25: sentient.v1.HealthRequest
+	(*NamedCount)(nil),                 // 26: sentient.v1.NamedCount
+	(*HealthResponse)(nil),             // 27: sentient.v1.HealthResponse
+	(*StatusRequest)(nil),              // 28: sentient.v1.StatusRequest
+	(*ActivityRow)(nil),                // 29: sentient.v1.ActivityRow
+	(*Prompt)(nil),                     // 30: sentient.v1.Prompt
+	(*StatusResponse)(nil),             // 31: sentient.v1.StatusResponse
+	(*HealthResponse_Daemon)(nil),      // 32: sentient.v1.HealthResponse.Daemon
+	(*HealthResponse_API)(nil),         // 33: sentient.v1.HealthResponse.API
+	(*HealthResponse_Storage)(nil),     // 34: sentient.v1.HealthResponse.Storage
+	(*HealthResponse_IngestAgent)(nil), // 35: sentient.v1.HealthResponse.IngestAgent
+	(*HealthResponse_Integrity)(nil),   // 36: sentient.v1.HealthResponse.Integrity
+	(*HealthResponse_Agent)(nil),       // 37: sentient.v1.HealthResponse.Agent
+	(*HealthResponse_LiveSession)(nil), // 38: sentient.v1.HealthResponse.LiveSession
+	(*HealthResponse_Sudo)(nil),        // 39: sentient.v1.HealthResponse.Sudo
+	(*timestamppb.Timestamp)(nil),      // 40: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),        // 41: google.protobuf.Duration
 }
 var file_sentient_proto_depIdxs = []int32{
-	33, // 0: sentient.v1.ActivityEvent.at:type_name -> google.protobuf.Timestamp
-	33, // 1: sentient.v1.ActivityListResponse.history_begins:type_name -> google.protobuf.Timestamp
-	33, // 2: sentient.v1.ActivityListResponse.from:type_name -> google.protobuf.Timestamp
-	33, // 3: sentient.v1.ActivityListResponse.to:type_name -> google.protobuf.Timestamp
-	22, // 4: sentient.v1.ActivityListResponse.rows:type_name -> sentient.v1.ActivityRow
-	1,  // 5: sentient.v1.ActivityListResponse.events:type_name -> sentient.v1.ActivityEvent
-	6,  // 6: sentient.v1.SessionListRow.summary:type_name -> sentient.v1.SessionSummary
-	33, // 7: sentient.v1.SessionListResponse.history_begins:type_name -> google.protobuf.Timestamp
-	4,  // 8: sentient.v1.SessionListResponse.sessions:type_name -> sentient.v1.SessionListRow
-	33, // 9: sentient.v1.SessionSummary.started:type_name -> google.protobuf.Timestamp
-	33, // 10: sentient.v1.SessionSummary.last_activity:type_name -> google.protobuf.Timestamp
-	33, // 11: sentient.v1.PromptWindowRequest.before:type_name -> google.protobuf.Timestamp
-	33, // 12: sentient.v1.PromptWindowResponse.history_begins:type_name -> google.protobuf.Timestamp
-	23, // 13: sentient.v1.PromptWindowResponse.prompts:type_name -> sentient.v1.Prompt
-	6,  // 14: sentient.v1.PromptWindowResponse.sessions:type_name -> sentient.v1.SessionSummary
-	33, // 15: sentient.v1.PromptWindowResponse.oldest:type_name -> google.protobuf.Timestamp
-	7,  // 16: sentient.v1.PromptWindowResponse.menu:type_name -> sentient.v1.SessionOption
-	33, // 17: sentient.v1.Subagent.at:type_name -> google.protobuf.Timestamp
-	33, // 18: sentient.v1.SessionDetailResponse.history_begins:type_name -> google.protobuf.Timestamp
-	33, // 19: sentient.v1.SessionDetailResponse.started:type_name -> google.protobuf.Timestamp
-	33, // 20: sentient.v1.SessionDetailResponse.last_activity:type_name -> google.protobuf.Timestamp
-	23, // 21: sentient.v1.SessionDetailResponse.prompts:type_name -> sentient.v1.Prompt
-	22, // 22: sentient.v1.SessionDetailResponse.activity:type_name -> sentient.v1.ActivityRow
-	11, // 23: sentient.v1.SessionDetailResponse.subagents:type_name -> sentient.v1.Subagent
-	33, // 24: sentient.v1.FileChange.first:type_name -> google.protobuf.Timestamp
-	14, // 25: sentient.v1.FileChange.diff:type_name -> sentient.v1.DiffLine
-	34, // 26: sentient.v1.Step.offset:type_name -> google.protobuf.Duration
-	33, // 27: sentient.v1.PromptDetailResponse.history_begins:type_name -> google.protobuf.Timestamp
-	23, // 28: sentient.v1.PromptDetailResponse.prompt:type_name -> sentient.v1.Prompt
-	22, // 29: sentient.v1.PromptDetailResponse.activity:type_name -> sentient.v1.ActivityRow
-	15, // 30: sentient.v1.PromptDetailResponse.files:type_name -> sentient.v1.FileChange
-	16, // 31: sentient.v1.PromptDetailResponse.steps:type_name -> sentient.v1.Step
-	33, // 32: sentient.v1.PromptDetailResponse.reply_at:type_name -> google.protobuf.Timestamp
-	33, // 33: sentient.v1.HealthResponse.checked_at:type_name -> google.protobuf.Timestamp
-	33, // 34: sentient.v1.HealthResponse.history_begins:type_name -> google.protobuf.Timestamp
-	25, // 35: sentient.v1.HealthResponse.daemon:type_name -> sentient.v1.HealthResponse.Daemon
-	26, // 36: sentient.v1.HealthResponse.api:type_name -> sentient.v1.HealthResponse.API
-	27, // 37: sentient.v1.HealthResponse.storage:type_name -> sentient.v1.HealthResponse.Storage
-	28, // 38: sentient.v1.HealthResponse.ingest:type_name -> sentient.v1.HealthResponse.IngestAgent
-	29, // 39: sentient.v1.HealthResponse.integrity:type_name -> sentient.v1.HealthResponse.Integrity
-	30, // 40: sentient.v1.HealthResponse.agents:type_name -> sentient.v1.HealthResponse.Agent
-	31, // 41: sentient.v1.HealthResponse.live:type_name -> sentient.v1.HealthResponse.LiveSession
-	32, // 42: sentient.v1.HealthResponse.sudo:type_name -> sentient.v1.HealthResponse.Sudo
-	33, // 43: sentient.v1.StatusRequest.from:type_name -> google.protobuf.Timestamp
-	33, // 44: sentient.v1.StatusRequest.to:type_name -> google.protobuf.Timestamp
-	33, // 45: sentient.v1.Prompt.started:type_name -> google.protobuf.Timestamp
-	34, // 46: sentient.v1.Prompt.duration:type_name -> google.protobuf.Duration
-	33, // 47: sentient.v1.StatusResponse.history_begins:type_name -> google.protobuf.Timestamp
-	22, // 48: sentient.v1.StatusResponse.activity:type_name -> sentient.v1.ActivityRow
-	23, // 49: sentient.v1.StatusResponse.prompts:type_name -> sentient.v1.Prompt
-	33, // 50: sentient.v1.HealthResponse.Daemon.started:type_name -> google.protobuf.Timestamp
-	34, // 51: sentient.v1.HealthResponse.Daemon.cpu_window:type_name -> google.protobuf.Duration
-	33, // 52: sentient.v1.HealthResponse.API.since:type_name -> google.protobuf.Timestamp
-	34, // 53: sentient.v1.HealthResponse.API.p50:type_name -> google.protobuf.Duration
-	34, // 54: sentient.v1.HealthResponse.API.p95:type_name -> google.protobuf.Duration
-	34, // 55: sentient.v1.HealthResponse.API.p99:type_name -> google.protobuf.Duration
-	19, // 56: sentient.v1.HealthResponse.API.errors_by_code:type_name -> sentient.v1.NamedCount
-	19, // 57: sentient.v1.HealthResponse.API.methods:type_name -> sentient.v1.NamedCount
-	33, // 58: sentient.v1.HealthResponse.IngestAgent.last_record:type_name -> google.protobuf.Timestamp
-	33, // 59: sentient.v1.HealthResponse.Integrity.checked_at:type_name -> google.protobuf.Timestamp
-	33, // 60: sentient.v1.HealthResponse.Integrity.full_at:type_name -> google.protobuf.Timestamp
-	34, // 61: sentient.v1.HealthResponse.Integrity.interval:type_name -> google.protobuf.Duration
-	33, // 62: sentient.v1.HealthResponse.LiveSession.last_activity:type_name -> google.protobuf.Timestamp
-	21, // 63: sentient.v1.Sentient.Status:input_type -> sentient.v1.StatusRequest
-	18, // 64: sentient.v1.Sentient.Health:input_type -> sentient.v1.HealthRequest
-	13, // 65: sentient.v1.Sentient.PromptDetail:input_type -> sentient.v1.PromptDetailRequest
-	8,  // 66: sentient.v1.Sentient.PromptWindow:input_type -> sentient.v1.PromptWindowRequest
-	10, // 67: sentient.v1.Sentient.SessionDetail:input_type -> sentient.v1.SessionDetailRequest
-	3,  // 68: sentient.v1.Sentient.SessionList:input_type -> sentient.v1.SessionListRequest
-	0,  // 69: sentient.v1.Sentient.ActivityList:input_type -> sentient.v1.ActivityListRequest
-	24, // 70: sentient.v1.Sentient.Status:output_type -> sentient.v1.StatusResponse
-	20, // 71: sentient.v1.Sentient.Health:output_type -> sentient.v1.HealthResponse
-	17, // 72: sentient.v1.Sentient.PromptDetail:output_type -> sentient.v1.PromptDetailResponse
-	9,  // 73: sentient.v1.Sentient.PromptWindow:output_type -> sentient.v1.PromptWindowResponse
-	12, // 74: sentient.v1.Sentient.SessionDetail:output_type -> sentient.v1.SessionDetailResponse
-	5,  // 75: sentient.v1.Sentient.SessionList:output_type -> sentient.v1.SessionListResponse
-	2,  // 76: sentient.v1.Sentient.ActivityList:output_type -> sentient.v1.ActivityListResponse
-	70, // [70:77] is the sub-list for method output_type
-	63, // [63:70] is the sub-list for method input_type
-	63, // [63:63] is the sub-list for extension type_name
-	63, // [63:63] is the sub-list for extension extendee
-	0,  // [0:63] is the sub-list for field type_name
+	40, // 0: sentient.v1.Alert.at:type_name -> google.protobuf.Timestamp
+	40, // 1: sentient.v1.Alert.reviewed_at:type_name -> google.protobuf.Timestamp
+	40, // 2: sentient.v1.AlertListResponse.history_begins:type_name -> google.protobuf.Timestamp
+	0,  // 3: sentient.v1.AlertListResponse.alerts:type_name -> sentient.v1.Alert
+	40, // 4: sentient.v1.AlertDetailResponse.history_begins:type_name -> google.protobuf.Timestamp
+	0,  // 5: sentient.v1.AlertDetailResponse.alert:type_name -> sentient.v1.Alert
+	40, // 6: sentient.v1.ActivityEvent.at:type_name -> google.protobuf.Timestamp
+	40, // 7: sentient.v1.ActivityListResponse.history_begins:type_name -> google.protobuf.Timestamp
+	40, // 8: sentient.v1.ActivityListResponse.from:type_name -> google.protobuf.Timestamp
+	40, // 9: sentient.v1.ActivityListResponse.to:type_name -> google.protobuf.Timestamp
+	29, // 10: sentient.v1.ActivityListResponse.rows:type_name -> sentient.v1.ActivityRow
+	8,  // 11: sentient.v1.ActivityListResponse.events:type_name -> sentient.v1.ActivityEvent
+	13, // 12: sentient.v1.SessionListRow.summary:type_name -> sentient.v1.SessionSummary
+	40, // 13: sentient.v1.SessionListResponse.history_begins:type_name -> google.protobuf.Timestamp
+	11, // 14: sentient.v1.SessionListResponse.sessions:type_name -> sentient.v1.SessionListRow
+	40, // 15: sentient.v1.SessionSummary.started:type_name -> google.protobuf.Timestamp
+	40, // 16: sentient.v1.SessionSummary.last_activity:type_name -> google.protobuf.Timestamp
+	40, // 17: sentient.v1.PromptWindowRequest.before:type_name -> google.protobuf.Timestamp
+	40, // 18: sentient.v1.PromptWindowResponse.history_begins:type_name -> google.protobuf.Timestamp
+	30, // 19: sentient.v1.PromptWindowResponse.prompts:type_name -> sentient.v1.Prompt
+	13, // 20: sentient.v1.PromptWindowResponse.sessions:type_name -> sentient.v1.SessionSummary
+	40, // 21: sentient.v1.PromptWindowResponse.oldest:type_name -> google.protobuf.Timestamp
+	14, // 22: sentient.v1.PromptWindowResponse.menu:type_name -> sentient.v1.SessionOption
+	40, // 23: sentient.v1.Subagent.at:type_name -> google.protobuf.Timestamp
+	40, // 24: sentient.v1.SessionDetailResponse.history_begins:type_name -> google.protobuf.Timestamp
+	40, // 25: sentient.v1.SessionDetailResponse.started:type_name -> google.protobuf.Timestamp
+	40, // 26: sentient.v1.SessionDetailResponse.last_activity:type_name -> google.protobuf.Timestamp
+	30, // 27: sentient.v1.SessionDetailResponse.prompts:type_name -> sentient.v1.Prompt
+	29, // 28: sentient.v1.SessionDetailResponse.activity:type_name -> sentient.v1.ActivityRow
+	18, // 29: sentient.v1.SessionDetailResponse.subagents:type_name -> sentient.v1.Subagent
+	40, // 30: sentient.v1.FileChange.first:type_name -> google.protobuf.Timestamp
+	21, // 31: sentient.v1.FileChange.diff:type_name -> sentient.v1.DiffLine
+	41, // 32: sentient.v1.Step.offset:type_name -> google.protobuf.Duration
+	40, // 33: sentient.v1.PromptDetailResponse.history_begins:type_name -> google.protobuf.Timestamp
+	30, // 34: sentient.v1.PromptDetailResponse.prompt:type_name -> sentient.v1.Prompt
+	29, // 35: sentient.v1.PromptDetailResponse.activity:type_name -> sentient.v1.ActivityRow
+	22, // 36: sentient.v1.PromptDetailResponse.files:type_name -> sentient.v1.FileChange
+	23, // 37: sentient.v1.PromptDetailResponse.steps:type_name -> sentient.v1.Step
+	40, // 38: sentient.v1.PromptDetailResponse.reply_at:type_name -> google.protobuf.Timestamp
+	40, // 39: sentient.v1.HealthResponse.checked_at:type_name -> google.protobuf.Timestamp
+	40, // 40: sentient.v1.HealthResponse.history_begins:type_name -> google.protobuf.Timestamp
+	32, // 41: sentient.v1.HealthResponse.daemon:type_name -> sentient.v1.HealthResponse.Daemon
+	33, // 42: sentient.v1.HealthResponse.api:type_name -> sentient.v1.HealthResponse.API
+	34, // 43: sentient.v1.HealthResponse.storage:type_name -> sentient.v1.HealthResponse.Storage
+	35, // 44: sentient.v1.HealthResponse.ingest:type_name -> sentient.v1.HealthResponse.IngestAgent
+	36, // 45: sentient.v1.HealthResponse.integrity:type_name -> sentient.v1.HealthResponse.Integrity
+	37, // 46: sentient.v1.HealthResponse.agents:type_name -> sentient.v1.HealthResponse.Agent
+	38, // 47: sentient.v1.HealthResponse.live:type_name -> sentient.v1.HealthResponse.LiveSession
+	39, // 48: sentient.v1.HealthResponse.sudo:type_name -> sentient.v1.HealthResponse.Sudo
+	40, // 49: sentient.v1.StatusRequest.from:type_name -> google.protobuf.Timestamp
+	40, // 50: sentient.v1.StatusRequest.to:type_name -> google.protobuf.Timestamp
+	40, // 51: sentient.v1.Prompt.started:type_name -> google.protobuf.Timestamp
+	41, // 52: sentient.v1.Prompt.duration:type_name -> google.protobuf.Duration
+	40, // 53: sentient.v1.StatusResponse.history_begins:type_name -> google.protobuf.Timestamp
+	29, // 54: sentient.v1.StatusResponse.activity:type_name -> sentient.v1.ActivityRow
+	30, // 55: sentient.v1.StatusResponse.prompts:type_name -> sentient.v1.Prompt
+	40, // 56: sentient.v1.HealthResponse.Daemon.started:type_name -> google.protobuf.Timestamp
+	41, // 57: sentient.v1.HealthResponse.Daemon.cpu_window:type_name -> google.protobuf.Duration
+	40, // 58: sentient.v1.HealthResponse.API.since:type_name -> google.protobuf.Timestamp
+	41, // 59: sentient.v1.HealthResponse.API.p50:type_name -> google.protobuf.Duration
+	41, // 60: sentient.v1.HealthResponse.API.p95:type_name -> google.protobuf.Duration
+	41, // 61: sentient.v1.HealthResponse.API.p99:type_name -> google.protobuf.Duration
+	26, // 62: sentient.v1.HealthResponse.API.errors_by_code:type_name -> sentient.v1.NamedCount
+	26, // 63: sentient.v1.HealthResponse.API.methods:type_name -> sentient.v1.NamedCount
+	40, // 64: sentient.v1.HealthResponse.IngestAgent.last_record:type_name -> google.protobuf.Timestamp
+	40, // 65: sentient.v1.HealthResponse.Integrity.checked_at:type_name -> google.protobuf.Timestamp
+	40, // 66: sentient.v1.HealthResponse.Integrity.full_at:type_name -> google.protobuf.Timestamp
+	41, // 67: sentient.v1.HealthResponse.Integrity.interval:type_name -> google.protobuf.Duration
+	40, // 68: sentient.v1.HealthResponse.LiveSession.last_activity:type_name -> google.protobuf.Timestamp
+	28, // 69: sentient.v1.Sentient.Status:input_type -> sentient.v1.StatusRequest
+	25, // 70: sentient.v1.Sentient.Health:input_type -> sentient.v1.HealthRequest
+	20, // 71: sentient.v1.Sentient.PromptDetail:input_type -> sentient.v1.PromptDetailRequest
+	15, // 72: sentient.v1.Sentient.PromptWindow:input_type -> sentient.v1.PromptWindowRequest
+	17, // 73: sentient.v1.Sentient.SessionDetail:input_type -> sentient.v1.SessionDetailRequest
+	10, // 74: sentient.v1.Sentient.SessionList:input_type -> sentient.v1.SessionListRequest
+	7,  // 75: sentient.v1.Sentient.ActivityList:input_type -> sentient.v1.ActivityListRequest
+	1,  // 76: sentient.v1.Sentient.AlertList:input_type -> sentient.v1.AlertListRequest
+	3,  // 77: sentient.v1.Sentient.AlertDetail:input_type -> sentient.v1.AlertDetailRequest
+	5,  // 78: sentient.v1.Sentient.ReviewAlert:input_type -> sentient.v1.ReviewAlertRequest
+	31, // 79: sentient.v1.Sentient.Status:output_type -> sentient.v1.StatusResponse
+	27, // 80: sentient.v1.Sentient.Health:output_type -> sentient.v1.HealthResponse
+	24, // 81: sentient.v1.Sentient.PromptDetail:output_type -> sentient.v1.PromptDetailResponse
+	16, // 82: sentient.v1.Sentient.PromptWindow:output_type -> sentient.v1.PromptWindowResponse
+	19, // 83: sentient.v1.Sentient.SessionDetail:output_type -> sentient.v1.SessionDetailResponse
+	12, // 84: sentient.v1.Sentient.SessionList:output_type -> sentient.v1.SessionListResponse
+	9,  // 85: sentient.v1.Sentient.ActivityList:output_type -> sentient.v1.ActivityListResponse
+	2,  // 86: sentient.v1.Sentient.AlertList:output_type -> sentient.v1.AlertListResponse
+	4,  // 87: sentient.v1.Sentient.AlertDetail:output_type -> sentient.v1.AlertDetailResponse
+	6,  // 88: sentient.v1.Sentient.ReviewAlert:output_type -> sentient.v1.ReviewAlertResponse
+	79, // [79:89] is the sub-list for method output_type
+	69, // [69:79] is the sub-list for method input_type
+	69, // [69:69] is the sub-list for extension type_name
+	69, // [69:69] is the sub-list for extension extendee
+	0,  // [0:69] is the sub-list for field type_name
 }
 
 func init() { file_sentient_proto_init() }
@@ -3226,7 +3810,7 @@ func file_sentient_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sentient_proto_rawDesc), len(file_sentient_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   33,
+			NumMessages:   40,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

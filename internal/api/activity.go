@@ -14,8 +14,8 @@ import (
 
 // ActivityList implements sentientpb.SentientServer.
 func (s *Server) ActivityList(ctx context.Context, req *sentientpb.ActivityListRequest) (*sentientpb.ActivityListResponse, error) {
-	if req.GetDays() < 1 || req.GetDays() > maxWindowDays || req.GetLimit() < 0 || req.GetLimit() > query.MaxWindowPrompts {
-		return nil, status.Errorf(codes.InvalidArgument, "days must be 1..%d and limit 0..%d", maxWindowDays, query.MaxWindowPrompts)
+	if req.GetDays() < 0 || req.GetDays() > maxWindowDays || req.GetLimit() < 0 || req.GetLimit() > query.MaxWindowPrompts {
+		return nil, status.Errorf(codes.InvalidArgument, "days must be 0..%d (0 = all time) and limit 0..%d", maxWindowDays, query.MaxWindowPrompts)
 	}
 	a, err := query.GetActivity(ctx, s.db, query.ActivityRequest{
 		Days: int(req.GetDays()), Resource: req.GetResource(), Action: req.GetAction(), FailedOnly: req.GetFailedOnly(), Limit: int(req.GetLimit()), Search: req.GetQuery(),

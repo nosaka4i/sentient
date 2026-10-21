@@ -164,6 +164,21 @@
 
   function windowLabel(days) { return days === 0 ? 'all time' : 'the last ' + plural(days, 'day'); }
 
+  // effectiveDays is the window the loaded prompts really cover. A quiet
+  // window is widened by the server to the newest prompts, so the chip that
+  // lights up is the smallest one (3, 7, 30 days, else all time) that reaches
+  // back to the oldest of them, not the one that was asked for.
+  function effectiveDays(win, requested) {
+    if (!win.widened || requested === 0) return requested;
+    var ages = win.prompts.map(function (p) { return win.now - p.t; });
+    var oldest = ages.length ? Math.max.apply(null, ages) : 0;
+    var steps = [3, 7, 30];
+    for (var i = 0; i < steps.length; i++) {
+      if (steps[i] >= requested && oldest <= steps[i] * 864e5) return steps[i];
+    }
+    return 0;
+  }
+
   // ---- the view ----
 
   // build computes what the page shows for a state: the HTML of the list, the
@@ -259,7 +274,7 @@
     normalize: normalize, merge: merge, matches: matches, sortRows: sortRows,
     rowHTML: rowHTML, headHTML: headHTML, sumHTML: sumHTML, build: build,
     parseSort: parseSort, sortParam: sortParam, nextSort: nextSort, sortName: sortName, sessionOptions: sessionOptions,
-    windowLabel: windowLabel, isDefaultSort: isDefaultSort,
+    windowLabel: windowLabel, effectiveDays: effectiveDays, isDefaultSort: isDefaultSort,
     DEFAULT_DAYS: DEFAULT_DAYS, ROW_STEP: ROW_STEP
   };
 
@@ -359,10 +374,11 @@
       el.view.innerHTML = v.html;
       el.shown.textContent = v.shown;
       el.total.textContent = v.total;
-      el.wlabel.textContent = windowLabel(state.days) + (state.win.widened ? ' (widened to the newest ' + state.win.prompts.length + ')' : '');
+      var shownDays = effectiveDays(state.win, state.days);
+      el.wlabel.textContent = windowLabel(shownDays) + (state.win.widened ? ' (nothing newer: the newest ' + plural(state.win.prompts.length, 'prompt') + ')' : '');
       el.wcount.textContent = '· ' + plural(state.win.prompts.length, 'prompt') + (state.win.more ? ' loaded, more available' : '');
       Array.prototype.forEach.call(el.wbar.querySelectorAll('[data-days]'), function (b) {
-        b.setAttribute('aria-pressed', Number(b.getAttribute('data-days')) === state.days ? 'true' : 'false');
+        b.setAttribute('aria-pressed', Number(b.getAttribute('data-days')) === shownDays ? 'true' : 'false');
       });
       if (v.empty) {
         el.empty.style.display = 'block';

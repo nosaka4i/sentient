@@ -108,8 +108,66 @@ func TestActivityListRoundTrip(t *testing.T) {
 	if err != nil || k.Resource != "prompt" {
 		t.Errorf("kind = %+v, %v", k, err)
 	}
-	for _, req := range []*sentientpb.ActivityListRequest{{Days: 0}, {Days: maxWindowDays + 1}, {Days: 1, Limit: -1}, {Days: 1, Limit: query.MaxWindowPrompts + 1}} {
+	for _, req := range []*sentientpb.ActivityListRequest{{Days: -1}, {Days: maxWindowDays + 1}, {Days: 1, Limit: -1}, {Days: 1, Limit: query.MaxWindowPrompts + 1}} {
 		if _, err := NewServer(nil).ActivityList(ctx, req); status.Code(err) != codes.InvalidArgument {
+			t.Errorf("%+v: %v", req, err)
+		}
+	}
+}
+
+func TestAlertsRoundTrip(t *testing.T) {
+	sock := startServer(t)
+	c, err := Dial(sock, "test client")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	ctx := context.Background()
+
+	l, err := c.AlertList(ctx, query.AlertFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.Counts.Open != 1 || l.Counts.Reviewed != 0 || l.Counts.OpenMedium != 1 || len(l.Alerts) != 1 || l.HistoryBegins.IsZero() {
+		t.Fatalf("list = %+v", l)
+	}
+	a := l.Alerts[0]
+	if a.Severity != "medium" || a.Rule != "outside-read" || a.Status != "open" || a.Resource != "file" || a.Action != "read" || a.Path != "/w/a" ||
+		a.SessionID != "s" || a.Agent != "claude" || a.Repo != "w" || a.At.IsZero() || !a.ReviewedAt.IsZero() {
+		t.Errorf("alert = %+v", a)
+	}
+	if hi, _ := c.AlertList(ctx, query.AlertFilter{Severity: "high"}); len(hi.Alerts) != 0 || hi.Counts.Open != 1 {
+		t.Errorf("high filter = %+v", hi)
+	}
+
+	d, err := c.AlertDetail(ctx, a.ID)
+	if err != nil || d.Alert.ID != a.ID || d.HistoryBegins.IsZero() {
+		t.Fatalf("detail = %+v, %v", d, err)
+	}
+	if _, err := c.AlertDetail(ctx, 99999); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown alert = %v", err)
+	}
+
+	if err := c.ReviewAlert(ctx, a.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	l, _ = c.AlertList(ctx, query.AlertFilter{Status: "reviewed"})
+	if len(l.Alerts) != 1 || l.Alerts[0].ReviewedAt.IsZero() || l.Counts.Open != 0 || l.Counts.Reviewed != 1 {
+		t.Errorf("after review = %+v", l)
+	}
+	if err := c.ReviewAlert(ctx, a.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	if l, _ = c.AlertList(ctx, query.AlertFilter{Status: "open"}); len(l.Alerts) != 1 {
+		t.Errorf("reopened = %+v", l)
+	}
+	if err := c.ReviewAlert(ctx, 99999, true); !errors.Is(err, ErrNotFound) {
+		t.Errorf("review unknown = %v", err)
+	}
+
+	srv := NewServer(nil)
+	for _, req := range []*sentientpb.AlertListRequest{{Status: "bogus"}, {Severity: "bogus"}, {Limit: -1}, {Limit: query.MaxListedAlerts + 1}} {
+		if _, err := srv.AlertList(ctx, req); status.Code(err) != codes.InvalidArgument {
 			t.Errorf("%+v: %v", req, err)
 		}
 	}

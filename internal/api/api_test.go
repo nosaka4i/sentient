@@ -52,6 +52,10 @@ func startServer(t *testing.T) string {
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
+	// one open alert on the action above
+	if _, err := st.DB.Exec(`INSERT INTO alerts (action_id, ts, severity, rule, status) SELECT id, ts, 'medium', 'outside-read', 'open' FROM actions LIMIT 1`); err != nil {
+		t.Fatal(err)
+	}
 
 	sock := filepath.Join(dir, "s.sock")
 	lis, err := Listen(sock, "", quiet)

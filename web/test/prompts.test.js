@@ -201,6 +201,25 @@ test('build, empty windows say what to do', () => {
   assert.equal(P.build(baseState({ days: 0, f: { q: 'zzz', agent: '', repo: '', flagged: false } })).empty, 'No prompts match.');
 });
 
+test('effectiveDays: a widened window lights the chip that really covers the data', () => {
+  const day = 864e5;
+  const win = (widened, ...ageDays) => ({ widened, now: NOW, prompts: ageDays.map((a, i) => ({ id: i, t: NOW - a * day })) });
+  // not widened: what was asked for
+  assert.equal(P.effectiveDays(win(false, 1, 2), 3), 3);
+  // widened, but still inside 3 days (fewer than the minimum prompts)
+  assert.equal(P.effectiveDays(win(true, 0.5, 2.9), 3), 3);
+  // widened past 3 days: the smallest chip that reaches the oldest prompt
+  assert.equal(P.effectiveDays(win(true, 1, 5), 3), 7);
+  assert.equal(P.effectiveDays(win(true, 1, 25), 3), 30);
+  assert.equal(P.effectiveDays(win(true, 1, 103), 3), 0, 'older than 30 days: all time');
+  // a chip asked for is never narrowed: a widened 7-day window skips the 3-day chip
+  assert.equal(P.effectiveDays(win(true, 1, 6.5), 7), 7);
+  assert.equal(P.effectiveDays(win(true, 1, 25), 7), 30);
+  // all time stays all time; an empty widened window falls back to the asked-for chip
+  assert.equal(P.effectiveDays(win(true, 1, 200), 0), 0);
+  assert.equal(P.effectiveDays(win(true), 3), 3);
+});
+
 test('sort values round-trip and column heads reverse or switch', () => {
   assert.deepEqual(P.parseSort('dur:asc'), { key: 'dur', asc: true });
   assert.deepEqual(P.parseSort('nope'), { key: 'date', asc: false });

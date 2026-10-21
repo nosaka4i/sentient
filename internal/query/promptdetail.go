@@ -61,7 +61,8 @@ type Step struct {
 	// A Bash tool call that ran several commands: the same CallID on each
 	// of its steps, CallCommand (the whole line) on the first.
 	CallID, CallCommand string
-	Builtin             bool // a shell builtin: it never execs, so only the log saw it
+	Builtin             bool  // a shell builtin: it never execs, so only the log saw it
+	ActionID            int64 // the action row behind this step (0 for the prompt itself); alerts point at it
 }
 
 // maxDiffLines caps a file's diff; the rest is summarized.
@@ -157,7 +158,7 @@ func promptActivity(ctx context.Context, db *sql.DB, p *PromptRow, hasRepo bool)
 func promptSteps(ctx context.Context, db *sql.DB, p *PromptRow, repoRoot string) ([]Step, []FileChange, error) {
 	r, err := db.QueryContext(ctx, `
 SELECT a.ts, a.resource, a.action, COALESCE(a.path, ''), a.failed, a.evidence, COALESCE(a.tool_use_id, ''), a.part,
-       COALESCE(a.raw_record_id, 0), a.lines_added, a.lines_removed
+       COALESCE(a.raw_record_id, 0), a.lines_added, a.lines_removed, a.id
 FROM actions a WHERE a.prompt_id = ? ORDER BY a.ts, a.id`, p.ID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("steps: %w", err)
@@ -169,6 +170,7 @@ FROM actions a WHERE a.prompt_id = ? ORDER BY a.ts, a.id`, p.ID)
 		evidence, toolUse      string
 		part                   int
 		rawID, added, removed  int64
+		id                     int64
 	}
 	var acts []act
 	parts := map[string]int{} // tool_use_id -> number of parts
@@ -176,7 +178,7 @@ FROM actions a WHERE a.prompt_id = ? ORDER BY a.ts, a.id`, p.ID)
 		var a act
 		var ts string
 		var failed int
-		if err := r.Scan(&ts, &a.resource, &a.action, &a.path, &failed, &a.evidence, &a.toolUse, &a.part, &a.rawID, &a.added, &a.removed); err != nil {
+		if err := r.Scan(&ts, &a.resource, &a.action, &a.path, &failed, &a.evidence, &a.toolUse, &a.part, &a.rawID, &a.added, &a.removed, &a.id); err != nil {
 			r.Close()
 			return nil, nil, err
 		}
@@ -203,7 +205,7 @@ FROM actions a WHERE a.prompt_id = ? ORDER BY a.ts, a.id`, p.ID)
 	for _, a := range acts {
 		s := Step{
 			N: int64(len(steps) + 1), Offset: a.ts.Sub(p.Started),
-			Resource: a.resource, Action: a.action, Path: a.path, Failed: a.failed, Evidence: a.evidence,
+			Resource: a.resource, Action: a.action, Path: a.path, Failed: a.failed, Evidence: a.evidence, ActionID: a.id,
 		}
 		if s.Offset < 0 {
 			s.Offset = 0

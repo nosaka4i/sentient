@@ -27,6 +27,14 @@ type fakeSource struct {
 	session     *query.SessionDetail
 	list        *query.SessionList
 	listDays    int // the days the sessions list was last asked for
+	alerts      *query.AlertList
+	alert       *query.AlertDetail
+	alertFilter query.AlertFilter // the alert list filter last asked for
+	alertID     int64
+	reviewErr   error
+	reviewed    bool
+	reviewedID  int64
+	reviewCalls int
 	activity    *query.Activity
 	activityReq query.ActivityRequest // the activity request last made
 	err         error
@@ -60,6 +68,21 @@ func (f *fakeSource) SessionList(ctx context.Context, days int) (*query.SessionL
 func (f *fakeSource) ActivityList(ctx context.Context, req query.ActivityRequest) (*query.Activity, error) {
 	f.activityReq = req
 	return f.activity, f.err
+}
+
+func (f *fakeSource) AlertList(ctx context.Context, flt query.AlertFilter) (*query.AlertList, error) {
+	f.alertFilter = flt
+	return f.alerts, f.err
+}
+
+func (f *fakeSource) AlertDetail(ctx context.Context, id int64) (*query.AlertDetail, error) {
+	f.alertID = id
+	return f.alert, f.err
+}
+
+func (f *fakeSource) ReviewAlert(ctx context.Context, id int64, reviewed bool) error {
+	f.reviewed, f.reviewedID, f.reviewCalls = reviewed, id, f.reviewCalls+1
+	return f.reviewErr
 }
 
 func (f *fakeSource) Status(ctx context.Context, from, to time.Time) (*query.Status, string, error) {
@@ -128,7 +151,6 @@ func TestDashboard(t *testing.T) {
 		`History from <time datetime="` + now.Add(-(30*time.Hour + 28*time.Minute)).Format("2006-01-02T15:04") + `">Oct 6 09:12</time> (1d 6h ago)`,
 		`Needs attention <span class="count">(0)</span>`,
 		`Nothing needs your attention`,
-		`href="/alerts"`,
 		`<a class="tile" href="/activity?action=request&amp;resource=prompt">`,
 		`<span class="num">214</span>`,
 		`<span class="warn">38 outside repo</span>`,
@@ -228,7 +250,7 @@ func TestStaticAndRouting(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Errorf("js: %d", resp.StatusCode)
 	}
-	for _, path := range []string{"/alerts", "/nope"} {
+	for _, path := range []string{"/nope", "/alert", "/alerts/1"} {
 		if resp, _ := get(t, s, path, "127.0.0.1:7357"); resp.StatusCode != 404 {
 			t.Errorf("%s: %d, want 404 (not built yet)", path, resp.StatusCode)
 		}

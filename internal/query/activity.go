@@ -34,7 +34,7 @@ const DefaultActivityLimit = 200
 
 // ActivityRequest asks for the counts of a window and the events of one kind.
 type ActivityRequest struct {
-	Days       int    // the window is the last N days (>= 1)
+	Days       int    // the window is the last N days; 0 = all time
 	Resource   string // the kind whose events to list; "" = pick a default
 	Action     string
 	FailedOnly bool
@@ -79,12 +79,14 @@ func KnownKind(resource, action string) bool {
 // and the events of the requested kind. A kind that is empty or unknown
 // falls back to command/execute, or else the first kind that has events.
 func GetActivity(ctx context.Context, db *sql.DB, req ActivityRequest, now time.Time) (*Activity, error) {
-	days := max(req.Days, 1)
 	limit := req.Limit
 	if limit <= 0 {
 		limit = DefaultActivityLimit
 	}
-	a := &Activity{To: now, From: now.Add(-time.Duration(days) * 24 * time.Hour)}
+	a := &Activity{To: now}
+	if req.Days > 0 {
+		a.From = now.Add(-time.Duration(req.Days) * 24 * time.Hour)
+	} // else all time: From stays zero, and every timestamp compares after it
 	var err error
 	if a.HistoryBegins, err = HistoryBegins(ctx, db); err != nil {
 		return nil, err

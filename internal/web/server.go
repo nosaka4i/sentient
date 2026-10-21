@@ -38,6 +38,9 @@ type Source interface {
 	SessionDetail(ctx context.Context, sessionID string) (*query.SessionDetail, error)
 	SessionList(ctx context.Context, days int) (*query.SessionList, error)
 	ActivityList(ctx context.Context, req query.ActivityRequest) (*query.Activity, error)
+	AlertList(ctx context.Context, f query.AlertFilter) (*query.AlertList, error)
+	AlertDetail(ctx context.Context, id int64) (*query.AlertDetail, error)
+	ReviewAlert(ctx context.Context, id int64, reviewed bool) error
 }
 
 // Server is the web UI.
@@ -58,7 +61,7 @@ func New(src Source, socket string, log *slog.Logger) (*Server, error) {
 	}
 	home, _ := os.UserHomeDir()
 	s := &Server{src: src, socket: socket, now: time.Now, home: home, log: log, pages: map[string]*template.Template{}}
-	for _, page := range []string{"activity", "dashboard", "health", "prompt", "prompts", "session", "sessions", "down"} {
+	for _, page := range []string{"activity", "alert", "alerts", "dashboard", "health", "prompt", "prompts", "session", "sessions", "down"} {
 		t, err := template.ParseFS(assets.FS, "templates/layout.html", "templates/"+page+".html")
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", page, err)
@@ -86,6 +89,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /session/{id}", s.session)
 	mux.HandleFunc("GET /sessions", s.sessions)
 	mux.HandleFunc("GET /activity", s.activity)
+	mux.HandleFunc("GET /alerts", s.alerts)
+	mux.HandleFunc("GET /alert/{id}", s.alert)
+	mux.HandleFunc("POST /alert/{id}/review", s.review)
 	mux.Handle("GET /static/", s.static)
 	return localOnly(gzipped(mux))
 }
@@ -126,10 +132,13 @@ type since struct{ ISO, Date, Ago string }
 
 type dashboardPage struct {
 	page
-	AttentionCount int
-	Tiles          []tile
-	PromptsTotal   int64
-	Prompts        []promptView
+	AttentionCount                int // open alerts
+	Attention                     []alertRowView
+	AttentionMore                 int // open alerts beyond the rows listed
+	OpenHigh, OpenMedium, OpenLow int64
+	Tiles                         []tile
+	PromptsTotal                  int64
+	Prompts                       []promptView
 }
 
 type downPage struct {
@@ -159,6 +168,19 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, pr := range st.Prompts {
 		p.Prompts = append(p.Prompts, newPromptView(pr, now))
+	}
+	al, err := s.src.AlertList(r.Context(), query.AlertFilter{Status: query.AlertOpen, Limit: attentionRows})
+	if err != nil {
+		s.down(w, err)
+		return
+	}
+	if al != nil {
+		p.AttentionCount = int(al.Counts.Open)
+		p.OpenHigh, p.OpenMedium, p.OpenLow = al.Counts.OpenHigh, al.Counts.OpenMedium, al.Counts.OpenLow
+		for _, a := range al.Alerts {
+			p.Attention = append(p.Attention, newAlertRow(a, now, s.home))
+		}
+		p.AttentionMore = max(p.AttentionCount-len(p.Attention), 0)
 	}
 	s.render(w, http.StatusOK, "dashboard", p)
 }

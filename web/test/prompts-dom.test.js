@@ -167,9 +167,19 @@ test('a time-window chip fetches that window and shows it', async () => {
   p.click({ '[data-days]': { getAttribute: () => '7' } });
   assert.deepEqual(p.fetched, ['/prompts/data?days=7']);
   await p.tick();
-  assert.equal(p.els.wlabel.textContent, 'the last 7 days (widened to the newest 5)');
+  assert.equal(p.els.wlabel.textContent, 'the last 7 days (nothing newer: the newest 5 prompts)');
   assert.equal(p.chips.find((c) => c.getAttribute('data-days') === '7').getAttribute('aria-pressed'), 'true');
   assert.equal(p.history.last, '/prompts?days=7');
+});
+
+test('a default window the server had to widen lights the chip that covers the data', () => {
+  const old = raw({ widened: true, prompts: [{ id: 1, s: 0, t: at(9, 20, 10, 0), x: 'old prompt', d: 60, a: 1, f: 0 }], sessions: [raw().sessions[1]] });
+  const p = setup({ first: old });
+  // the 3-day chip was asked for, but the prompt is 17 days old: the 30-day chip is the honest one
+  assert.equal(p.chips.find((c) => c.getAttribute('data-days') === '3').getAttribute('aria-pressed'), 'false');
+  assert.equal(p.chips.find((c) => c.getAttribute('data-days') === '30').getAttribute('aria-pressed'), 'true');
+  assert.equal(p.els.wlabel.textContent, 'the last 30 days (nothing newer: the newest 1 prompt)');
+  assert.equal(p.history.last, '/prompts', 'the URL still has the default window');
 });
 
 test('a truncated window offers "Load older", which fetches before the oldest prompt and merges', async () => {

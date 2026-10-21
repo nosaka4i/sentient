@@ -1,12 +1,3 @@
-{{define "step"}}
-        <li class="step">
-          <span class="n">{{.N}}</span><span class="t">{{.T}}</span>
-          <span class="k ra"><span class="r">{{.Res}}</span><span class="sep">/</span>{{.Act}}</span>
-          <span class="p">{{.Path}}{{if .Note}} <span class="note">· {{.Note}}</span>{{end}}{{if .Failed}} <span class="tag fail">failed</span>{{end}}</span>
-          <span class="d"></span><span class="ev"><span class="tag">{{.Ev}}</span></span>
-        </li>
-{{- end}}
-
 {{define "content"}}
   <a class="back" href="/">&larr; Dashboard</a>
 

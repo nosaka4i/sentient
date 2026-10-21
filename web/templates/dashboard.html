@@ -3,9 +3,35 @@
   <section class="card attention" aria-labelledby="h-att">
     <div class="card-head">
       <h2 id="h-att">Needs attention <span class="count">({{.AttentionCount}})</span></h2>
+{{- if .AttentionCount}}
+      <div class="sevbar" role="img" aria-label="{{.OpenHigh}} high, {{.OpenMedium}} medium, {{.OpenLow}} low" title="{{.OpenHigh}} high · {{.OpenMedium}} medium · {{.OpenLow}} low">
+        {{- if .OpenHigh}}<span class="h" style="flex-grow:{{.OpenHigh}}"></span>{{end}}
+        {{- if .OpenMedium}}<span class="m" style="flex-grow:{{.OpenMedium}}"></span>{{end}}
+        {{- if .OpenLow}}<span class="l" style="flex-grow:{{.OpenLow}}"></span>{{end}}
+      </div>
+{{- end}}
       <a class="all-link" href="/alerts" title="Every alert, including reviewed">All alerts &rarr;</a>
     </div>
+{{- if .Attention}}
+    <ul class="alerts">
+{{- range .Attention}}
+      <li>
+        <a class="alert {{.SevClass}}" href="{{.Href}}" title="Open details">
+          <span class="sev sev-{{.SevClass}}">{{.SevLabel}}</span>
+          <span class="path">{{.Title}}</span>
+          <span class="what">{{if .Resource}}<span class="ra"><span class="r">{{.Resource}}</span><span class="sep">/</span>{{.Action}}</span>{{end}}</span>
+          <span class="meta"><time datetime="{{.ISO}}">{{.Time}}</time></span>
+          <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </a>
+      </li>
+{{- end}}
+    </ul>
+{{- if .AttentionMore}}
+    <div class="more-row"><span class="left">{{.AttentionMore}} more open</span><a class="chip" href="/alerts">See all</a></div>
+{{- end}}
+{{- else}}
     <div class="empty" style="display:block"><span style="color:var(--high);margin-right:6px">&check;</span>Nothing needs your attention</div>
+{{- end}}
   </section>
 
   <!-- LAST 24H -->

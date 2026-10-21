@@ -70,6 +70,16 @@
 </html>
 {{end}}
 
+{{/* one row of a trace: the prompt page and the alert page share it */}}
+{{define "step"}}
+        <li class="step{{if .Flagged}} effect flagged{{end}}">
+          <span class="n">{{.N}}</span><span class="t">{{.T}}</span>
+          <span class="k ra"><span class="r">{{.Res}}</span><span class="sep">/</span>{{.Act}}</span>
+          <span class="p">{{.Path}}{{if .Note}} <span class="note">· {{.Note}}</span>{{end}}{{if .Failed}} <span class="tag fail">failed</span>{{end}}{{if .Flagged}} <span class="tag hi">flagged</span>{{end}}</span>
+          <span class="d"></span><span class="ev"><span class="tag">{{.Ev}}</span></span>
+        </li>
+{{- end}}
+
 {{define "tiles"}}
 {{- range .}}
 {{- if .SubHref}}

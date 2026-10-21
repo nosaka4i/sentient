@@ -92,6 +92,7 @@ func TestActivityRequestFromTheURL(t *testing.T) {
 	s := newTestServer(t, src)
 	for path, want := range map[string]query.ActivityRequest{
 		"/activity?days=7": {Days: 7},
+		"/activity?days=0": {Days: 0}, // all time
 		"/activity?days=30&resource=file&action=update":      {Days: 30, Resource: "file", Action: "update"},
 		"/activity?resource=command&action=execute&failed=1": {Days: 1, Resource: "command", Action: "execute", FailedOnly: true},
 		"/activity?days=99":                         {Days: 1}, // not an offered window
@@ -264,6 +265,26 @@ func TestActivityHidesTheResultColumnWhereItIsAlwaysEmpty(t *testing.T) {
 		if hasResult(kind[0], kind[1]) != want {
 			t.Errorf("hasResult(%v) = %v", kind, !want)
 		}
+	}
+}
+
+func TestActivityAllTimeWindow(t *testing.T) {
+	a := sampleActivity()
+	a.From = time.Time{} // all time
+	s := newTestServer(t, &fakeSource{activity: a})
+	_, body := get(t, s, "/activity?days=0&resource=command&action=execute", "localhost")
+	for _, want := range []string{
+		`<p class="pmeta"><span>All time</span></p>`,
+		`<a href="/activity?action=execute&amp;days=0&amp;resource=command" aria-pressed="true">All time</a>`,
+		`<a href="/activity?action=execute&amp;resource=command" aria-pressed="false">Last 24h</a>`,
+		`<input type="hidden" name="days" value="0">`, // the search form keeps all time
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("page is missing %q", want)
+		}
+	}
+	if strings.Contains(body, "Rolling window") {
+		t.Error("all time is not a rolling window")
 	}
 }
 

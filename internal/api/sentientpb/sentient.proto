@@ -27,7 +27,66 @@ service Sentient {
   // ActivityList returns the counts of every resource/action kind in a window
   // and the events of one kind (web /activity).
   rpc ActivityList(ActivityListRequest) returns (ActivityListResponse);
+  // AlertList returns alerts (newest first) and the counts of all alerts.
+  rpc AlertList(AlertListRequest) returns (AlertListResponse);
+  // AlertDetail returns one alert with the agent's record of its action.
+  rpc AlertDetail(AlertDetailRequest) returns (AlertDetailResponse);
+  // ReviewAlert marks an alert reviewed, or open again: the one write the
+  // UI makes.
+  rpc ReviewAlert(ReviewAlertRequest) returns (ReviewAlertResponse);
 }
+
+message Alert {
+  int64 id = 1;
+  google.protobuf.Timestamp at = 2;
+  string severity = 3; // high | medium | low
+  string rule = 4;
+  string status = 5; // open | reviewed
+  google.protobuf.Timestamp reviewed_at = 6;
+  int64 action_id = 7; // 0 when the alert has no action (a monitor gap)
+  string resource = 8;
+  string action = 9;
+  string path = 10;
+  string summary = 11;
+  int64 prompt_id = 12;
+  string prompt_text = 13;
+  string agent = 14;
+  string repo = 15;
+  string session_id = 16;
+}
+
+message AlertListRequest {
+  string status = 1;   // open | reviewed | empty for both
+  string severity = 2; // high | medium | low | empty for all
+  int32 limit = 3;     // 0 = 2000
+}
+
+message AlertListResponse {
+  google.protobuf.Timestamp history_begins = 1;
+  int64 open = 2;      // counts cover all alerts, whatever the filter
+  int64 reviewed = 3;
+  int64 open_high = 4;
+  int64 open_medium = 5;
+  int64 open_low = 6;
+  repeated Alert alerts = 7;
+}
+
+message AlertDetailRequest {
+  int64 id = 1;
+}
+
+message AlertDetailResponse {
+  google.protobuf.Timestamp history_begins = 1;
+  Alert alert = 2;
+  string raw_record = 3; // the agent's log record behind the action, capped
+}
+
+message ReviewAlertRequest {
+  int64 id = 1;
+  bool reviewed = 2; // true = mark reviewed, false = open again
+}
+
+message ReviewAlertResponse {}
 
 message ActivityListRequest {
   int32 days = 1;       // the window is the last N days (>= 1)
@@ -187,6 +246,7 @@ message Step {
   string call_id = 8;
   string call_command = 9;
   bool builtin = 10; // a shell builtin (never execs): evidence is log only
+  int64 action_id = 11; // the action row behind this step (0 for the prompt itself)
 }
 
 message PromptDetailResponse {

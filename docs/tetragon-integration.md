@@ -1,11 +1,17 @@
-# Tetragon integration: build plan
+# Kernel collectors: build plan (Tetragon on Linux, eslogger on macOS)
 
 **Status:** proposed, not yet built
 
 The *what* is in [design.md](design.md#linux-collector-tetragon) (policy,
 gaps, noise) and the evaluation is in [tetragon.md](tetragon.md). This is the
 *how*: where the code goes, what it writes, how kernel events get tied to a
-session and a prompt, and the order to build it in.
+session and a prompt, and the order to build it in. The file keeps its name
+for the Tetragon-era links; it now covers both platforms.
+
+Platform split in one line: one `Collector` interface and OS-neutral record
+types; one implementation per platform, picked at runtime by `GOOS` and what
+is installed; build tags only for tiny OS-specific bits (paths, rusage).
+Store, queries and web pages never know which collector produced a row.
 
 ## Context
 
@@ -78,14 +84,52 @@ merging, gap detection, hash chain). A manual end-to-end check on the Linux
 box (48 MB RSS measured) comes at each build step below. Coverage stays at 70%
 or more per package.
 
+## macOS: `internal/collector/eslogger/`
+
+No Apple entitlement is needed for `eslogger` (macOS 13+), so this ships
+before the native Endpoint Security extension; the extension later replaces
+it behind the same interface (`internal/collector/es/`).
+
+- **Capture.** `sentientd` runs `eslogger exec fork exit create write
+  close unlink rename setmode kill open` as a root subprocess (launchd
+  daemon, Full Disk Access granted to it) and reads JSON lines. It
+  restarts the subprocess if it dies and records the downtime as a gap.
+- **Normalization.** Same OS-neutral records as the Tetragon path, so
+  `processes`, `kernel_events` and the attribution steps are shared.
+  Parser fixtures come from real captures; the first is the rly bundle
+  `~/.rly/inbox/20261016-100826-eslogger.txt`. Compiles and tests on any OS.
+- **Agent filtering is in user space.** eslogger selects by event type only,
+  not by process tree, so the collector tracks the tree itself: start on an
+  `exec` whose binary matches an agent, follow `fork`/`exec` descendants,
+  drop everything else before it reaches the store. `open` is high volume and
+  is dropped for system library paths as in the Linux policy.
+- **Gaps.** ES messages carry sequence numbers (to confirm in the JSON); a
+  jump is a drop, which is a better signal than Tetragon's loss counters.
+  Subprocess exit or a permission failure is also a `monitor gap`.
+- **Network.** `eslogger` has no outbound-connect event, so `network
+  connect` on macOS is coarse until the native extension plus a Network
+  Extension: poll `nettop -P -L 1` and attribute by pid. Documented
+  limitation, shown as such on Health.
+- **Agent binary.** The desktop app bundles Claude Code under
+  `~/Library/Application Support/Claude/claude-code/<version>/` and the
+  user has no `claude` on PATH (backlog `a5fc746`), so matching is by a list
+  of path patterns, not one name.
+- **Root.** The Mac daemon runs as the user today (dev mode, data in
+  `~/Library/Application Support/sentient`). With `eslogger` it needs root:
+  a launchd daemon with `DefaultHomes` already covering `/Users/*`.
+
 ## Build order
 
-1. Migration 5, store writes, `normalize.go` and its fixtures.
-2. `client.go`: stream into `kernel_events` and `processes`, hash chain
-   verified by the existing integrity check.
-3. Session and prompt attribution.
-4. Merge with log actions (`evidence: both` / `kernel`).
-5. Gap monitor, Health card, `/proc` scan and the `matchPIDs` policy.
+1. Migration 5, store writes, OS-neutral record types and the `Collector`
+   interface, with `normalize` fixtures (Tetragon and eslogger).
+2. **macOS first:** `eslogger` parser and subprocess runner into
+   `kernel_events` and `processes`, hash chain verified by the existing
+   integrity check. The Mac already runs the log-only version, so this is
+   the first place a kernel row shows up end to end.
+3. Session and prompt attribution (shared).
+4. Merge with log actions (`evidence: both` / `kernel`) (shared).
+5. Linux: Tetragon `client.go`, gap monitor, Health card, `/proc` scan and
+   the `matchPIDs` policy.
 6. UI: evidence tags back on the trace, file effects on command rows.
 
 ## Why X, not Y
@@ -112,6 +156,12 @@ or more per package.
   `kernel_events` needs a retention or compression plan (backlog `6efed70`).
 - **npm installs** of Claude Code run as `node`, so the in-kernel binary
   filter doesn't fit; filter by ancestry in user space (deferred).
+
+- **eslogger event coverage.** Confirm from a fresh capture that `fork`,
+  `close` (modified), `setmode` and `kill` come through as the build list
+  assumes, and that the sequence number is in the JSON.
+- **Full Disk Access for a launchd daemon** is granted per binary; check what
+  survives an update of `sentientd`.
 
 ## Related and deferred
 

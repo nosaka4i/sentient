@@ -73,6 +73,7 @@ type stepView struct {
 	Path     string
 	Note     string
 	Failed   bool
+	Flagged  bool // the step an alert is about (the alert page)
 	Ev       string
 	Call     bool // a Bash call header: Path holds the whole command line
 	CallNote string

@@ -1,0 +1,88 @@
+{{define "content"}}
+  <a class="back" href="/alerts">&larr; Alerts</a>
+
+  <!-- HEADLINE -->
+  <div class="prompt-block">
+    <p class="eyebrow">Alert</p>
+    <div class="headline">
+      <span class="sev sev-{{.Row.SevClass}}">{{.Row.SevLabel}}</span>
+      <h1>{{.Row.Title}}</h1>
+    </div>
+    <p class="pmeta">
+      <span><time datetime="{{.Row.ISO}}">{{.Row.Time}}</time></span>
+      {{- if .Row.Resource}}
+      <span class="ra"><span class="r">{{.Row.Resource}}</span><span class="sep">/</span>{{.Row.Action}}</span>
+      {{- end}}
+      {{- if .Agent}}<span>{{template "agent-icon" .Agent}}</span>{{end}}
+      {{- if .Repo}}<span class="repo">{{.Repo}}</span>{{end}}
+      {{- if .SessionHref}}
+      <span>session <a class="sess" href="{{.SessionHref}}" title="All prompts in this session">{{.SessionShort}}</a></span>
+      {{- end}}
+      {{- if .Row.PromptHref}}
+      <span>prompt <a class="plink" href="{{.Row.PromptHref}}" title="Open the prompt this happened in">&ldquo;{{.Row.PromptText}}&rdquo;</a></span>
+      {{- end}}
+      <span>rule <span class="mono">{{.Rule}}</span></span>
+      <span>{{if .Open}}<span class="state-open"><span class="dot"></span>Open</span>{{else}}<span class="state-done"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L19 7"/></svg>Reviewed{{if .ReviewedAt}} · {{.ReviewedAt}}{{end}}</span>{{end}}</span>
+    </p>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="actions">
+    <form method="post" action="/alert/{{.ID}}/review">
+      <input type="hidden" name="reviewed" value="{{if .Open}}1{{else}}0{{end}}">
+      <button class="btn{{if .Open}} primary{{end}}" type="submit">{{if .Open}}Mark reviewed{{else}}Reopen{{end}}</button>
+    </form>
+    {{- if .CanRevert}}
+    <button class="btn" type="button" disabled title="Remove this change (not built yet)">Revert this change <span class="soon">soon</span></button>
+    {{- end}}
+    {{- if .Row.PromptHref}}
+    <a class="btn" href="{{.Row.PromptHref}}">Open prompt</a>
+    {{- end}}
+  </div>
+
+{{- if .File}}
+  <!-- WHAT CHANGED -->
+  <section class="card attention" aria-labelledby="h-what">
+    <div class="card-head">
+      <h2 id="h-what">What changed</h2>
+      {{- if .StepLabel}}<span class="hint">{{.StepLabel}}</span>{{end}}
+    </div>
+    <div class="change-head">
+      <span class="fpath">{{.File.Path}}{{if .File.Outside}} <span class="tag outside">outside repo</span>{{end}}</span>
+      <span class="stat"><span class="add">+{{.File.Added}}</span> <span class="del">&minus;{{.File.Removed}}</span></span>
+    </div>
+    <div class="commit">{{.File.StepsLabel}} · <span class="ra"><span class="r">file</span><span class="sep">/</span>{{.File.Verb}}</span>{{if .File.By}} by {{.File.By}}{{end}} · {{.File.Clock}}</div>
+<pre class="diff">{{range .File.Diff}}<span class="{{.Class}}">{{.Prefix}}{{.Text}}</span>{{end}}</pre>
+  </section>
+{{- end}}
+
+{{- if .Steps}}
+  <!-- WHERE IT HAPPENED -->
+  <section class="card" aria-labelledby="h-where">
+    <div class="card-head">
+      <h2 id="h-where">Where it happened</h2>
+      {{- if .Row.PromptHref}}<a class="all-link" href="{{.Row.PromptHref}}#trace">Full trace &rarr;</a>{{end}}
+    </div>
+    <ol class="steps">
+      {{- if .EarlierSteps}}<li class="gap">&hellip; {{.EarlierSteps}} earlier step{{if ne .EarlierSteps 1}}s{{end}}</li>{{end}}
+{{- range .Steps}}{{template "step" .}}{{end}}
+      {{- if .LaterSteps}}<li class="gap">&hellip; {{.LaterSteps}} more step{{if ne .LaterSteps 1}}s{{end}}</li>{{end}}
+    </ol>
+  </section>
+{{- end}}
+
+{{- if .Raw}}
+  <!-- EVIDENCE -->
+  <section class="card fold" id="evidence" aria-labelledby="h-ev">
+    <div class="card-head">
+      <h2 id="h-ev">Evidence</h2>
+      <span class="tag">log</span>
+    </div>
+    <p class="fold-sum">The agent's own record of this action. Kernel evidence joins it once kernel capture is on.</p>
+    <details class="rawrec">
+      <summary>Show raw record</summary>
+<pre class="raw">{{.Raw}}</pre>
+    </details>
+  </section>
+{{- end}}
+{{end}}
