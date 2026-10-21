@@ -226,21 +226,21 @@ td code { white-space: nowrap; }
 #os-win:checked ~ .panel-win { display: block; }
 
 /* architecture diagram */
-.diagram { margin: 8px 0 20px; overflow-x: auto; }
-.diagram svg { display: block; width: 100%; min-width: 640px; height: auto; }
-.diagram .box { fill: var(--surface); stroke: var(--border); stroke-width: 1.5; }
-.diagram .box.core { stroke: var(--high); }
-.diagram .row { fill: var(--surface-2); stroke: none; }
-.diagram .zone { fill: none; stroke: var(--text-3); stroke-width: 1; stroke-dasharray: 5 5; }
+.diagram { margin: 12px 0 14px; overflow-x: auto; }
+.diagram svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.diagram .box { fill: var(--surface); stroke: var(--text-3); stroke-width: 1.5; }
+.diagram .core { fill: var(--high-tint); stroke: var(--high); stroke-width: 2; }
+.diagram .layer { fill: var(--surface-2); stroke: var(--text-3); stroke-width: 1.5; }
+.diagram .host { fill: none; stroke: var(--high); stroke-width: 1.5; stroke-dasharray: 7 6; }
 .diagram .t { fill: var(--text); font-family: var(--sans); font-size: 14px; font-weight: 600; }
 .diagram .s { fill: var(--text-2); font-family: var(--sans); font-size: 12px; }
 .diagram .m { fill: var(--text-2); font-family: var(--mono); font-size: 11.5px; }
-.diagram .z { fill: var(--text-3); font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; }
+.diagram .z { fill: var(--high); font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.1em; }
 .diagram .lbl { fill: var(--text-3); font-family: var(--sans); font-size: 11.5px; }
-.diagram .arrow { stroke: var(--text-3); stroke-width: 1.5; fill: none; marker-end: url(#ah); }
-.diagram .arrow.hot { stroke: var(--high); marker-end: url(#ah-hot); }
-.diagram #ah path { fill: var(--text-3); }
-.diagram #ah-hot path { fill: var(--high); }
+.diagram .arrow { stroke: var(--text-2); stroke-width: 1.5; fill: none; marker-end: url(#ah); }
+.diagram .arrow.cap { stroke: var(--high); marker-end: url(#ah-cap); }
+.diagram #ah path { fill: var(--text-2); }
+.diagram #ah-cap path { fill: var(--high); }
 .legend { color: var(--text-3); font-size: 14px; }
 
 /* ---------- small screens ---------- */
@@ -250,7 +250,9 @@ td code { white-space: nowrap; }
   .cards, .arch, .principles { grid-template-columns: 1fr; }
   .nav-links a.opt, .top-links a.opt { display: none; }
 
-  .layout { grid-template-columns: 1fr; gap: 0; }
+  /* minmax(0, ...) so wide content (the diagram, code blocks) scrolls
+     inside its own box instead of stretching the column past the screen. */
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .sidebar { position: static; max-height: none; padding: 20px 0 0; border-bottom: 1px solid var(--border); }
   .sidebar nav { display: flex; flex-wrap: wrap; gap: 4px; }
   .sidebar h4 { width: 100%; }

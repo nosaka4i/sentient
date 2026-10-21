@@ -55,94 +55,92 @@ sen serve        <span class="c"># dashboard on http://127.0.0.1:7357</span></co
     <p>Two independent sources feed <code>sentientd</code>: kernel events from Tetragon, and the agent's own session logs. <code>sentientd</code> correlates them, applies the rules and stores the result. <code>sen</code> and the dashboard read it through a local API.</p>
 
     <div class="diagram">
-      <svg viewBox="0 0 860 470" role="img" aria-label="Sentient architecture: the coding agent's system calls are captured by Tetragon through eBPF, and its session logs are read directly. Both feed sentientd, which stores records in sentient.db and serves a gRPC API over a Unix socket to sen and sen serve.">
+      <svg viewBox="0 0 900 540" role="img" aria-label="Sentient architecture, all on localhost. The coding agent writes session logs and makes system calls into the OS kernel, where eBPF on Linux (via Tetragon) or Endpoint Security on macOS captures them. sentientd reads both, stores records in sentient.db, and serves sen and sen serve over a Unix socket. You use sen in a terminal and the dashboard in a browser.">
         <defs>
           <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
-          <marker id="ah-hot" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="ah-cap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
         </defs>
 
-        <!-- zones -->
-        <rect class="zone" x="10" y="10" width="210" height="250" rx="12"/>
-        <text class="z" x="24" y="32">YOUR ACCOUNT</text>
-        <rect class="zone" x="250" y="10" width="370" height="450" rx="12"/>
-        <text class="z" x="264" y="32">ROOT</text>
-        <rect class="zone" x="650" y="10" width="200" height="450" rx="12"/>
-        <text class="z" x="664" y="32">YOU</text>
+        <!-- localhost boundary -->
+        <rect class="host" x="10" y="10" width="880" height="520" rx="16"/>
+        <text class="z" x="30" y="36">YOUR MACHINE</text>
 
-        <!-- coding agent -->
-        <rect class="box" x="30" y="50" width="170" height="64" rx="8"/>
-        <text class="t" x="46" y="77">Coding agent</text>
-        <text class="s" x="46" y="98">e.g. Claude Code</text>
+        <!-- coding agent (circle) -->
+        <circle class="box" cx="125" cy="115" r="62"/>
+        <text class="t" x="125" y="111" text-anchor="middle">Coding agent</text>
+        <text class="s" x="125" y="129" text-anchor="middle">e.g. Claude Code</text>
 
-        <!-- session logs -->
-        <rect class="box" x="30" y="170" width="170" height="64" rx="8"/>
-        <text class="t" x="46" y="197">Session logs</text>
-        <text class="m" x="46" y="218">~/.claude/projects</text>
+        <!-- session logs (document) -->
+        <path class="box" d="M265,82 h144 l16,16 v52 h-160 z"/>
+        <path class="box" d="M409,82 v16 h16" style="fill:none"/>
+        <text class="t" x="280" y="112">Session logs</text>
+        <text class="m" x="280" y="132">~/.claude/projects</text>
 
-        <!-- kernel -->
-        <rect class="box" x="30" y="370" width="170" height="64" rx="8"/>
-        <text class="t" x="46" y="397">Linux kernel</text>
-        <text class="s" x="46" y="418">files, processes, network</text>
+        <!-- OS kernel layer with the two capture paths -->
+        <rect class="layer" x="40" y="380" width="400" height="120" rx="10"/>
+        <text class="t" x="58" y="405">OS kernel</text>
+        <rect class="box" x="58" y="420" width="176" height="62" rx="8"/>
+        <text class="t" x="74" y="446">eBPF</text>
+        <text class="s" x="74" y="466">Linux · via Tetragon</text>
+        <rect class="box" x="246" y="420" width="176" height="62" rx="8"/>
+        <text class="t" x="262" y="446">Endpoint Security</text>
+        <text class="s" x="262" y="466">macOS</text>
 
-        <!-- tetragon -->
-        <rect class="box" x="270" y="370" width="150" height="64" rx="8"/>
-        <text class="t" x="286" y="397">Tetragon</text>
-        <text class="s" x="286" y="418">eBPF, own service</text>
+        <!-- sentientd (core) -->
+        <rect class="core" x="470" y="200" width="190" height="112" rx="10"/>
+        <text class="t" x="490" y="232">sentientd</text>
+        <text class="s" x="490" y="252">monitor daemon · root</text>
+        <text class="s" x="490" y="272">correlates, flags, records</text>
+        <text class="m" x="490" y="296">API: gRPC · Unix socket</text>
 
-        <!-- sentientd -->
-        <rect class="box core" x="440" y="50" width="160" height="300" rx="8"/>
-        <text class="t" x="456" y="77">sentientd</text>
-        <text class="s" x="456" y="96">monitor, systemd</text>
-        <rect class="row" x="452" y="112" width="136" height="38" rx="5"/>
-        <text class="s" x="464" y="136">ingester</text>
-        <rect class="row" x="452" y="158" width="136" height="38" rx="5"/>
-        <text class="s" x="464" y="182">correlator</text>
-        <rect class="row" x="452" y="204" width="136" height="38" rx="5"/>
-        <text class="s" x="464" y="228">rules</text>
-        <rect class="row" x="452" y="250" width="136" height="38" rx="5"/>
-        <text class="s" x="464" y="274">local API</text>
-        <text class="m" x="456" y="318">no network port</text>
+        <!-- database (cylinder) -->
+        <path class="box" d="M485,368 v62 a80,14 0 0 0 160,0 v-62"/>
+        <ellipse class="box" cx="565" cy="368" rx="80" ry="14"/>
+        <text class="t" x="565" y="408" text-anchor="middle">sentient.db</text>
+        <text class="s" x="565" y="426" text-anchor="middle">SQLite · hash-chained</text>
 
-        <!-- store -->
-        <rect class="box" x="440" y="384" width="160" height="56" rx="8"/>
-        <text class="t" x="456" y="408">sentient.db</text>
-        <text class="s" x="456" y="427">SQLite, hash-chained</text>
+        <!-- sen CLI and web server -->
+        <rect class="box" x="715" y="150" width="155" height="58" rx="8"/>
+        <text class="t" x="731" y="175">sen</text>
+        <text class="s" x="731" y="194">CLI</text>
+        <rect class="box" x="715" y="290" width="155" height="58" rx="8"/>
+        <text class="t" x="731" y="315">sen serve</text>
+        <text class="m" x="731" y="334">web · 127.0.0.1:7357</text>
 
-        <!-- sen -->
-        <rect class="box" x="670" y="50" width="160" height="64" rx="8"/>
-        <text class="t" x="686" y="77">sen</text>
-        <text class="m" x="686" y="98">sen status</text>
+        <!-- clients (circles) -->
+        <circle class="box" cx="792" cy="72" r="28"/>
+        <text class="t" x="792" y="77" text-anchor="middle">You</text>
+        <circle class="box" cx="792" cy="448" r="36"/>
+        <text class="t" x="792" y="453" text-anchor="middle">Browser</text>
 
-        <!-- sen serve -->
-        <rect class="box" x="670" y="170" width="160" height="64" rx="8"/>
-        <text class="t" x="686" y="197">sen serve</text>
-        <text class="m" x="686" y="218">127.0.0.1:7357</text>
+        <!-- agent writes logs, makes system calls -->
+        <path class="arrow" d="M187,115 L263,115"/>
+        <text class="lbl" x="202" y="106">writes</text>
+        <path class="arrow" d="M125,177 L125,378"/>
+        <text class="lbl" x="133" y="280">system calls</text>
 
-        <!-- browser -->
-        <rect class="box" x="670" y="300" width="160" height="64" rx="8"/>
-        <text class="t" x="686" y="327">Browser</text>
-        <text class="s" x="686" y="348">local, SSH tunnel, phone</text>
+        <!-- two capture paths into sentientd -->
+        <path class="arrow cap" d="M332,150 C332,215 400,240 468,240"/>
+        <text class="lbl" x="324" y="196" text-anchor="end">reads</text>
+        <path class="arrow cap" d="M340,380 C340,320 410,285 468,280"/>
+        <text class="lbl" x="355" y="352">kernel events</text>
 
-        <!-- arrows -->
-        <path class="arrow" d="M115,114 L115,168"/>
-        <text class="lbl" x="122" y="146">writes</text>
-        <path class="arrow" d="M38,114 C0,180 0,330 38,368"/>
-        <text class="lbl" x="18" y="300" transform="rotate(-90 18 300)">system calls</text>
-        <path class="arrow" d="M200,402 L268,402"/>
-        <text class="lbl" x="214" y="394">eBPF</text>
-        <path class="arrow hot" d="M345,370 C345,250 390,150 450,131"/>
-        <text class="lbl" x="300" y="262">kernel events</text>
-        <text class="lbl" x="300" y="277">(gRPC)</text>
-        <path class="arrow hot" d="M200,202 C300,202 360,140 450,128"/>
-        <text class="lbl" x="250" y="190">read directly</text>
-        <path class="arrow" d="M520,350 L520,382"/>
-        <path class="arrow" d="M600,269 C640,269 640,82 668,82"/>
-        <text class="lbl" x="606" y="160" transform="rotate(-90 606 160)">gRPC · Unix socket</text>
-        <path class="arrow" d="M600,269 C640,269 640,202 668,202"/>
-        <path class="arrow" d="M750,234 L750,298"/>
+        <!-- sentientd to database -->
+        <path class="arrow" d="M565,312 L565,352"/>
+        <text class="lbl" x="557" y="336" text-anchor="end">writes</text>
+
+        <!-- local API to sen and sen serve -->
+        <path class="arrow" d="M660,232 C690,232 690,179 713,179"/>
+        <path class="arrow" d="M660,280 C690,280 690,319 713,319"/>
+
+        <!-- clients -->
+        <path class="arrow" d="M792,100 L792,148"/>
+        <text class="lbl" x="800" y="128">terminal</text>
+        <path class="arrow" d="M792,412 L792,350"/>
+        <text class="lbl" x="800" y="386">HTTP</text>
       </svg>
     </div>
-    <p class="legend">Cyan arrows are the two capture paths. The agent runs in your account and can't reach anything inside the root zone.</p>
+    <p class="legend">Everything runs on your machine, with no network port and no telemetry. Cyan arrows are the two capture paths.</p>
 
     <h2 id="platforms">Supported platforms</h2>
     <div class="table-wrap">
