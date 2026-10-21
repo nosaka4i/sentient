@@ -24,6 +24,42 @@ service Sentient {
   rpc SessionDetail(SessionDetailRequest) returns (SessionDetailResponse);
   // SessionList returns the sessions active in a time window (web /sessions).
   rpc SessionList(SessionListRequest) returns (SessionListResponse);
+  // ActivityList returns the counts of every resource/action kind in a window
+  // and the events of one kind (web /activity).
+  rpc ActivityList(ActivityListRequest) returns (ActivityListResponse);
+}
+
+message ActivityListRequest {
+  int32 days = 1;       // the window is the last N days (>= 1)
+  string resource = 2;  // the kind whose events to list; empty = a default
+  string action = 3;
+  bool failed_only = 4;
+  int32 limit = 5;      // 0 = 200
+  string query = 6;     // only events whose text contains this (case-insensitive)
+}
+
+message ActivityEvent {
+  google.protobuf.Timestamp at = 1;
+  string what = 2;       // the path, command, host or text
+  bool failed = 3;
+  int64 lines_added = 4;
+  int64 lines_removed = 5;
+  int64 prompt_id = 6;
+  string prompt_text = 7;
+  string agent = 8;
+  string repo = 9;
+  string session_id = 10;
+}
+
+message ActivityListResponse {
+  google.protobuf.Timestamp history_begins = 1;
+  google.protobuf.Timestamp from = 2;
+  google.protobuf.Timestamp to = 3;
+  repeated ActivityRow rows = 4;   // one per kind, zeros included
+  string resource = 5;             // the kind whose events follow
+  string action = 6;
+  repeated ActivityEvent events = 7; // newest first
+  int64 events_total = 8;
 }
 
 message SessionListRequest {

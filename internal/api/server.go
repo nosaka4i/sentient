@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -27,8 +28,23 @@ import (
 	"github.com/nosaka4i/sentient/internal/version"
 )
 
-// DefaultSocket is where sentientd listens in production.
-const DefaultSocket = "/run/sentient/sentientd.sock"
+// DefaultSocket is where sentientd listens when --socket isn't given: the
+// system service's path on Linux; on macOS, where it runs as the user, a
+// path in the user's Library (kept short: a Unix socket path is limited to
+// about 100 characters).
+var DefaultSocket = defaultSocket(runtime.GOOS, userHome())
+
+func defaultSocket(goos, home string) string {
+	if goos == "darwin" && home != "" {
+		return filepath.Join(home, "Library", "Application Support", "sentient", "sentientd.sock")
+	}
+	return "/run/sentient/sentientd.sock"
+}
+
+func userHome() string {
+	h, _ := os.UserHomeDir()
+	return h
+}
 
 // Server implements the Sentient service on top of the store.
 type Server struct {

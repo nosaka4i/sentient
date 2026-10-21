@@ -25,7 +25,7 @@
 
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="https://github.com/nosaka4i/sentient">
+    <a class="brand" href="/" title="Dashboard">
       <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".35"/>
         <circle cx="12" cy="12" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".7"/>
@@ -36,6 +36,7 @@
     {{if .Since}}<div class="since">Monitored from <time datetime="{{.Since.ISO}}">{{.Since.Date}}</time> ({{.Since.Ago}})</div>{{end}}
     <div class="top-right">
       <nav class="nav" aria-label="Pages">
+        <a href="/"{{if eq .Nav "dashboard"}} aria-current="page"{{end}}>Dashboard</a>
         <a href="/sessions"{{if eq .Nav "sessions"}} aria-current="page"{{end}}>Sessions</a>
         <a href="/prompts"{{if eq .Nav "prompts"}} aria-current="page"{{end}}>Prompts</a>
       </nav>

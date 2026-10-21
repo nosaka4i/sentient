@@ -111,9 +111,75 @@ func TestRunFailsOnBadDataDir(t *testing.T) {
 	}
 }
 
-func TestDefaultHomes(t *testing.T) {
-	h := DefaultHomes()
-	if len(h) == 0 || h[0] != "/root" {
+func TestDefaultHomesByPlatform(t *testing.T) {
+	// a fake filesystem root with both layouts
+	root := t.TempDir()
+	for _, d := range []string{"home/alice", "home/bob", "Users/hu", "Users/other", "Users/Shared", "Users/Guest"} {
+		if err := os.MkdirAll(filepath.Join(root, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	os.WriteFile(filepath.Join(root, "home", "afile"), nil, 0o644) // a file under /home is not a home
+	join := func(ds ...string) []string {
+		var out []string
+		for _, d := range ds {
+			out = append(out, filepath.Join(root, d))
+		}
+		return out
+	}
+	eq := func(a, b []string) bool {
+		if len(a) != len(b) {
+			return false
+		}
+		for i := range a {
+			if a[i] != b[i] {
+				return false
+			}
+		}
+		return true
+	}
+	// Linux: /root plus every directory under /home
+	if got := defaultHomes("linux", "/home/alice", false, root); !eq(got, join("root", "home/alice", "home/bob")) {
+		t.Errorf("linux = %v", got)
+	}
+	// macOS as a normal user: just that user's home
+	if got := defaultHomes("darwin", "/Users/hu", false, root); !eq(got, []string{"/Users/hu"}) {
+		t.Errorf("darwin user = %v", got)
+	}
+	// macOS as root: every user, without Shared and Guest
+	if got := defaultHomes("darwin", "/var/root", true, root); !eq(got, join("Users/hu", "Users/other")) {
+		t.Errorf("darwin root = %v", got)
+	}
+	// macOS with no known home: nothing, not a wrong guess
+	if got := defaultHomes("darwin", "", false, root); len(got) != 0 {
+		t.Errorf("darwin no home = %v", got)
+	}
+	// the real thing on this machine returns something sensible
+	if h := DefaultHomes(); len(h) == 0 {
 		t.Errorf("DefaultHomes = %v", h)
+	}
+}
+
+func TestDefaultPathsByPlatform(t *testing.T) {
+	for _, c := range []struct{ goos, home, data, group string }{
+		{"linux", "/home/u", "/opt/sentient/data", "sentient"},
+		{"darwin", "/Users/hu", "/Users/hu/Library/Application Support/sentient/data", ""},
+		{"darwin", "", "/opt/sentient/data", ""}, // no home to put it in: the system path
+	} {
+		if got := defaultDataDir(c.goos, c.home); got != c.data {
+			t.Errorf("data dir %s %q = %q, want %q", c.goos, c.home, got, c.data)
+		}
+		if got := defaultSocketGroup(c.goos); got != c.group {
+			t.Errorf("socket group %s = %q, want %q", c.goos, got, c.group)
+		}
+	}
+}
+
+func TestMaxRSSUnits(t *testing.T) {
+	if got := maxRSSBytes("linux", 2048); got != 2048*1024 {
+		t.Errorf("linux reports KB: %d", got)
+	}
+	if got := maxRSSBytes("darwin", 2048); got != 2048 {
+		t.Errorf("macOS reports bytes: %d", got)
 	}
 }

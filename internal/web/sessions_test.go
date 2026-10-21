@@ -200,14 +200,14 @@ func TestSessionsDownAndNoOlderNote(t *testing.T) {
 
 func TestHeaderNavMarksTheCurrentPage(t *testing.T) {
 	s := newTestServer(t, &fakeSource{st: fullStatus(), list: sampleSessionList(), window: sampleWindow(), health: healthReport()})
-	for path, current := range map[string]string{"/": "", "/sessions": "Sessions", "/prompts": "Prompts"} {
+	for path, current := range map[string]string{"/": "Dashboard", "/sessions": "Sessions", "/prompts": "Prompts", "/health": ""} {
 		_, body := get(t, s, path, "localhost")
-		for _, link := range []string{`<a href="/sessions"`, `<a href="/prompts"`} {
+		for _, link := range []string{`<a href="/"`, `<a href="/sessions"`, `<a href="/prompts"`, `<a class="brand" href="/"`} {
 			if !strings.Contains(body, link) {
 				t.Errorf("%s: header has no %s link", path, link)
 			}
 		}
-		marked := regexp.MustCompile(`<a href="/[a-z]+" aria-current="page">([A-Za-z]+)</a>`).FindStringSubmatch(body)
+		marked := regexp.MustCompile(`<a href="/[a-z]*" aria-current="page">([A-Za-z]+)</a>`).FindStringSubmatch(body)
 		switch {
 		case current == "" && marked != nil, current != "" && (marked == nil || marked[1] != current):
 			t.Errorf("%s: current page marked as %v, want %q", path, marked, current)

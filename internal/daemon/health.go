@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -126,9 +127,18 @@ func rssBytes() int64 {
 	}
 	var ru syscall.Rusage
 	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &ru); err == nil {
-		return ru.Maxrss * 1024 // Linux reports KB
+		return maxRSSBytes(runtime.GOOS, int64(ru.Maxrss))
 	}
 	return 0
+}
+
+// maxRSSBytes converts getrusage's peak RSS to bytes: Linux reports
+// kilobytes, macOS bytes.
+func maxRSSBytes(goos string, v int64) int64 {
+	if goos == "darwin" {
+		return v
+	}
+	return v * 1024
 }
 
 func parseVmRSS(status []byte) (int64, bool) {

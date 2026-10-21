@@ -457,8 +457,7 @@ pre.diff .d { color: var(--del); background: var(--low-tint); }
 .step .t { color: var(--text-3); font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
 .step .k { white-space: nowrap; }
 .step .p { font-family: var(--mono); font-size: 12.5px; color: var(--text); overflow-wrap: anywhere; }
-.step .p .note { font-family: var(--sans); font-size: 12px; color: var(--text-3); }
-.step .d { color: var(--text-3); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.step .p .note { font-family: var(--sans); font-size: 12px; color: var(--text-3); }.step .d { color: var(--text-3); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .step .ev { justify-self: end; }
 .step.call { background: var(--surface-2); }
 .step.call .k { color: var(--text-2); font-family: var(--mono); font-size: 12.5px; }
@@ -565,6 +564,74 @@ a.chip { text-decoration: none; }
 .sessions th.num .sort { justify-content: flex-end; }
 .sessions .m-only { display: none; }
 
+/* activity page */
+.page-head { display: flex; align-items: flex-end; gap: 12px 20px; flex-wrap: wrap; margin-bottom: 24px; }
+.page-head .titles { min-width: 0; }
+.page-head h1 { margin: 0 0 4px; font-size: clamp(21px, 3.2vw, 27px); line-height: 1.3; letter-spacing: -0.015em; font-weight: 600; }
+.page-head h1 .hk { font-family: var(--mono); font-size: 0.62em; font-weight: 500; color: var(--text-2); margin-left: 10px; letter-spacing: 0; white-space: nowrap; }
+.page-head h1 .hk .sep { color: var(--text-3); padding: 0 3px; }
+.seg { margin-left: auto; display: inline-flex; border: 1px solid var(--border); border-radius: 8px; padding: 2px; background: var(--surface); }
+.seg a { font-size: 13px; color: var(--text-3); padding: 4px 12px; border-radius: 6px; white-space: nowrap; }
+.seg a:hover { color: var(--text); background: var(--hover); }
+.seg a[aria-pressed="true"] { background: var(--surface-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.card-head h2 .ra { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 13px; color: var(--text); }
+.groups { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); }
+.grp { background: var(--surface); display: flex; flex-direction: column; min-width: 0; flex: var(--n) 1 calc(var(--n) * 170px); }
+.grp h3 { margin: 0; padding: 8px 14px 0; font-size: 11px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+.grp .tiles { flex: 1; background: transparent; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+.grp .tile { padding: 8px 14px 10px; cursor: pointer; transition: background-color .12s, color .12s; }
+.grp .tile .num { font-size: 22px; }
+.grp .tile .sum { font-size: 12px; }
+.grp .tile:hover, .grp .tile:focus-visible { background: var(--high); color: var(--high-fg); outline: none; }
+.grp .tile:hover *, .grp .tile:focus-visible * { color: inherit !important; }
+.tile .sum .add { color: var(--ok); }
+.tile .sum .del { color: var(--del); }
+.tile .sum .warn { color: var(--text); font-weight: 600; }
+.tile.sel { background: var(--high-tint); box-shadow: inset 0 -3px 0 var(--high); }
+.tile.sel .lbl, .tile.sel .lbl b { color: var(--high); }
+.tile.sel:hover { background: var(--high); }
+.events { list-style: none; margin: 0; padding: 0; }
+.ev-head, .events .ev { display: grid; align-items: baseline; gap: 2px 14px; grid-template-columns: 104px minmax(0, 1fr) 104px minmax(0, 210px) 150px; padding: 10px 16px; font-size: 13px; position: relative; }
+.ev-head.nox, .events.nox .ev { grid-template-columns: 104px minmax(0, 1fr) minmax(0, 210px) 150px; }
+.ev-note { padding: 7px 16px; font-size: 12.5px; color: var(--text-3); border-bottom: 1px solid var(--border); }
+.ev-note b { color: var(--text-2); font-weight: 600; }
+.ev-search { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.ev-search .search { flex: 1 1 260px; max-width: 420px; }
+.ev-search .chip { padding: 3px 12px; text-decoration: none; }
+@media (max-width: 720px) { .ev-search { padding: 10px 12px; } .ev-search .search { max-width: none; } }
+/* events grouped under a prompt and session: the rows keep only time, what, result */
+.ev-head.grouped, .events.grouped .ev { grid-template-columns: 104px minmax(0, 1fr) 104px; }
+.ev-head.grouped.nox, .events.grouped.nox .ev { grid-template-columns: 104px minmax(0, 1fr); }
+/* two lines: the prompt (one line, "…" if it overflows), then session, agent, repo, time span, count */
+.ev-group { display: block; padding: 8px 16px; background: var(--surface-2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); font-size: 13px; }
+.ev-group .gp { display: block; color: var(--text); font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev-group a.gp:hover { color: var(--high); text-decoration: underline; }
+.ev-group .gp.none { color: var(--text-3); font-weight: 400; }
+.ev-group .gm { display: block; margin-top: 2px; color: var(--text-3); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev-group .gm a { font-family: var(--mono); color: var(--accent); }
+.ev-group .gm .repo { color: var(--text-2); }
+.ev-head { padding-top: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+.events > li + li { border-top: 1px solid var(--border); }
+.events .ev .t { color: var(--text-3); font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.events .ev .c { font-family: var(--mono); font-size: 12.5px; color: var(--text); overflow-wrap: anywhere; }
+.events .ev .x { font-size: 12px; color: var(--text-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.events .ev .pr { min-width: 0; }
+.events .ev .pr a { display: block; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.events .ev .pr a:hover { color: var(--high); text-decoration: underline; }
+.events .ev .w { font-size: 12.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.events .ev .w a { font-family: var(--mono); color: var(--accent); }
+.events .ev .w .repo { color: var(--text-2); }
+.events .ev.failed::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--low); }
+.card-head .chip { margin-left: auto; }
+.card-head .hint + .chip { margin-left: 0; }
+.chip .box { width: 12px; height: 12px; border-radius: 3px; box-shadow: inset 0 0 0 1px var(--border-strong); display: grid; place-items: center; }
+.chip .box svg { display: none; }
+.card-head .chip[aria-pressed="true"] { color: var(--text); border-color: var(--border-strong); background: var(--surface-2); }
+.card-head .chip[aria-pressed="true"] .box { background: var(--high); box-shadow: none; color: var(--high-fg); }
+.card-head .chip[aria-pressed="true"] .box svg { display: block; }
+.list-foot { padding: 10px 16px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--text-3); }
+@media (max-width: 380px) { .grp { flex-basis: calc(var(--n) * 150px); } }
+
 .session-block { margin-bottom: 28px; }
 .session-block .eyebrow { margin: 0 0 8px; font-size: 12px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
 .session-block h1 { margin: 0 0 8px; font-size: clamp(21px, 3.2vw, 27px); line-height: 1.3; letter-spacing: -0.015em; font-weight: 600; font-family: var(--mono); }
@@ -600,6 +667,15 @@ a.chip { text-decoration: none; }
   .sessions td.sess { margin-bottom: 2px; }
   .sessions td.first { min-width: 0; }
   .sessions .m-only { display: block; color: var(--text-3); font-size: 12.5px; margin-top: 3px; }
+  .page-head .seg { margin-left: 0; }
+  .ev-head { display: none; }
+  .events .ev { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 10px 12px; }
+  .events .ev .t { order: 1; }
+  .events .ev .x { order: 2; margin-left: auto; }
+  .events .ev .c { order: 3; flex-basis: 100%; }
+  .events .ev .pr { order: 4; flex: 1 1 0; }
+  .events .ev .w { order: 5; }
+  .events .ev .pr:empty, .events .ev .w:empty { display: none; }
   .sumline { padding: 10px 12px; }
   .sumline a.open { margin-left: 0; flex-basis: 100%; margin-top: 4px; }
   .more-row { padding: 14px 12px; }

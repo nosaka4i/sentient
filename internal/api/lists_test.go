@@ -83,6 +83,38 @@ func TestSessionListRoundTrip(t *testing.T) {
 	}
 }
 
+func TestActivityListRoundTrip(t *testing.T) {
+	sock := startServer(t)
+	c, err := Dial(sock, "test client")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	ctx := context.Background()
+
+	// the seeded data is from 2026, so a recent window is quiet: all 22 kinds with zero counts
+	a, err := c.ActivityList(ctx, query.ActivityRequest{Days: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(a.Rows) != 22 || a.Rows[0].Resource != "file" || a.From.IsZero() || a.To.IsZero() || a.HistoryBegins.IsZero() {
+		t.Fatalf("activity = %+v", a)
+	}
+	if a.Resource != "" || len(a.Events) != 0 || a.EventsTotal != 0 {
+		t.Errorf("a quiet window lists nothing: %s/%s %d events", a.Resource, a.Action, len(a.Events))
+	}
+	// asking for a kind echoes it back
+	k, err := c.ActivityList(ctx, query.ActivityRequest{Days: 30000 / 100, Resource: "prompt", Action: "request", Limit: 5})
+	if err != nil || k.Resource != "prompt" {
+		t.Errorf("kind = %+v, %v", k, err)
+	}
+	for _, req := range []*sentientpb.ActivityListRequest{{Days: 0}, {Days: maxWindowDays + 1}, {Days: 1, Limit: -1}, {Days: 1, Limit: query.MaxWindowPrompts + 1}} {
+		if _, err := NewServer(nil).ActivityList(ctx, req); status.Code(err) != codes.InvalidArgument {
+			t.Errorf("%+v: %v", req, err)
+		}
+	}
+}
+
 func TestPromptWindowRejectsBadRequests(t *testing.T) {
 	srv := NewServer(nil)
 	for _, req := range []*sentientpb.PromptWindowRequest{

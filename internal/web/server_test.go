@@ -20,16 +20,18 @@ import (
 var now = time.Date(2026, 10, 7, 15, 40, 0, 0, time.Local)
 
 type fakeSource struct {
-	st       *query.Status
-	health   *health.Report
-	detail   *query.PromptDetail
-	window   *query.PromptWindow
-	session  *query.SessionDetail
-	list     *query.SessionList
-	listDays int // the days the sessions list was last asked for
-	err      error
-	from, to time.Time
-	asked    int64 // the prompt id last requested
+	st          *query.Status
+	health      *health.Report
+	detail      *query.PromptDetail
+	window      *query.PromptWindow
+	session     *query.SessionDetail
+	list        *query.SessionList
+	listDays    int // the days the sessions list was last asked for
+	activity    *query.Activity
+	activityReq query.ActivityRequest // the activity request last made
+	err         error
+	from, to    time.Time
+	asked       int64 // the prompt id last requested
 	// the window request last made, and the session id last requested
 	windowReq    query.WindowRequest
 	askedSession string
@@ -53,6 +55,11 @@ func (f *fakeSource) SessionDetail(ctx context.Context, id string) (*query.Sessi
 func (f *fakeSource) SessionList(ctx context.Context, days int) (*query.SessionList, error) {
 	f.listDays = days
 	return f.list, f.err
+}
+
+func (f *fakeSource) ActivityList(ctx context.Context, req query.ActivityRequest) (*query.Activity, error) {
+	f.activityReq = req
+	return f.activity, f.err
 }
 
 func (f *fakeSource) Status(ctx context.Context, from, to time.Time) (*query.Status, string, error) {
@@ -221,7 +228,7 @@ func TestStaticAndRouting(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Errorf("js: %d", resp.StatusCode)
 	}
-	for _, path := range []string{"/activity?resource=file&action=read", "/alerts", "/nope"} {
+	for _, path := range []string{"/alerts", "/nope"} {
 		if resp, _ := get(t, s, path, "127.0.0.1:7357"); resp.StatusCode != 404 {
 			t.Errorf("%s: %d, want 404 (not built yet)", path, resp.StatusCode)
 		}

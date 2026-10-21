@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
@@ -17,11 +18,33 @@ import (
 	"github.com/nosaka4i/sentient/internal/version"
 )
 
-// Production defaults (docs/design.md "Store", "Local API").
-const (
-	DefaultDataDir     = "/opt/sentient/data"
-	DefaultSocketGroup = "sentient"
+// Defaults for where sentientd keeps things (docs/design.md "Store", "Local
+// API"). On Linux it is a system service: /opt/sentient/data and a socket
+// group. On macOS it runs as the user for now, so everything is in the
+// user's Library and there is no group.
+var (
+	DefaultDataDir     = defaultDataDir(runtime.GOOS, userHome())
+	DefaultSocketGroup = defaultSocketGroup(runtime.GOOS)
 )
+
+func defaultDataDir(goos, home string) string {
+	if goos == "darwin" && home != "" {
+		return filepath.Join(home, "Library", "Application Support", "sentient", "data")
+	}
+	return "/opt/sentient/data"
+}
+
+func defaultSocketGroup(goos string) string {
+	if goos == "darwin" {
+		return ""
+	}
+	return "sentient"
+}
+
+func userHome() string {
+	h, _ := os.UserHomeDir()
+	return h
+}
 
 // Config configures the daemon.
 type Config struct {
@@ -38,16 +61,43 @@ type Config struct {
 	Ready chan<- struct{}
 }
 
-// DefaultHomes returns /root and every directory under /home.
+// DefaultHomes returns the home directories whose ~/.claude/projects is
+// ingested. Linux (a root service): /root and every directory under /home.
+// macOS: the current user's home, plus every user under /Users when running
+// as root.
 func DefaultHomes() []string {
-	homes := []string{"/root"}
-	m, _ := filepath.Glob("/home/*")
-	for _, h := range m {
-		if fi, err := os.Stat(h); err == nil && fi.IsDir() {
-			homes = append(homes, h)
+	return defaultHomes(runtime.GOOS, userHome(), os.Getuid() == 0, "/")
+}
+
+// defaultHomes is DefaultHomes with its inputs spelled out; root is the
+// filesystem root (a temp dir in tests).
+func defaultHomes(goos, home string, isRoot bool, root string) []string {
+	dirs := func(pattern string, skip ...string) []string {
+		var out []string
+		m, _ := filepath.Glob(filepath.Join(root, pattern))
+	next:
+		for _, h := range m {
+			for _, s := range skip {
+				if filepath.Base(h) == s {
+					continue next
+				}
+			}
+			if fi, err := os.Stat(h); err == nil && fi.IsDir() {
+				out = append(out, h)
+			}
 		}
+		return out
 	}
-	return homes
+	if goos == "darwin" {
+		if !isRoot {
+			if home == "" {
+				return nil
+			}
+			return []string{home}
+		}
+		return dirs("Users/*", "Shared", "Guest")
+	}
+	return append([]string{filepath.Join(root, "root")}, dirs("home/*")...)
 }
 
 // Run runs sentientd until ctx is cancelled.

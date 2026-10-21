@@ -1,0 +1,119 @@
+{{define "content"}}
+  <a class="back" href="/">&larr; Dashboard</a>
+
+  <div class="page-head">
+    <div class="titles">
+      <h1>Activity{{if .Selected}} <span class="hk"><span class="r">{{.Resource}}</span><span class="sep">/</span>{{.Action}}</span>{{end}}</h1>
+      <p class="pmeta">{{if .Range}}<span>{{.Range}}</span>{{end}}</p>
+    </div>
+    <div class="seg" role="group" aria-label="Time window">
+      {{- range .Windows}}
+      <a href="{{.Href}}" aria-pressed="{{if .On}}true{{else}}false{{end}}">{{.Label}}</a>
+      {{- end}}
+    </div>
+  </div>
+
+  <section class="card" aria-labelledby="h-counts">
+    <div class="card-head">
+      <h2 id="h-counts">All activity <span class="count">(22 kinds)</span></h2>
+      <span class="hint">click a count to list its actions</span>
+    </div>
+    <div class="groups">
+{{- range .Groups}}
+      <div class="grp" style="--n:{{.N}}">
+        <h3>{{.Name}}</h3>
+        <div class="tiles">
+{{- range .Tiles}}
+          <a class="tile{{if .Zero}} zero{{end}}{{if .Sel}} sel{{end}}" href="{{.Href}}#events"{{if .Sel}} aria-current="true"{{end}}>
+            <span class="lbl"><b>{{.Resource}}</b> / {{.Action}}</span>
+            <span class="num">{{.Count}}</span>
+            <span class="{{.SumClass}}">{{.Sum}}</span>
+          </a>
+{{- end}}
+        </div>
+      </div>
+{{- end}}
+    </div>
+  </section>
+
+{{- if .Selected}}
+  <section class="card" id="events" aria-labelledby="h-events">
+    <div class="card-head">
+      <h2 id="h-events"><span class="ra"><span class="r">{{.Resource}}</span><span class="sep">/</span>{{.Action}}</span> <span class="count">({{.Total}})</span></h2>
+      <span class="hint">newest first</span>
+      {{- if .CanFail}}
+      <a class="chip" href="{{.FailedHref}}#events" aria-pressed="{{if .FailedOnly}}true{{else}}false{{end}}"><span class="box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L19 7"/></svg></span>failed only</a>
+      {{- end}}
+    </div>
+    <form class="ev-search" action="/activity#events" method="get" role="search">
+      {{- if ne .State.Days 1}}<input type="hidden" name="days" value="{{.State.Days}}">{{end}}
+      <input type="hidden" name="resource" value="{{.Resource}}"><input type="hidden" name="action" value="{{.Action}}">
+      {{- if .FailedOnly}}<input type="hidden" name="failed" value="1">{{end}}
+      <div class="search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input type="search" name="q" value="{{.Q}}" placeholder="Search these actions, e.g. grep" aria-label="Search these actions" autocomplete="off">
+      </div>
+      <button class="chip" type="submit">Search</button>
+      {{- if .Q}}<a class="chip" href="{{.ClearHref}}">Clear</a>{{end}}
+    </form>
+{{- if .Q}}
+    <div class="ev-note">Showing <b>{{.Total}} of {{.KindCount}}</b> {{.Resource}} / {{.Action}} actions containing <b>&ldquo;{{.Q}}&rdquo;</b>. The counts above are not filtered.</div>
+{{- end}}
+{{- if and .Events .Grouped}}
+    <div class="ev-head grouped{{if not .ShowResult}} nox{{end}}" aria-hidden="true">
+      <span>Time</span><span>{{.WhatHead}}</span>{{if .ShowResult}}<span>Result</span>{{end}}
+    </div>
+{{- range .Sections}}
+    <div class="ev-group">
+      {{- if .PromptHref}}<a class="gp" href="{{.PromptHref}}" title="Open this prompt">{{.PromptText}}</a>{{else}}<span class="gp none">no prompt</span>{{end}}
+      <span class="gm">{{if .SessionHref}}<a href="{{.SessionHref}}" title="Open session">{{.SessionShort}}</a> · {{end}}{{template "agent-icon" .Agent}}{{if .Repo}} <span class="repo">{{.Repo}}</span>{{end}} · {{.Span}} · {{len .Events}} action{{if ne (len .Events) 1}}s{{end}}</span>
+    </div>
+    <ul class="events grouped{{if not $.ShowResult}} nox{{end}}">
+{{- range .Events}}
+      <li>
+        <div class="ev{{if .Failed}} failed{{end}}">
+          <span class="t"><time datetime="{{.ISO}}">{{.Time}}</time></span>
+          <span class="c"{{if .Title}} title="{{.Title}}"{{end}}>{{.What}}</span>
+          {{- if $.ShowResult}}
+          <span class="x">{{if .Failed}}<span class="tag fail">failed</span>{{else if or .Added .Removed}}<span class="add">+{{.Added}}</span> <span class="del">&minus;{{.Removed}}</span>{{end}}</span>
+          {{- end}}
+        </div>
+      </li>
+{{- end}}
+    </ul>
+{{- end}}
+{{- if .Truncated}}
+    <div class="list-foot">Showing the newest {{.Shown}} of {{.Total}}. Narrow the window or open a prompt to see the rest.</div>
+{{- end}}
+{{- else if .Events}}
+    <div class="ev-head{{if not .ShowResult}} nox{{end}}" aria-hidden="true">
+      <span>Time</span><span>{{.WhatHead}}</span>{{if .ShowResult}}<span>Result</span>{{end}}<span>Prompt</span><span>Agent · repo</span>
+    </div>
+    <ul class="events{{if not .ShowResult}} nox{{end}}">
+{{- range .Events}}
+      <li>
+        <div class="ev{{if .Failed}} failed{{end}}">
+          <span class="t"><time datetime="{{.ISO}}">{{.Time}}</time></span>
+          <span class="c"{{if .Title}} title="{{.Title}}"{{end}}>{{.What}}</span>
+          {{- if $.ShowResult}}
+          <span class="x">{{if .Failed}}<span class="tag fail">failed</span>{{else if or .Added .Removed}}<span class="add">+{{.Added}}</span> <span class="del">&minus;{{.Removed}}</span>{{end}}</span>
+          {{- end}}
+          <span class="pr">{{if .PromptHref}}<a href="{{.PromptHref}}">{{.PromptText}}</a>{{end}}</span>
+          <span class="w">{{if .SessionHref}}<a href="{{.SessionHref}}" title="Open session">{{.SessionShort}}</a> · {{end}}{{template "agent-icon" .Agent}}{{if .Repo}} <span class="repo">{{.Repo}}</span>{{end}}</span>
+        </div>
+      </li>
+{{- end}}
+    </ul>
+{{- if .Truncated}}
+    <div class="list-foot">Showing the newest {{.Shown}} of {{.Total}}. Narrow the window or open a prompt to see the rest.</div>
+{{- end}}
+{{- else}}
+    <div class="empty" style="display:block">{{if .FailedOnly}}Nothing failed in this window.{{else if .Q}}No actions here contain &ldquo;{{.Q}}&rdquo;.{{else}}No actions in this window.{{end}}</div>
+{{- end}}
+  </section>
+{{- else}}
+  <section class="card" id="events">
+    <div class="empty" style="display:block">Nothing happened in this window. Widen it with the buttons above.</div>
+  </section>
+{{- end}}
+{{end}}

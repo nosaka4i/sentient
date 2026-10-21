@@ -5,13 +5,24 @@ VERSION  ?= 0.0.1
 LDFLAGS  := -X github.com/nosaka4i/sentient/internal/version.Version=$(VERSION)
 TOOLS    := .claudetmp/tools
 
-.PHONY: build test jstest cover vet fmt check proto tools
+.PHONY: build build-mac test fix jstest cover vet fmt check proto tools
 
 build:
 	$(GO) build -ldflags "$(LDFLAGS)" -o bin/ ./cmd/sen ./cmd/sentientd
 
+# PKG narrows it to one package: make test PKG=./internal/web
+# Binaries for an Apple-silicon Mac, in bin/darwin-arm64/ (pure Go: no CGO,
+# so they cross-compile here). Copy them to the Mac with scp or rsync.
+build-mac:
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GO) build -ldflags "$(LDFLAGS)" -o bin/darwin-arm64/ ./cmd/sen ./cmd/sentientd
+
+PKG ?= ./...
 test:
-	$(GO) test ./...
+	$(GO) test -cover $(PKG)
+
+# Rewrites files that aren't gofmt-formatted.
+fix:
+	gofmt -w cmd internal
 
 # Tests of the prompts page's script (needs node 20+; nothing to install).
 jstest:

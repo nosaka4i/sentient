@@ -37,6 +37,7 @@ type Source interface {
 	PromptWindow(ctx context.Context, req query.WindowRequest) (*query.PromptWindow, error)
 	SessionDetail(ctx context.Context, sessionID string) (*query.SessionDetail, error)
 	SessionList(ctx context.Context, days int) (*query.SessionList, error)
+	ActivityList(ctx context.Context, req query.ActivityRequest) (*query.Activity, error)
 }
 
 // Server is the web UI.
@@ -57,7 +58,7 @@ func New(src Source, socket string, log *slog.Logger) (*Server, error) {
 	}
 	home, _ := os.UserHomeDir()
 	s := &Server{src: src, socket: socket, now: time.Now, home: home, log: log, pages: map[string]*template.Template{}}
-	for _, page := range []string{"dashboard", "health", "prompt", "prompts", "session", "sessions", "down"} {
+	for _, page := range []string{"activity", "dashboard", "health", "prompt", "prompts", "session", "sessions", "down"} {
 		t, err := template.ParseFS(assets.FS, "templates/layout.html", "templates/"+page+".html")
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", page, err)
@@ -84,6 +85,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /prompts/data", s.promptsData)
 	mux.HandleFunc("GET /session/{id}", s.session)
 	mux.HandleFunc("GET /sessions", s.sessions)
+	mux.HandleFunc("GET /activity", s.activity)
 	mux.Handle("GET /static/", s.static)
 	return localOnly(gzipped(mux))
 }
@@ -116,7 +118,7 @@ type page struct {
 	Refresh int
 	Live    bool
 	Since   *since
-	Nav     string // current header link ("sessions", "prompts", "health")
+	Nav     string // current header link ("dashboard", "sessions", "prompts", "health")
 	Sub     bool   // a sub-page (back link, tighter top spacing)
 }
 
@@ -144,7 +146,7 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := dashboardPage{
-		page:         page{Title: "status", Version: version.Version, Refresh: RefreshSeconds, Live: true},
+		page:         page{Title: "status", Nav: "dashboard", Version: version.Version, Refresh: RefreshSeconds, Live: true},
 		Tiles:        tiles(st.Activity),
 		PromptsTotal: st.PromptsTotal,
 	}

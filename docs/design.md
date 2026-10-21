@@ -101,7 +101,12 @@ The goal is a rich web UI; the CLI comes first and shares its foundation.
   lightness/fill (high solid cyan, medium cyan outline/tint, low grey).
   No amber; no timeline.
 - **Server-rendered pages** (`html/template`, no framework): dashboard,
-  health, prompt, session. **The prompts page is the exception:** it is a
+  health, prompt, session, sessions (one row per session; filters and sort
+  live in the URL, `.mocks/sessions-01.html`) and activity (every
+  resource/action count of a window as tiles, plus the events of the
+  selected tile, `.mocks/activity-01.html`; the dashboard tiles link to it).
+  The header links Sessions, Prompts and Health. Responses are gzipped and
+  static files revalidate by ETag. **The prompts page is the exception:** it is a
   shell plus `static/prompts.js`. The server returns a *window* of prompts as
   compact JSON (`/prompts/data`: the last N days, default 3, widened to the
   newest 100 if quiet; or one session; always at most 5,000, older pages via
