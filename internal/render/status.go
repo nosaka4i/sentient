@@ -48,9 +48,9 @@ func promptCells(p query.PromptRow, now time.Time) []string {
 func Status(w io.Writer, st *query.Status, now time.Time, tty bool) error {
 	p := &printer{w: w}
 	if st.HistoryBegins.IsZero() {
-		p.line("Monitored from: nothing recorded yet")
+		p.line("History: nothing recorded yet")
 	} else {
-		p.line(fmt.Sprintf("Monitored from %s (%s)", Date(st.HistoryBegins, now), Ago(st.HistoryBegins, now)))
+		p.line(fmt.Sprintf("History from %s (%s)", Date(st.HistoryBegins, now), Ago(st.HistoryBegins, now)))
 	}
 	if st.UnknownRecords > 0 {
 		p.line(fmt.Sprintf("warning: %d agent log records of unknown type were stored uninterpreted (see the sentientd log)", st.UnknownRecords))

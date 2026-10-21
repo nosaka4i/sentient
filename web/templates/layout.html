@@ -33,7 +33,7 @@
       </svg>
       sentient
     </a>
-    {{if .Since}}<div class="since">Monitored from <time datetime="{{.Since.ISO}}">{{.Since.Date}}</time> ({{.Since.Ago}})</div>{{end}}
+    {{if .Since}}<div class="since">History from <time datetime="{{.Since.ISO}}">{{.Since.Date}}</time> ({{.Since.Ago}})</div>{{end}}
     <div class="top-right">
       <nav class="nav" aria-label="Pages">
         <a href="/"{{if eq .Nav "dashboard"}} aria-current="page"{{end}}>Dashboard</a>

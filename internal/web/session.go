@@ -12,7 +12,7 @@ import (
 	"github.com/nosaka4i/sentient/internal/version"
 )
 
-// sinceOf is the header's "Monitored from" data (nil when nothing is recorded).
+// sinceOf is the header's "History from" data (nil when nothing is recorded).
 func sinceOf(t, now time.Time) *since {
 	if t.IsZero() {
 		return nil

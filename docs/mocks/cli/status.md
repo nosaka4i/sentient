@@ -6,7 +6,7 @@ Alerts first, then a summary of activity in the window, then the window's prompt
 
 ```
 $ sen status
-Monitored from Oct 6 09:12 (1d 6h ago)
+History from Oct 6 09:12 (1d 6h ago)
 
 NEEDS ATTENTION (4)
 #    DATE          AGENT    REPO     SEVERITY   RESOURCE   ACTION    PATH
@@ -49,7 +49,7 @@ When capture was interrupted, that becomes the first attention item:
 
 ## Notes
 
-- Top line says where the data starts: "Monitored from <date> (<age> ago)" — a range from then to now. Chosen over "History begins", "Watching since", "Oldest data", "Initialized"; avoid "recorder".
+- Top line says where the data starts: "History from <date> (<age> ago)" — a range from then to now. It was "Monitored from", but the start is the oldest imported log record, and logs are backfilled: sentient may have started watching long after (on a Mac, a 103-day-old log made it say monitored for 103 days on the first day). "Monitored from" is kept for later, when kernel capture can say when sentient first watched a session. Avoid "recorder".
 - Sections are tables, columns separated by tabs (Go `text/tabwriter` aligns them in a terminal; when piped, emit raw tabs so `cut`/`awk` work).
 - Every activity is described as RESOURCE + ACTION (+ PATH), audit-log style (cf. Kubernetes verb/resource, CloudTrail event/resource type). Actions are present-tense verbs even though they already happened. Enables filters like `--resource file --action delete`.
 - Vocabulary (proposed):

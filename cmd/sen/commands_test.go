@@ -107,7 +107,7 @@ func TestStatusAgainstServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"Monitored from ", "(just now)", "NEEDS ATTENTION (4) (sample data)",
+	for _, want := range []string{"History from ", "(just now)", "NEEDS ATTENTION (4) (sample data)",
 		"LAST 24H\n", "command\texecute\t2\t\n", "PROMPTS (1)\n", "\tclaude\t\ts\t<1m+\t0\t\tfix the flaky test\n", "  sen session <id>"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("status output missing %q:\n%s", want, out)

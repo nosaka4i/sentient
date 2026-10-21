@@ -56,7 +56,7 @@ func TestPromptsPageEmbedsTheFirstWindow(t *testing.T) {
 		`id="f-session"`, `id="f-sort"`, `id="f-flag"`, `data-days="30"`,
 		`<script id="prompts-data" type="application/json">`,
 		`<script src="/static/prompts.js"></script>`,
-		`Monitored from`, // the header still has the history start
+		`History from`, // the header still has the history start
 		`<noscript>`,
 	} {
 		if !strings.Contains(body, want) {

@@ -45,7 +45,7 @@ func row(res, act string, n int64, summary string) query.ActivityRow {
 
 // The terminal layout, aligned with three spaces between columns as in
 // docs/mocks/cli/status.md.
-const wantTTY = `Monitored from Oct 6 09:12 (1d 6h ago)
+const wantTTY = `History from Oct 6 09:12 (1d 6h ago)
 
 NEEDS ATTENTION (4) (sample data)
 #    DATE          AGENT    REPO     SEVERITY   RESOURCE   ACTION   PATH
@@ -117,7 +117,7 @@ func TestStatusEmptyAndWarning(t *testing.T) {
 	}
 	out := b.String()
 	for _, want := range []string{
-		"Monitored from: nothing recorded yet\n",
+		"History: nothing recorded yet\n",
 		"warning: 3 agent log records of unknown type",
 		"LAST 24H\nno activity yet\n",
 		"PROMPTS (0)\nno prompts yet\n",

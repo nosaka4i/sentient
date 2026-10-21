@@ -125,7 +125,7 @@ func TestDashboard(t *testing.T) {
 	}
 	for _, want := range []string{
 		`<meta http-equiv="refresh" content="30">`,
-		`Monitored from <time datetime="` + now.Add(-(30*time.Hour + 28*time.Minute)).Format("2006-01-02T15:04") + `">Oct 6 09:12</time> (1d 6h ago)`,
+		`History from <time datetime="` + now.Add(-(30*time.Hour + 28*time.Minute)).Format("2006-01-02T15:04") + `">Oct 6 09:12</time> (1d 6h ago)`,
 		`Needs attention <span class="count">(0)</span>`,
 		`Nothing needs your attention`,
 		`href="/alerts"`,
@@ -194,7 +194,7 @@ func TestDashboardFreshInstall(t *testing.T) {
 		t.Error("failed link shown with 0 failures")
 	}
 	if strings.Contains(body, `class="since"`) {
-		t.Error("Monitored from shown with no history")
+		t.Error("History from shown with no history")
 	}
 }
 
