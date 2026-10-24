@@ -6,7 +6,9 @@
 #
 # Usage:
 #   ./sentient.sh build       # throttled `make build` (bin/sen, bin/sentientd)
+#   ./sentient.sh install     # throttled `make install` (sen, sentientd into $GOBIN / $GOPATH/bin)
 #   ./sentient.sh sentientd   # the monitor daemon, unprivileged dev mode
+#   ./sentient.sh kernel      # the daemon as root with --tetragon, scratch data in .claudetmp/dev/kdata, logs/sentientd-kernel.log
 #   ./sentient.sh serve       # the web UI on 127.0.0.1:7357
 #
 # Dev data, socket and logs stay under the repo (.claudetmp/dev/, logs/),
@@ -51,10 +53,27 @@ case "$SERVICE" in
     make build 2>&1 | tee -a "$LOG_DIR/build.log"
     ;;
 
+  install)
+    cd "$REPO_ROOT"
+    make install 2>&1 | tee -a "$LOG_DIR/build.log"
+    echo "installed to ${GOBIN:-$(go env GOPATH)/bin}"
+    ;;
+
   sentientd)
     need_bin sentientd
     cd "$REPO_ROOT"
     bin/sentientd --data-dir "$DATA_DIR" --socket "$SOCKET" --socket-group "" --home "$HOME" 2>&1 | tee -a "$LOG_DIR/sentientd.log"
+    ;;
+
+  kernel)
+    # sentientd as root, reading Tetragon's socket (root-only), into a scratch
+    # database so it never touches real data. After Ctrl-C, give yourself the
+    # files back to inspect them: sudo chown -R "$USER": $DEV_DIR/kdata
+    need_bin sentientd
+    cd "$REPO_ROOT"
+    KDATA="${SENTIENT_KERNEL_DIR:-$DEV_DIR/kdata}"
+    mkdir -p "$KDATA"
+    sudo bin/sentientd --tetragon --home "$HOME" --data-dir "$KDATA" --socket "$KDATA/s.sock" --socket-group "" 2>&1 | tee -a "$LOG_DIR/sentientd-kernel.log"
     ;;
 
   serve)
@@ -68,7 +87,7 @@ case "$SERVICE" in
     ;;
 
   *)
-    echo "usage: $0 {build|sentientd|serve}" >&2
+    echo "usage: $0 {build|install|sentientd|kernel|serve}" >&2
     exit 1
     ;;
 

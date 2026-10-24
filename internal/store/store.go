@@ -40,11 +40,22 @@ func OpenPath(ctx context.Context, path string) (*Store, error) {
 	q.Add("_pragma", "busy_timeout(10000)")
 	q.Add("_pragma", "foreign_keys(ON)")
 	q.Add("_pragma", "synchronous(NORMAL)")
+	// Every transaction we begin writes. Take the write lock at BEGIN: a
+	// deferred transaction that reads and then writes is refused at once with
+	// SQLITE_BUSY if another writer committed in between (the single
+	// connection below prevents that inside the daemon; this covers another
+	// process holding the database open).
+	q.Add("_txlock", "immediate")
 	dsn := "file:" + path + "?" + q.Encode()
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", path, err)
 	}
+	// One connection: the ingester, the kernel collector, the API and the
+	// monitor all share it, so their reads and writes queue in order instead
+	// of colliding. Never run a query on Store.DB while a Tx or an open Rows is
+	// held in the same goroutine: it would wait for the connection forever.
+	db.SetMaxOpenConns(1)
 	s := &Store{DB: db}
 	if err := s.Migrate(ctx); err != nil {
 		db.Close()

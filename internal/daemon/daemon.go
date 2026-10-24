@@ -13,10 +13,17 @@ import (
 	"time"
 
 	"github.com/nosaka4i/sentient/internal/api"
+	"github.com/nosaka4i/sentient/internal/collector"
+	"github.com/nosaka4i/sentient/internal/collector/tetragon"
+	"github.com/nosaka4i/sentient/internal/collector/tetragon/policy"
 	"github.com/nosaka4i/sentient/internal/ingest/claudecode"
 	"github.com/nosaka4i/sentient/internal/store"
 	"github.com/nosaka4i/sentient/internal/version"
 )
+
+// kernelQueue is how many kernel records wait for the store before the
+// collector's sink starts dropping them (and recording a gap).
+const kernelQueue = 50000
 
 // Defaults for where sentientd keeps things (docs/design.md "Store", "Local
 // API"). On Linux it is a system service: /opt/sentient/data and a socket
@@ -53,6 +60,9 @@ type Config struct {
 	SocketGroup  string        // group allowed to use the socket; "" = owner only
 	Homes        []string      // home dirs whose ~/.claude/projects is ingested
 	PollInterval time.Duration // ingest poll interval
+	// Tetragon is the gRPC address of a running Tetragon. Empty leaves the
+	// kernel collector off, which is the log-only mode.
+	Tetragon string
 	// IntegrityInterval is how often the full hash-chain check runs
 	// (default hourly).
 	IntegrityInterval time.Duration
@@ -145,11 +155,21 @@ func Run(ctx context.Context, cfg Config) error {
 	srv.SetHealth(mon.report)
 
 	var wg sync.WaitGroup
-	errc := make(chan error, 2)
+	errc := make(chan error, 5)
 	wg.Add(3)
 	go func() { defer wg.Done(); errc <- ing.Run(ctx) }()
 	go func() { defer wg.Done(); errc <- api.Serve(ctx, lis, srv) }()
 	go func() { defer wg.Done(); mon.run(ctx) }()
+	if cfg.Tetragon != "" {
+		var coll collector.Collector = &tetragon.Collector{Addr: cfg.Tetragon, Agents: policy.AgentPrefixes(cfg.Homes)}
+		log.Info("kernel collector on", "collector", coll.Name(), "addr", cfg.Tetragon)
+		// Events are queued and written in batches, so a busy store (the
+		// first import of a big transcript) slows the queue, not Tetragon.
+		sink := collector.NewBufferedSink(st, coll.Name(), kernelQueue)
+		wg.Add(2)
+		go func() { defer wg.Done(); errc <- sink.Run(ctx) }()
+		go func() { defer wg.Done(); errc <- coll.Run(ctx, sink) }()
+	}
 
 	var first error
 	select {

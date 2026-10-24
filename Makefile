@@ -5,10 +5,15 @@ VERSION  ?= 0.0.1
 LDFLAGS  := -X github.com/nosaka4i/sentient/internal/version.Version=$(VERSION)
 TOOLS    := .claudetmp/tools
 
-.PHONY: build build-mac test fix jstest cover vet fmt check proto tools
+.PHONY: build install build-mac test fix jstest cover vet fmt check proto tools
 
 build:
 	$(GO) build -ldflags "$(LDFLAGS)" -o bin/ ./cmd/sen ./cmd/sentientd
+
+# Installs sen and sentientd to $GOBIN (default $GOPATH/bin), with the version
+# stamped in like build does. Make sure that directory is on your PATH.
+install:
+	$(GO) install -ldflags "$(LDFLAGS)" ./cmd/sen ./cmd/sentientd
 
 # PKG narrows it to one package: make test PKG=./internal/web
 # Binaries for an Apple-silicon Mac, in bin/darwin-arm64/ (pure Go: no CGO,

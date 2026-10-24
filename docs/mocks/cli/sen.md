@@ -14,6 +14,7 @@ Usage:
 Available Commands:
   status      What needs your attention, and the last 24h of activity
   serve       Serve the web dashboard on localhost
+  policy      Print the Tetragon policy sentient needs (does not install it)
   version     Print the sen version
   help        Help about any command
 
@@ -23,4 +24,4 @@ Flags:
 Use "sen [command] --help" for more information about a command.
 ```
 
-Built: `sen`, `status`, `serve` (web dashboard on `127.0.0.1:7357`, `--addr`, `--socket`) and `version`; `session`, `activity` and `alert` come later and get added to this help when built. See [status](status.md).
+Built: `sen`, `status`, `serve` (web dashboard on `127.0.0.1:7357`, `--addr`, `--socket`), `policy` ([policy](policy.md)) and `version`; `session`, `activity` and `alert` come later and get added to this help when built. See [status](status.md).

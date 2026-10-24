@@ -32,7 +32,7 @@ func newRootCmd() *cobra.Command {
 		// No Run: a command without one prints help (and no "sen [flags]" usage line).
 	}
 	root.CompletionOptions.HiddenDefaultCmd = true
-	root.AddCommand(newStatusCmd(), newServeCmd(), newVersionCmd())
+	root.AddCommand(newStatusCmd(), newServeCmd(), newPolicyCmd(), newVersionCmd())
 	return root
 }
 

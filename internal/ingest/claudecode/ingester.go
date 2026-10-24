@@ -29,7 +29,7 @@ import (
 const Agent = "claude"
 
 // batchSize is how many records go into one transaction.
-const batchSize = 1000
+const batchSize = 200
 
 // Config configures an Ingester.
 type Config struct {

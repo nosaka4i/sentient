@@ -36,6 +36,7 @@ Usage:
 Available Commands:
   status      What needs your attention, and the last 24h of activity
   serve       Serve the web dashboard on localhost
+  policy      Print the Tetragon policy sentient needs (does not install it)
   version     Print the sen version
   help        Help about any command
 

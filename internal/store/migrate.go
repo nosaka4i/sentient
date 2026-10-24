@@ -117,6 +117,53 @@ UPDATE prompts SET
 	action_count = (SELECT COUNT(*) FROM actions a WHERE a.prompt_id = prompts.id
 		AND (a.resource IN ('file', 'dir', 'command', 'process', 'network', 'git', 'launch item') OR (a.resource = 'web' AND a.action = 'fetch')));
 `,
+	// 5: kernel evidence (docs/tetragon-integration.md). processes are the
+	// agent's process tree as a collector saw it (Tetragon on Linux, eslogger
+	// on macOS); kernel_events are what those processes did, verbatim and
+	// hash-chained like raw_log_records; monitor_gaps are the times a
+	// collector wasn't watching.
+	`
+CREATE TABLE processes (
+	exec_id        TEXT PRIMARY KEY,                  -- unique per exec, from the collector
+	collector      TEXT NOT NULL,                     -- tetragon | eslogger
+	session_id     INTEGER REFERENCES sessions(id),   -- the agent session it belongs to, once attributed
+	prompt_id      INTEGER REFERENCES prompts(id),
+	pid            INTEGER NOT NULL,
+	parent_exec_id TEXT,
+	binary         TEXT NOT NULL,
+	argv           TEXT,                              -- JSON array
+	cwd            TEXT,
+	uid            INTEGER,
+	started_at     TEXT NOT NULL,
+	exited_at      TEXT,
+	exit_code      INTEGER
+);
+CREATE INDEX processes_session ON processes(session_id);
+CREATE INDEX processes_parent ON processes(parent_exec_id);
+CREATE INDEX processes_started ON processes(started_at);
+
+CREATE TABLE kernel_events (
+	id        INTEGER PRIMARY KEY,
+	exec_id   TEXT,                                   -- the process that did it
+	ts        TEXT NOT NULL,
+	type      TEXT NOT NULL,                          -- exec | exit | file_create | file_write | file_unlink | file_rename | file_setmode | net_connect | kill | ...
+	path      TEXT,
+	path2     TEXT,                                   -- rename target
+	payload   TEXT NOT NULL,                          -- the collector's record, verbatim JSON
+	prev_hash TEXT NOT NULL,
+	hash      TEXT NOT NULL
+);
+CREATE INDEX kernel_events_ts ON kernel_events(ts);
+CREATE INDEX kernel_events_exec ON kernel_events(exec_id);
+
+CREATE TABLE monitor_gaps (
+	id         INTEGER PRIMARY KEY,
+	collector  TEXT NOT NULL,
+	started_at TEXT NOT NULL,
+	ended_at   TEXT,                                  -- NULL while the gap is still open
+	reason     TEXT NOT NULL
+);
+`,
 }
 
 // SchemaVersion is the version the code expects.

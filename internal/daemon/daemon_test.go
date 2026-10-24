@@ -6,10 +6,12 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/nosaka4i/sentient/internal/api"
+	"github.com/nosaka4i/sentient/internal/store"
 )
 
 func TestRunIngestsAndServes(t *testing.T) {
@@ -100,6 +102,56 @@ func TestRunIngestsAndServes(t *testing.T) {
 	}
 	if _, err := os.Stat(sock); !os.IsNotExist(err) {
 		t.Error("socket not removed on shutdown")
+	}
+}
+
+func TestRunWithTetragonDownRecordsAGap(t *testing.T) {
+	dir, err := os.MkdirTemp("", "sen")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	data := filepath.Join(dir, "data")
+	ready := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error)
+	go func() {
+		done <- Run(ctx, Config{
+			DataDir:  data,
+			Socket:   filepath.Join(dir, "d.sock"),
+			Homes:    []string{filepath.Join(dir, "none")},
+			Tetragon: "unix://" + filepath.Join(dir, "no-tetragon.sock"), // nothing listens here
+			Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+			Ready:    ready,
+		})
+	}()
+	<-ready
+
+	// the collector reports the outage as a gap, visible to a second reader
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		st, err := store.Open(ctx, data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var n int
+		var reason string
+		st.DB.QueryRow(`SELECT COUNT(*), COALESCE(MAX(reason), '') FROM monitor_gaps WHERE collector = 'tetragon' AND ended_at IS NULL`).Scan(&n, &reason)
+		st.Close()
+		if n == 1 {
+			if !strings.Contains(reason, "unreachable") {
+				t.Errorf("reason = %q", reason)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("no gap recorded for an unreachable Tetragon")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }
 
