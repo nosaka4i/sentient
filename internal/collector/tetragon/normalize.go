@@ -13,6 +13,7 @@ import (
 	"github.com/cilium/tetragon/api/v1/tetragon"
 
 	"github.com/nosaka4i/sentient/internal/collector"
+	"github.com/nosaka4i/sentient/internal/collector/tetragon/policy"
 	"github.com/nosaka4i/sentient/internal/dbtime"
 	"github.com/nosaka4i/sentient/internal/store"
 )
@@ -38,16 +39,7 @@ func NewNormalizer(sink collector.Sink, agentPrefixes []string) *Normalizer {
 }
 
 func (n *Normalizer) isAgent(binary string) bool {
-	for _, p := range n.prefixes {
-		if strings.HasSuffix(p, "/") {
-			if strings.HasPrefix(binary, p) {
-				return true
-			}
-		} else if binary == p {
-			return true
-		}
-	}
-	return false
+	return policy.IsAgent(n.prefixes, binary)
 }
 
 // Handle processes one event from the stream. Events that are not part of the

@@ -30,6 +30,21 @@ func AgentPrefixes(homes []string) []string {
 	return out
 }
 
+// IsAgent reports whether binary is one of the agent paths in prefixes (see
+// AgentPrefixes).
+func IsAgent(prefixes []string, binary string) bool {
+	for _, p := range prefixes {
+		if strings.HasSuffix(p, "/") {
+			if strings.HasPrefix(binary, p) {
+				return true
+			}
+		} else if binary == p {
+			return true
+		}
+	}
+	return false
+}
+
 // systemBinaries are agent installs outside any home directory.
 var systemBinaries = []string{"/usr/local/bin/claude"}
 

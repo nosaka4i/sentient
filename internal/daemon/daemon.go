@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nosaka4i/sentient/internal/api"
+	"github.com/nosaka4i/sentient/internal/attribute"
 	"github.com/nosaka4i/sentient/internal/collector"
 	"github.com/nosaka4i/sentient/internal/collector/tetragon"
 	"github.com/nosaka4i/sentient/internal/collector/tetragon/policy"
@@ -24,6 +25,9 @@ import (
 // kernelQueue is how many kernel records wait for the store before the
 // collector's sink starts dropping them (and recording a gap).
 const kernelQueue = 50000
+
+// attributeInterval is how often kernel processes are tied to log sessions.
+const attributeInterval = 5 * time.Second
 
 // Defaults for where sentientd keeps things (docs/design.md "Store", "Local
 // API"). On Linux it is a system service: /opt/sentient/data and a socket
@@ -161,14 +165,17 @@ func Run(ctx context.Context, cfg Config) error {
 	go func() { defer wg.Done(); errc <- api.Serve(ctx, lis, srv) }()
 	go func() { defer wg.Done(); mon.run(ctx) }()
 	if cfg.Tetragon != "" {
-		var coll collector.Collector = &tetragon.Collector{Addr: cfg.Tetragon, Agents: policy.AgentPrefixes(cfg.Homes)}
+		agents := policy.AgentPrefixes(cfg.Homes)
+		var coll collector.Collector = &tetragon.Collector{Addr: cfg.Tetragon, Agents: agents}
 		log.Info("kernel collector on", "collector", coll.Name(), "addr", cfg.Tetragon)
 		// Events are queued and written in batches, so a busy store (the
 		// first import of a big transcript) slows the queue, not Tetragon.
 		sink := collector.NewBufferedSink(st, coll.Name(), kernelQueue)
-		wg.Add(2)
+		att := &attribute.Attributor{St: st, Log: log, IsAgent: func(b string) bool { return policy.IsAgent(agents, b) }}
+		wg.Add(3)
 		go func() { defer wg.Done(); errc <- sink.Run(ctx) }()
 		go func() { defer wg.Done(); errc <- coll.Run(ctx, sink) }()
+		go func() { defer wg.Done(); errc <- att.Run(ctx, attributeInterval) }()
 	}
 
 	var first error

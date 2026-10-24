@@ -164,6 +164,12 @@ CREATE TABLE monitor_gaps (
 	reason     TEXT NOT NULL
 );
 `,
+	// 6: how sure the session of a process is. exact: the only session in that
+	// directory active while the agent ran; ambiguous: several were, and the
+	// one that became active first was taken. Children inherit their parent's.
+	`
+ALTER TABLE processes ADD COLUMN attribution TEXT;
+`,
 }
 
 // SchemaVersion is the version the code expects.
