@@ -102,6 +102,33 @@ and `AddGap`.
    as `kernel` only, and one the agent's tools can't explain is what the alert
    rules look for.
 
+**Routine commands of the agent itself** (backlog `00b522e`, to do). Claude
+Code runs commands on its own that are in no tool call: in one session 296
+`git` runs (the same hardened `git -c core.askPass= ... status` form) and 319
+helper copies of the `claude` binary. The log has none of them, only the text
+of about ten status snapshots. They are evidence of what the harness does
+unasked, so nothing is filtered: all of it is stored. The views group
+identical commands from the agent's own process into one row with a count and
+time range, per subcommand, so a new one (`git fetch`, `git config`) is a new
+row the first time it runs. Their file and network events stay attached to the
+process. The signatures that may be grouped are a short list in the repo that
+contributors can extend; a command that matches none is shown as an action. A
+kernel exec with no log match that is not grouped becomes an `evidence:
+kernel` action.
+
+**Built-in tools.** Edit, Write and Read run inside the agent process, so the
+kernel reports only "this process created or opened this path", not which tool
+or prompt. The merge pairs the log's tool call with the kernel event by path
+and time (about 2 seconds). A kernel write with no log call, or a log edit
+with no kernel event, is a mismatch to flag (a gap or an agent started before
+the policy explains the second). Not yet checked against a live Edit; whether
+a write is distinguishable from a read in `security_file_open` is open.
+
+**Log-only counts.** Without the kernel collector the totals are what the
+agent reported, a lower bound: no routine commands, no files a command
+touched, nothing the model did not route through a tool. Pages that show totals
+say so.
+
 **File effects of a command** (backlog `65d950c`). File unlink, write, rename
 and chmod events carry the exec that caused them, so `query` can return "this
 command deleted 4 files, wrote 2". `/activity` and the prompt trace get an
