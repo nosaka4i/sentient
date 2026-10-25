@@ -64,7 +64,7 @@ func TestStoreSinkWritesWhatACollectorReports(t *testing.T) {
 		coll != "eslogger" || started != "2026-10-17T09:00:02.000000000Z" || ended != "2026-10-17T09:00:05.000000000Z" || reason != "stream dropped" {
 		t.Errorf("gap = %q %q..%q %q, %v", coll, started, ended, reason, err)
 	}
-	if res, err := st.VerifyKernelChainFrom(context.Background(), store.ChainPoint{}); err != nil || res.BadID != 0 || res.Checked != 1 {
+	if res, err := st.VerifyKernelChainFrom(context.Background(), store.ChainPoint{}); err != nil || res.BadID != 0 || res.Checked != 2 { // the event and the exit
 		t.Errorf("chain = %+v, %v", res, err)
 	}
 }

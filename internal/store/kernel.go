@@ -11,9 +11,7 @@ import (
 type Process struct {
 	ExecID       string // unique per exec, from the collector
 	Collector    string // tetragon | eslogger
-	SessionID    int64  // 0 until the process is attributed to an agent session
-	PromptID     int64
-	PID          int64
+	PID         int64
 	ParentExecID string
 	Binary       string
 	Argv         string // JSON array
@@ -27,20 +25,24 @@ type Process struct {
 // from the /proc scan and again live).
 func (t *Tx) AddProcess(ctx context.Context, p Process) error {
 	_, err := t.tx.ExecContext(ctx, `
-INSERT INTO processes (exec_id, collector, session_id, prompt_id, pid, parent_exec_id, binary, argv, cwd, uid, started_at)
-VALUES (?, ?, NULLIF(?, 0), NULLIF(?, 0), ?, NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?)
+INSERT INTO processes (exec_id, collector, pid, parent_exec_id, binary, argv, cwd, uid, started_at)
+VALUES (?, ?, ?, NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?)
 ON CONFLICT (exec_id) DO NOTHING`,
-		p.ExecID, p.Collector, p.SessionID, p.PromptID, p.PID, p.ParentExecID, p.Binary, p.Argv, p.Cwd, p.UID, p.StartedAt)
+		p.ExecID, p.Collector, p.PID, p.ParentExecID, p.Binary, p.Argv, p.Cwd, p.UID, p.StartedAt)
 	if err != nil {
 		return fmt.Errorf("add process: %w", err)
 	}
 	return nil
 }
 
-// ExitProcess records when a process ended and its exit status. Exiting a
-// process that was never recorded is not an error (the exec may predate the
-// collector); it reports whether the process was known.
+// ExitProcess records when a process ended and its exit status: an `exit`
+// event appended to the kernel chain, and the processes index updated from it.
+// Exiting a process that was never recorded is not an error (the exec may
+// predate the collector); it reports whether the process was known.
 func (t *Tx) ExitProcess(ctx context.Context, execID, at string, code int) (bool, error) {
+	if _, err := t.AppendKernel(ctx, KernelEvent{ExecID: execID, TS: at, Type: "exit", Payload: fmt.Sprintf(`{"exit_code":%d}`, code)}); err != nil {
+		return false, err
+	}
 	res, err := t.tx.ExecContext(ctx, `UPDATE processes SET exited_at = ?, exit_code = ? WHERE exec_id = ?`, at, code, execID)
 	if err != nil {
 		return false, fmt.Errorf("exit process: %w", err)
@@ -53,8 +55,9 @@ func (t *Tx) ExitProcess(ctx context.Context, execID, at string, code int) (bool
 // either leaves it as it was.
 func (t *Tx) AttributeProcess(ctx context.Context, execID string, sessionID, promptID int64) error {
 	_, err := t.tx.ExecContext(ctx, `
-UPDATE processes SET session_id = COALESCE(NULLIF(?, 0), session_id), prompt_id = COALESCE(NULLIF(?, 0), prompt_id)
-WHERE exec_id = ?`, sessionID, promptID, execID)
+INSERT INTO process_attribution (exec_id, session_id, prompt_id) VALUES (?, ?, NULLIF(?, 0))
+ON CONFLICT (exec_id) DO UPDATE SET session_id = COALESCE(NULLIF(?, 0), session_id), prompt_id = COALESCE(NULLIF(?, 0), prompt_id)`,
+		execID, sessionID, promptID, sessionID, promptID)
 	if err != nil {
 		return fmt.Errorf("attribute process: %w", err)
 	}

@@ -81,7 +81,7 @@ func (f *fixture) get(execID string) (session, prompt int64, how string) {
 	f.t.Helper()
 	var s, p *int64
 	var h *string
-	if err := f.st.DB.QueryRow(`SELECT session_id, prompt_id, attribution FROM processes WHERE exec_id = ?`, execID).Scan(&s, &p, &h); err != nil {
+	if err := f.st.DB.QueryRow(`SELECT a.session_id, a.prompt_id, a.attribution FROM processes p LEFT JOIN process_attribution a ON a.exec_id = p.exec_id WHERE p.exec_id = ?`, execID).Scan(&s, &p, &h); err != nil {
 		f.t.Fatal(err)
 	}
 	if s != nil {

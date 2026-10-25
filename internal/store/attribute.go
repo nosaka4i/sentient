@@ -21,7 +21,7 @@ func (t *Tx) UnattributedProcesses(ctx context.Context) ([]ProcessRef, error) {
 	rows, err := t.tx.QueryContext(ctx, `
 SELECT p.exec_id, p.binary, COALESCE(p.cwd, ''), p.started_at, COALESCE(p.exited_at, ''), COALESCE(q.binary, '')
 FROM processes p LEFT JOIN processes q ON q.exec_id = p.parent_exec_id
-WHERE p.session_id IS NULL`)
+WHERE NOT EXISTS (SELECT 1 FROM process_attribution a WHERE a.exec_id = p.exec_id)`)
 	if err != nil {
 		return nil, fmt.Errorf("unattributed processes: %w", err)
 	}
@@ -68,8 +68,10 @@ GROUP BY r.session_id ORDER BY s.started_at, r.session_id`, cwd, from, to)
 // AttributeRoot ties an agent's root process to a session. how is "exact" or
 // "ambiguous".
 func (t *Tx) AttributeRoot(ctx context.Context, execID string, sessionID int64, how string) error {
-	_, err := t.tx.ExecContext(ctx, `UPDATE processes SET session_id = ?, attribution = ? WHERE exec_id = ?`,
-		sessionID, how, execID)
+	_, err := t.tx.ExecContext(ctx, `
+INSERT INTO process_attribution (exec_id, session_id, attribution) VALUES (?, ?, ?)
+ON CONFLICT (exec_id) DO UPDATE SET session_id = excluded.session_id, attribution = excluded.attribution`,
+		execID, sessionID, how)
 	if err != nil {
 		return fmt.Errorf("attribute root: %w", err)
 	}
@@ -86,15 +88,14 @@ func (t *Tx) AttributeDescendants(ctx context.Context) (int, error) {
 	total := 0
 	for i := 0; i < maxProcessDepth; i++ {
 		res, err := t.tx.ExecContext(ctx, `
-UPDATE processes SET
-  session_id  = (SELECT q.session_id FROM processes q WHERE q.exec_id = processes.parent_exec_id),
-  attribution = (SELECT q.attribution FROM processes q WHERE q.exec_id = processes.parent_exec_id),
-  prompt_id   = (SELECT pr.id FROM prompts pr
-                 WHERE pr.session_id = (SELECT q.session_id FROM processes q WHERE q.exec_id = processes.parent_exec_id)
-                   AND pr.started_at <= processes.started_at
-                 ORDER BY pr.started_at DESC, pr.seq DESC LIMIT 1)
-WHERE session_id IS NULL
-  AND parent_exec_id IN (SELECT exec_id FROM processes WHERE session_id IS NOT NULL)`)
+INSERT INTO process_attribution (exec_id, session_id, prompt_id, attribution)
+SELECT p.exec_id, q.session_id,
+  (SELECT pr.id FROM prompts pr
+   WHERE pr.session_id = q.session_id AND pr.started_at <= p.started_at
+   ORDER BY pr.started_at DESC, pr.seq DESC LIMIT 1),
+  q.attribution
+FROM processes p JOIN process_attribution q ON q.exec_id = p.parent_exec_id
+WHERE NOT EXISTS (SELECT 1 FROM process_attribution a WHERE a.exec_id = p.exec_id)`)
 		if err != nil {
 			return total, fmt.Errorf("attribute descendants: %w", err)
 		}

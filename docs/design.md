@@ -274,8 +274,10 @@ Schema (draft; only what `sen status` needs is in scope now):
 ```sql
 sessions       (id PK, agent, agent_session_id, repo_root, cwd, started_at, ended_at)
 prompts        (id PK, session_id FK, seq, text, started_at, ended_at)
-processes      (exec_id PK, session_id FK, prompt_id FK, pid, parent_exec_id,
-                binary, argv, cwd, uid, started_at, exited_at, exit_code)
+processes      (exec_id PK, pid, parent_exec_id, binary, argv, cwd, uid,
+                started_at, exited_at, exit_code)   -- index of exec/exit events
+process_attribution (exec_id PK, session_id FK, prompt_id FK, attribution)  -- derived links
+-- kernel_events and raw_log_records reject UPDATE/DELETE (triggers); see storage-design.md
 kernel_events  (id PK, exec_id FK, ts, type, payload JSON, prev_hash, hash)
 raw_log_records(id PK, session_id FK, ts, source_file, record JSON, prev_hash, hash)
 

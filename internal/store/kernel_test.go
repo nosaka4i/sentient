@@ -45,7 +45,7 @@ func TestProcessesAreRecordedAttributedAndExited(t *testing.T) {
 
 	var bin, argv, cwd, parent string
 	var sess, prompt, uid int64
-	if err := st.DB.QueryRow(`SELECT binary, COALESCE(argv,''), COALESCE(cwd,''), COALESCE(session_id,0), COALESCE(prompt_id,0), uid FROM processes WHERE exec_id = 'e1'`).
+	if err := st.DB.QueryRow(`SELECT binary, COALESCE(argv,''), COALESCE(cwd,''), COALESCE(a.session_id,0), COALESCE(a.prompt_id,0), uid FROM processes p LEFT JOIN process_attribution a ON a.exec_id = p.exec_id WHERE p.exec_id = 'e1'`).
 		Scan(&bin, &argv, &cwd, &sess, &prompt, &uid); err != nil {
 		t.Fatal(err)
 	}
@@ -123,6 +123,7 @@ func TestKernelChainDetectsEditing(t *testing.T) {
 		"time":    `UPDATE kernel_events SET ts = '2026-10-17T09:00:09.000000000Z' WHERE id = ?`,
 	} {
 		fresh, fids := seedKernelChain(t) // each edit on its own copy
+		dropGuards(t, fresh)
 		if _, err := fresh.DB.Exec(stmt, fids[2]); err != nil {
 			t.Fatal(err)
 		}
@@ -133,6 +134,7 @@ func TestKernelChainDetectsEditing(t *testing.T) {
 	}
 	// deleting an event breaks the chain at the next one
 	fresh, fids := seedKernelChain(t)
+	dropGuards(t, fresh)
 	if _, err := fresh.DB.Exec(`DELETE FROM kernel_events WHERE id = ?`, fids[1]); err != nil {
 		t.Fatal(err)
 	}
@@ -142,6 +144,64 @@ func TestKernelChainDetectsEditing(t *testing.T) {
 	// the chain of kernel events is separate from the raw-record chain
 	if bad, err := st.VerifyChain(ctx); err != nil || bad != 0 {
 		t.Errorf("raw chain = %d, %v", bad, err)
+	}
+}
+
+// dropGuards removes the append-only triggers so a test can tamper with
+// evidence the way a person with the file could, and check it is detected.
+func dropGuards(t *testing.T, st *Store) {
+	t.Helper()
+	for _, g := range []string{"raw_log_records_no_update", "raw_log_records_no_delete", "kernel_events_no_update", "kernel_events_no_delete"} {
+		if _, err := st.DB.Exec(`DROP TRIGGER ` + g); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestEvidenceRejectsUpdateAndDelete(t *testing.T) {
+	st, ids := seedKernelChain(t)
+	for _, stmt := range []string{
+		`UPDATE kernel_events SET payload = '{}' WHERE id = ?`,
+		`DELETE FROM kernel_events WHERE id = ?`,
+	} {
+		if _, err := st.DB.Exec(stmt, ids[0]); err == nil {
+			t.Errorf("%s was allowed", stmt)
+		}
+	}
+	ctx := context.Background()
+	tx, _ := st.Begin(ctx)
+	if _, err := tx.AppendRaw(ctx, RawRecord{TS: "2026-10-17T09:00:00.000000000Z", SourceFile: "f", Type: "user", Record: "{}"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	for _, stmt := range []string{`UPDATE raw_log_records SET record = '{}'`, `DELETE FROM raw_log_records`} {
+		if _, err := st.DB.Exec(stmt); err == nil {
+			t.Errorf("%s was allowed", stmt)
+		}
+	}
+}
+
+func TestExitIsAChainedEvent(t *testing.T) {
+	st, _ := seedKernelChain(t)
+	ctx := context.Background()
+	tx, _ := st.Begin(ctx)
+	if err := tx.AddProcess(ctx, Process{ExecID: "x", Collector: "tetragon", PID: 9, Binary: "/bin/true", StartedAt: "2026-10-17T09:00:00.000000000Z"}); err != nil {
+		t.Fatal(err)
+	}
+	if known, err := tx.ExitProcess(ctx, "x", "2026-10-17T09:00:05.000000000Z", 2); err != nil || !known {
+		t.Fatalf("exit = %v, %v", known, err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	var payload string
+	if err := st.DB.QueryRow(`SELECT payload FROM kernel_events WHERE exec_id = 'x' AND type = 'exit'`).Scan(&payload); err != nil || payload != `{"exit_code":2}` {
+		t.Errorf("exit event = %q, %v", payload, err)
+	}
+	if res, err := st.VerifyKernelChainFrom(ctx, ChainPoint{}); err != nil || res.BadID != 0 {
+		t.Errorf("chain with exit = %+v, %v", res, err)
 	}
 }
 

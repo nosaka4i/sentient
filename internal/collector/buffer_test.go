@@ -66,7 +66,7 @@ func TestBufferedSinkWritesInOrderInBatches(t *testing.T) {
 	if err := st.DB.QueryRow(`SELECT exit_code, exited_at FROM processes WHERE exec_id = 'e1'`).Scan(&code, &exited); err != nil || code != 3 || exited == "" {
 		t.Errorf("process exit = %d %q, %v (exit must apply after the process was added)", code, exited, err)
 	}
-	if res, err := st.VerifyKernelChainFrom(context.Background(), store.ChainPoint{}); err != nil || res.BadID != 0 || res.Checked != 1200 {
+	if res, err := st.VerifyKernelChainFrom(context.Background(), store.ChainPoint{}); err != nil || res.BadID != 0 || res.Checked != 1201 { // the events and the exit
 		t.Errorf("chain = %+v, %v", res, err)
 	}
 	if b.Dropped() != 0 {
@@ -82,8 +82,8 @@ func TestBufferedSinkFlushesWhatIsLeftOnShutdown(t *testing.T) {
 	if err := b.Run(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if n := count(t, st, `SELECT COUNT(*) FROM kernel_events`); n != 50 {
-		t.Errorf("%d events written, want 50", n)
+	if n := count(t, st, `SELECT COUNT(*) FROM kernel_events`); n != 51 { // the events and the exit
+		t.Errorf("%d events written, want 51", n)
 	}
 }
 

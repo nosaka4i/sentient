@@ -92,6 +92,7 @@ func TestIntegrity(t *testing.T) {
 		t.Errorf("after incremental: %+v", s)
 	}
 
+	st.DB.Exec(`DROP TRIGGER raw_log_records_no_update`)
 	st.DB.Exec(`UPDATE raw_log_records SET record = '{"x":1}' WHERE id = 2`)
 	in.full(ctx)
 	if s := in.state(); s.OK || s.BadRecordID != 2 {

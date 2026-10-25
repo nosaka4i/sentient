@@ -170,6 +170,51 @@ CREATE TABLE monitor_gaps (
 	`
 ALTER TABLE processes ADD COLUMN attribution TEXT;
 `,
+		// 7: evidence is immutable (docs/storage-design.md). The links between a
+		// process and a session or prompt move out of processes into their own
+		// table, so processes is only an index of exec and exit events and the
+		// links can be dropped and recomputed. kernel_events and raw_log_records
+		// reject UPDATE and DELETE; exits are appended to the kernel chain.
+		`
+CREATE TABLE process_attribution (
+	exec_id     TEXT PRIMARY KEY,
+	session_id  INTEGER NOT NULL REFERENCES sessions(id),
+	prompt_id   INTEGER REFERENCES prompts(id),
+	attribution TEXT                                  -- exact | ambiguous
+);
+CREATE INDEX process_attribution_session ON process_attribution(session_id);
+INSERT INTO process_attribution (exec_id, session_id, prompt_id, attribution)
+	SELECT exec_id, session_id, prompt_id, attribution FROM processes WHERE session_id IS NOT NULL;
+
+CREATE TABLE processes_new (
+	exec_id        TEXT PRIMARY KEY,
+	collector      TEXT NOT NULL,
+	pid            INTEGER NOT NULL,
+	parent_exec_id TEXT,
+	binary         TEXT NOT NULL,
+	argv           TEXT,
+	cwd            TEXT,
+	uid            INTEGER,
+	started_at     TEXT NOT NULL,
+	exited_at      TEXT,
+	exit_code      INTEGER
+);
+INSERT INTO processes_new (exec_id, collector, pid, parent_exec_id, binary, argv, cwd, uid, started_at, exited_at, exit_code)
+	SELECT exec_id, collector, pid, parent_exec_id, binary, argv, cwd, uid, started_at, exited_at, exit_code FROM processes;
+DROP TABLE processes;
+ALTER TABLE processes_new RENAME TO processes;
+CREATE INDEX processes_parent ON processes(parent_exec_id);
+CREATE INDEX processes_started ON processes(started_at);
+
+CREATE TRIGGER raw_log_records_no_update BEFORE UPDATE ON raw_log_records
+	BEGIN SELECT RAISE(ABORT, 'raw_log_records is append-only'); END;
+CREATE TRIGGER raw_log_records_no_delete BEFORE DELETE ON raw_log_records
+	BEGIN SELECT RAISE(ABORT, 'raw_log_records is append-only'); END;
+CREATE TRIGGER kernel_events_no_update BEFORE UPDATE ON kernel_events
+	BEGIN SELECT RAISE(ABORT, 'kernel_events is append-only'); END;
+CREATE TRIGGER kernel_events_no_delete BEFORE DELETE ON kernel_events
+	BEGIN SELECT RAISE(ABORT, 'kernel_events is append-only'); END;
+`,
 }
 
 // SchemaVersion is the version the code expects.

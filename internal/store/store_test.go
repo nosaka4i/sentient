@@ -356,6 +356,7 @@ func TestWritesAndChain(t *testing.T) {
 		t.Fatalf("VerifyChain intact = %d %v", bad, err)
 	}
 	// Editing a record breaks the chain at that record.
+	dropGuards(t, st)
 	if _, err := st.DB.Exec(`UPDATE raw_log_records SET record = '{"b":3}' WHERE id = ?`, rawIDs[1]); err != nil {
 		t.Fatal(err)
 	}
@@ -394,6 +395,7 @@ func TestVerifyChainIncremental(t *testing.T) {
 	}
 	// A record whose prev_hash doesn't continue the chain is caught.
 	appendN(1)
+	dropGuards(t, st)
 	st.DB.Exec(`UPDATE raw_log_records SET prev_hash = 'x' WHERE id = 6`)
 	if bad, _ := st.VerifyChainFrom(ctx, inc.Last); bad.BadID != 6 {
 		t.Errorf("tampered = %+v", bad)
