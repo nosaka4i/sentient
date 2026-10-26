@@ -1,9 +1,12 @@
 package claudecode
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -326,5 +329,37 @@ func TestSessionFromPath(t *testing.T) {
 		if got := sessionFromPath(path); got != want {
 			t.Errorf("sessionFromPath(%q) = %q, want %q", path, got, want)
 		}
+	}
+}
+
+func TestABulkImportIsReportedInTheLog(t *testing.T) {
+	var buf bytes.Buffer
+	log := slog.New(slog.NewTextHandler(&buf, nil))
+	in := New(openStore(t), Config{Homes: []string{fixtureHome(t)}, Logger: log})
+	in.bulkBytes, in.progressEvery = 1, 0 // report every file
+	if err := in.ScanOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	for _, want := range []string{"importing agent transcripts", "files=2", "percent=", "imported agent transcripts", "records=25"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("log lacks %q:\n%s", want, out)
+		}
+	}
+	// nothing left: a quiet pass says nothing more
+	buf.Reset()
+	if err := in.ScanOnce(context.Background()); err != nil || buf.Len() != 0 {
+		t.Errorf("idle scan logged %q, %v", buf.String(), err)
+	}
+}
+
+func TestOrdinaryTailingIsNotLogged(t *testing.T) {
+	var buf bytes.Buffer
+	in := New(openStore(t), Config{Homes: []string{fixtureHome(t)}, Logger: slog.New(slog.NewTextHandler(&buf, nil))})
+	if err := in.ScanOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), "importing") {
+		t.Errorf("a small scan was reported as an import:\n%s", buf.String())
 	}
 }

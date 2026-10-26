@@ -94,7 +94,7 @@ func (t *Tx) AppendRaw(ctx context.Context, r RawRecord) (int64, error) {
 	res, err := t.tx.ExecContext(ctx, `
 INSERT INTO raw_log_records (session_id, ts, source_file, type, unknown, record, prev_hash, hash)
 VALUES (NULLIF(?, 0), NULLIF(?, ''), ?, ?, ?, ?, ?, ?)`,
-		r.SessionID, r.TS, r.SourceFile, r.Type, boolInt(r.Unknown), r.Record, prev, hash)
+		r.SessionID, r.TS, r.SourceFile, r.Type, boolInt(r.Unknown), encodeRecord(r.Record), prev, hash)
 	if err != nil {
 		return 0, fmt.Errorf("append raw record: %w", err)
 	}
@@ -278,11 +278,17 @@ SELECT id, COALESCE(ts, ''), source_file, record, prev_hash, hash FROM raw_log_r
 	defer rows.Close()
 	for rows.Next() {
 		var id int64
-		var ts, src, rec, ph, h string
-		if err := rows.Scan(&id, &ts, &src, &rec, &ph, &h); err != nil {
+		var ts, src, ph, h string
+		var stored any
+		if err := rows.Scan(&id, &ts, &src, &stored, &ph, &h); err != nil {
 			return res, err
 		}
 		res.Checked++
+		rec, err := DecodeRecord(stored)
+		if err != nil {
+			res.BadID = id
+			return res, nil
+		}
 		if ph != res.Last.Hash || ChainHash(res.Last.Hash, ts, src, rec) != h {
 			res.BadID = id
 			return res, nil

@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	github.com/cilium/tetragon/api v1.7.1
 	github.com/dustin/go-humanize v1.0.1
+	github.com/klauspost/compress v1.18.0
 	github.com/mattn/go-isatty v0.0.24
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/sys v0.48.0

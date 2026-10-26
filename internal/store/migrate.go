@@ -170,12 +170,12 @@ CREATE TABLE monitor_gaps (
 	`
 ALTER TABLE processes ADD COLUMN attribution TEXT;
 `,
-		// 7: evidence is immutable (docs/storage-design.md). The links between a
-		// process and a session or prompt move out of processes into their own
-		// table, so processes is only an index of exec and exit events and the
-		// links can be dropped and recomputed. kernel_events and raw_log_records
-		// reject UPDATE and DELETE; exits are appended to the kernel chain.
-		`
+	// 7: evidence is immutable (docs/storage-design.md). The links between a
+	// process and a session or prompt move out of processes into their own
+	// table, so processes is only an index of exec and exit events and the
+	// links can be dropped and recomputed. kernel_events and raw_log_records
+	// reject UPDATE and DELETE; exits are appended to the kernel chain.
+	`
 CREATE TABLE process_attribution (
 	exec_id     TEXT PRIMARY KEY,
 	session_id  INTEGER NOT NULL REFERENCES sessions(id),
@@ -229,6 +229,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	s.MigratedFrom = cur
 	if cur > len(migrations) {
 		return fmt.Errorf("database schema version %d is newer than this sentientd (%d)", cur, len(migrations))
 	}

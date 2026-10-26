@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nosaka4i/sentient/internal/dbtime"
+	"github.com/nosaka4i/sentient/internal/store"
 )
 
 // ErrNotFound means the requested prompt (or other record) doesn't exist.
@@ -289,8 +290,12 @@ func toolBlock(ctx context.Context, db *sql.DB, rawID int64, toolUse string) (ra
 	if rawID == 0 || toolUse == "" {
 		return rawBlock{}, false
 	}
-	var rec string
-	if err := db.QueryRowContext(ctx, `SELECT record FROM raw_log_records WHERE id = ?`, rawID).Scan(&rec); err != nil {
+	var stored any
+	if err := db.QueryRowContext(ctx, `SELECT record FROM raw_log_records WHERE id = ?`, rawID).Scan(&stored); err != nil {
+		return rawBlock{}, false
+	}
+	rec, err := store.DecodeRecord(stored)
+	if err != nil {
 		return rawBlock{}, false
 	}
 	var r rawRecord
@@ -408,9 +413,14 @@ ORDER BY ts DESC, id DESC LIMIT 50`, session, start, end)
 	}
 	defer r.Close()
 	for r.Next() {
-		var ts, rec string
-		if err := r.Scan(&ts, &rec); err != nil {
+		var ts string
+		var stored any
+		if err := r.Scan(&ts, &stored); err != nil {
 			return "", time.Time{}, err
+		}
+		rec, err := store.DecodeRecord(stored)
+		if err != nil {
+			continue
 		}
 		var rr rawRecord
 		if json.Unmarshal([]byte(rec), &rr) != nil || rr.IsSidechain {

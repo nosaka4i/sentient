@@ -22,6 +22,9 @@ const DBFileName = "sentient.db"
 // Store is an open sentient database.
 type Store struct {
 	DB *sql.DB
+	// MigratedFrom is the schema version the file was at when it was opened
+	// (0 for a new database); it equals SchemaVersion() when nothing was applied.
+	MigratedFrom int
 }
 
 // Open opens (creating if needed) the database in dataDir, enables WAL mode

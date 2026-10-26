@@ -49,6 +49,9 @@ type Ingester struct {
 	mu        sync.Mutex
 	repoRoots map[string]string // cwd -> repo root ("" = not in a repo)
 	unknown   map[string]int    // record type -> count since start
+
+	bulkBytes     int64         // unread bytes that make a scan worth reporting
+	progressEvery time.Duration // how often a reported scan logs progress
 }
 
 // New returns an Ingester writing to st.
@@ -66,6 +69,9 @@ func New(st *store.Store, cfg Config) *Ingester {
 		log:       log.With("component", "ingest.claudecode"),
 		repoRoots: map[string]string{},
 		unknown:   map[string]int{},
+
+		bulkBytes:     bulkBytes,
+		progressEvery: progressEvery,
 	}
 }
 
@@ -113,16 +119,64 @@ func (in *Ingester) Files() []string {
 	return append(mains, subs...)
 }
 
+// A scan with at least bulkBytes unread (the first import, or catching up
+// after the daemon was off) is reported in the log: when it starts, every
+// progressEvery while it runs, and when it ends. Ordinary tailing is silent.
+const (
+	bulkBytes     = 8 << 20
+	progressEvery = 10 * time.Second
+)
+
+// pending sizes what is unread across files.
+func (in *Ingester) pending(ctx context.Context, files []string) (n int, bytes int64) {
+	for _, f := range files {
+		fi, err := os.Stat(f)
+		if err != nil {
+			continue
+		}
+		off, _ := in.st.Offset(ctx, f)
+		if fi.Size() < off {
+			off = 0
+		}
+		if fi.Size() > off {
+			n++
+			bytes += fi.Size() - off
+		}
+	}
+	return n, bytes
+}
+
 // ScanOnce ingests whatever is new in every transcript file.
 func (in *Ingester) ScanOnce(ctx context.Context) error {
+	files := in.Files()
+	pendingFiles, pendingBytes := in.pending(ctx, files)
+	bulk := pendingBytes >= in.bulkBytes
+	start := time.Now()
+	last := start
+	if bulk {
+		in.log.Info("importing agent transcripts", "files", pendingFiles, "size_mb", pendingBytes>>20)
+	}
 	var errs []error
-	for _, f := range in.Files() {
+	var records, read int64
+	for _, f := range files {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		if err := in.IngestFile(ctx, f); err != nil {
+		n, b, err := in.ingestFile(ctx, f)
+		records += int64(n)
+		read += b
+		if err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", f, err))
 		}
+		if bulk && time.Since(last) >= in.progressEvery {
+			last = time.Now()
+			in.log.Info("importing agent transcripts", "percent", 100*read/pendingBytes, "records", records,
+				"read_mb", read>>20, "elapsed", time.Since(start).Round(time.Second))
+		}
+	}
+	if bulk {
+		in.log.Info("imported agent transcripts", "records", records, "read_mb", read>>20,
+			"took", time.Since(start).Round(time.Second), "errors", len(errs))
 	}
 	return errors.Join(errs...)
 }
@@ -140,67 +194,73 @@ func sessionFromPath(path string) string {
 // IngestFile ingests complete lines appended to path since the last call,
 // resuming from the offset stored with the records.
 func (in *Ingester) IngestFile(ctx context.Context, path string) error {
+	_, _, err := in.ingestFile(ctx, path)
+	return err
+}
+
+// ingestFile is IngestFile, also returning how many records and bytes it read.
+func (in *Ingester) ingestFile(ctx context.Context, path string) (n int, read int64, err error) {
 	off, err := in.st.Offset(ctx, path)
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	fi, err := os.Stat(path)
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	if fi.Size() < off {
 		in.log.Warn("transcript shrank; re-reading from the start", "file", path, "size", fi.Size(), "offset", off)
 		off = 0
 	}
 	if fi.Size() == off {
-		return nil
+		return 0, 0, nil
 	}
+	start := off
 	f, err := os.Open(path)
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	defer f.Close()
 	if _, err := f.Seek(off, io.SeekStart); err != nil {
-		return err
+		return 0, 0, err
 	}
 	r := bufio.NewReaderSize(f, 1<<20)
 	fallbackSession := sessionFromPath(path)
 
 	tx, err := in.st.Begin(ctx)
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	defer func() { tx.Rollback() }()
-	n := 0
 	for {
 		line, err := r.ReadBytes('\n')
 		if errors.Is(err, io.EOF) {
 			break // a partial last line is read on a later scan, once complete
 		}
 		if err != nil {
-			return err
+			return n, off - start, err
 		}
 		off += int64(len(line))
 		if err := in.ingestLine(ctx, tx, path, fallbackSession, bytes.TrimSpace(line)); err != nil {
-			return err
+			return n, off - start, err
 		}
 		n++
 		if n%batchSize == 0 {
 			if err := tx.SetOffset(ctx, path, off); err != nil {
-				return err
+				return n, off - start, err
 			}
 			if err := tx.Commit(); err != nil {
-				return err
+				return n, off - start, err
 			}
 			if tx, err = in.st.Begin(ctx); err != nil {
-				return err
+				return n, off - start, err
 			}
 		}
 	}
 	if err := tx.SetOffset(ctx, path, off); err != nil {
-		return err
+		return n, off - start, err
 	}
-	return tx.Commit()
+	return n, off - start, tx.Commit()
 }
 
 func (in *Ingester) noteUnknown(typ, path string) {

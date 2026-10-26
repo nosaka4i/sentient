@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nosaka4i/sentient/internal/dbtime"
+	"github.com/nosaka4i/sentient/internal/store"
 )
 
 // Alert statuses and severities, as stored.
@@ -180,14 +181,16 @@ func GetAlert(ctx context.Context, db *sql.DB, id int64) (*AlertDetail, error) {
 		return nil, fmt.Errorf("alert: %w", err)
 	}
 	if d.Alert.ActionID != 0 {
-		var rec sql.NullString
+		var stored any
 		err := db.QueryRowContext(ctx, `
-SELECT r.record FROM actions a JOIN raw_log_records r ON r.id = a.raw_record_id WHERE a.id = ?`, d.Alert.ActionID).Scan(&rec)
+SELECT r.record FROM actions a JOIN raw_log_records r ON r.id = a.raw_record_id WHERE a.id = ?`, d.Alert.ActionID).Scan(&stored)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("alert record: %w", err)
 		}
-		if rec.Valid {
-			d.RawRecord = Ellipsis(rec.String, maxRawRecord)
+		if rec, err := store.DecodeRecord(stored); err != nil {
+			return nil, fmt.Errorf("alert record: %w", err)
+		} else if rec != "" {
+			d.RawRecord = Ellipsis(rec, maxRawRecord)
 		}
 	}
 	return d, nil

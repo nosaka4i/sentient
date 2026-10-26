@@ -11,7 +11,7 @@ import (
 type Process struct {
 	ExecID       string // unique per exec, from the collector
 	Collector    string // tetragon | eslogger
-	PID         int64
+	PID          int64
 	ParentExecID string
 	Binary       string
 	Argv         string // JSON array

@@ -144,6 +144,9 @@ func Run(ctx context.Context, cfg Config) error {
 		return err
 	}
 	defer os.Remove(cfg.Socket)
+	if st.MigratedFrom < store.SchemaVersion() {
+		log.Info("database schema updated", "from", st.MigratedFrom, "to", store.SchemaVersion())
+	}
 	log.Info("sentientd started", "version", version.Version, "data_dir", cfg.DataDir,
 		"socket", cfg.Socket, "homes", cfg.Homes)
 	if cfg.Ready != nil {
