@@ -18,6 +18,7 @@ import (
 	"github.com/nosaka4i/sentient/internal/collector/tetragon"
 	"github.com/nosaka4i/sentient/internal/collector/tetragon/policy"
 	"github.com/nosaka4i/sentient/internal/ingest/claudecode"
+	"github.com/nosaka4i/sentient/internal/merge"
 	"github.com/nosaka4i/sentient/internal/store"
 	"github.com/nosaka4i/sentient/internal/version"
 )
@@ -26,7 +27,8 @@ import (
 // collector's sink starts dropping them (and recording a gap).
 const kernelQueue = 50000
 
-// attributeInterval is how often kernel processes are tied to log sessions.
+// attributeInterval is how often kernel processes are tied to log sessions and
+// the log's commands are merged with kernel execs.
 const attributeInterval = 5 * time.Second
 
 // Defaults for where sentientd keeps things (docs/design.md "Store", "Local
@@ -162,7 +164,7 @@ func Run(ctx context.Context, cfg Config) error {
 	srv.SetHealth(mon.report)
 
 	var wg sync.WaitGroup
-	errc := make(chan error, 5)
+	errc := make(chan error, 6)
 	wg.Add(3)
 	go func() { defer wg.Done(); errc <- ing.Run(ctx) }()
 	go func() { defer wg.Done(); errc <- api.Serve(ctx, lis, srv) }()
@@ -175,10 +177,12 @@ func Run(ctx context.Context, cfg Config) error {
 		// first import of a big transcript) slows the queue, not Tetragon.
 		sink := collector.NewBufferedSink(st, coll.Name(), kernelQueue)
 		att := &attribute.Attributor{St: st, Log: log, IsAgent: func(b string) bool { return policy.IsAgent(agents, b) }}
-		wg.Add(3)
+		mrg := &merge.Merger{St: st, Log: log}
+		wg.Add(4)
 		go func() { defer wg.Done(); errc <- sink.Run(ctx) }()
 		go func() { defer wg.Done(); errc <- coll.Run(ctx, sink) }()
 		go func() { defer wg.Done(); errc <- att.Run(ctx, attributeInterval) }()
+		go func() { defer wg.Done(); errc <- mrg.Run(ctx, attributeInterval) }()
 	}
 
 	var first error

@@ -363,3 +363,20 @@ func TestOrdinaryTailingIsNotLogged(t *testing.T) {
 		t.Errorf("a small scan was reported as an import:\n%s", buf.String())
 	}
 }
+
+func TestBashCallsKeepTheirWholeCommandAndResultTime(t *testing.T) {
+	st := openStore(t)
+	in := New(st, Config{Homes: []string{fixtureHome(t)}})
+	if err := in.ScanOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, st, `SELECT COUNT(*) FROM actions WHERE resource = 'command' AND part = 0 AND call_command IS NULL`); n != 0 {
+		t.Errorf("%d Bash calls lack their command", n)
+	}
+	if n := count(t, st, `SELECT COUNT(*) FROM actions WHERE resource = 'command' AND part > 0 AND call_command IS NOT NULL`); n != 0 {
+		t.Errorf("%d later parts carry the command", n)
+	}
+	if n := count(t, st, `SELECT COUNT(*) FROM actions WHERE resource = 'command' AND result_ts IS NOT NULL`); n == 0 {
+		t.Error("no command has its result time")
+	}
+}

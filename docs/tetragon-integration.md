@@ -96,11 +96,38 @@ and `AddGap`.
 3. A process belongs to the prompt in effect when it was exec'd, and its
    later events inherit that; other events belong to the prompt whose time
    window contains them.
-4. A `command execute` from the log and a kernel exec with the same argv in
-   the same session within about 2 seconds are one action:
-   `actions.evidence` becomes `both`. A kernel exec with no log match is added
-   as `kernel` only, and one the agent's tools can't explain is what the alert
-   rules look for.
+4. **Merging the log's commands with kernel execs** (`internal/merge`). The
+   log stamps a Bash call when the agent issues it; the command runs only after
+   any approval, which can take minutes or days. So there is no time window.
+   Claude Code runs each Bash call as `bash -c "source snapshot && eval '<the
+   whole command>' < /dev/null && pwd -P >| file"`, so the kernel's record of
+   that shell holds the same command text the log has.
+   - A Bash call matches the wrapper shell of the same session whose `eval`
+     text equals the call's command (quotes, backslashes and whitespace
+     ignored). Equal calls in one session pair in order, each shell once.
+   - The shell must have started after the call was logged and before the call
+     ended: the call's result was logged, or its prompt ended (an interrupted
+     call), whichever is first, with a few seconds' slack. A call with neither
+     is still waiting for approval or still running, and matches whenever its
+     shell appears.
+   - Each part of a chained command pairs, in order, with a direct child of
+     that shell of the same program and arguments. A match sets
+     `actions.evidence` to `both` and `exec_id`. Parts with no match stay `log`
+     (never run, denied, or the kernel was not watching).
+   - A direct child of a matched wrapper shell that matches no part, and a
+     direct child of the agent itself (the routine commands below), become
+     `kernel` command actions. So does a wrapper shell no call matched, as one
+     action showing the command it ran (its children are not listed
+     separately). Grandchildren (a compiler under `go test`) stay in the
+     process tree and are not actions. A kernel action the agent's tools can't
+     explain is what the alert rules look for.
+   - A kernel exec is turned into an action only once the session's log has
+     reached its start time, so a call that is logged late can still claim it.
+     Kernel actions are not counted in a prompt's action total; the views count
+     and group them.
+   - A call is settled, and no longer examined, when it ended before the
+     kernel was being watched, or when the kernel has been seen past its end.
+     Calls logged before this existed have no stored command and are not merged.
 
 **Routine commands of the agent itself** (backlog `00b522e`, to do). Claude
 Code runs commands on its own that are in no tool call: in one session 296

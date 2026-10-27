@@ -159,16 +159,20 @@ type Action struct {
 	RawRecordID int64
 	ToolUseID   string
 	Part        int // index within the tool call (Bash: one per simple command)
+	// CallCommand is the whole Bash command line, set on the first part only.
+	CallCommand string
+	// ExecID is the kernel exec behind a kernel-only action.
+	ExecID string
 }
 
 // AddAction inserts an action. An action whose (tool_use_id, part) already
 // exists is ignored (Claude Code may write the same tool call twice).
 func (t *Tx) AddAction(ctx context.Context, a Action) error {
 	res, err := t.tx.ExecContext(ctx, `
-INSERT INTO actions (session_id, prompt_id, ts, resource, action, path, summary, evidence, raw_record_id, tool_use_id, part)
-VALUES (NULLIF(?, 0), NULLIF(?, 0), ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, NULLIF(?, 0), NULLIF(?, ''), ?)
+INSERT INTO actions (session_id, prompt_id, ts, resource, action, path, summary, evidence, raw_record_id, tool_use_id, part, call_command)
+VALUES (NULLIF(?, 0), NULLIF(?, 0), ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, NULLIF(?, 0), NULLIF(?, ''), ?, NULLIF(?, ''))
 ON CONFLICT DO NOTHING`,
-		a.SessionID, a.PromptID, a.TS, a.Resource, a.Action, a.Path, a.Summary, a.Evidence, a.RawRecordID, a.ToolUseID, a.Part)
+		a.SessionID, a.PromptID, a.TS, a.Resource, a.Action, a.Path, a.Summary, a.Evidence, a.RawRecordID, a.ToolUseID, a.Part, a.CallCommand)
 	if err != nil {
 		return fmt.Errorf("add action: %w", err)
 	}
@@ -198,6 +202,7 @@ func IsSystemAction(resource, action string) bool {
 // ToolResult is what a tool call's result tells us about its action.
 type ToolResult struct {
 	ToolUseID    string
+	TS           string // when the result was logged
 	Failed       bool
 	Action       string // if set, replaces the action verb (e.g. Write: create vs update)
 	LinesAdded   int
@@ -215,9 +220,10 @@ UPDATE actions SET
 	                     THEN ? ELSE 0 END,
 	action        = COALESCE(NULLIF(?, ''), action),
 	lines_added   = ?,
-	lines_removed = ?
+	lines_removed = ?,
+	result_ts     = NULLIF(?, '')
 WHERE tool_use_id = ?`,
-		boolInt(r.Failed), r.Action, r.LinesAdded, r.LinesRemoved, r.ToolUseID)
+		boolInt(r.Failed), r.Action, r.LinesAdded, r.LinesRemoved, r.TS, r.ToolUseID)
 	if err != nil {
 		return false, fmt.Errorf("apply tool result: %w", err)
 	}

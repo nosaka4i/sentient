@@ -155,6 +155,13 @@ type toolInput struct {
 // mapTool maps a tool call to its actions: one per simple command for
 // Bash (see SplitCommands), otherwise one. Tools that don't act on the
 // system (task lists, questions, tool search…) map to nothing.
+// bashCommand is the whole command line of a Bash tool call.
+func bashCommand(raw json.RawMessage) string {
+	var in toolInput
+	_ = json.Unmarshal(raw, &in)
+	return in.Command
+}
+
 func mapTool(name string, raw json.RawMessage) []mappedAction {
 	var in toolInput
 	_ = json.Unmarshal(raw, &in) // missing/odd input still yields the action

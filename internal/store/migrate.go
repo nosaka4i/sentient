@@ -215,6 +215,21 @@ CREATE TRIGGER kernel_events_no_update BEFORE UPDATE ON kernel_events
 CREATE TRIGGER kernel_events_no_delete BEFORE DELETE ON kernel_events
 	BEGIN SELECT RAISE(ABORT, 'kernel_events is append-only'); END;
 `,
+	// 8: merging the log's commands with kernel execs (docs/tetragon-integration.md
+	// "Merging the log's commands with kernel execs"). call_command is the whole
+	// Bash command, kept on the first part of its tool call; result_ts is when the
+	// call's result was logged; call_links says which wrapper shell ran a call and
+	// whether the merge is done with it. At most one action per kernel exec.
+	`
+ALTER TABLE actions ADD COLUMN call_command TEXT;
+ALTER TABLE actions ADD COLUMN result_ts TEXT;
+CREATE TABLE call_links (
+	tool_use_id   TEXT PRIMARY KEY,
+	shell_exec_id TEXT,                                -- NULL until a shell is matched
+	settled       INTEGER NOT NULL DEFAULT 0           -- 1 = no later kernel event can change it
+);
+CREATE UNIQUE INDEX actions_exec ON actions(exec_id) WHERE exec_id IS NOT NULL;
+`,
 }
 
 // SchemaVersion is the version the code expects.

@@ -354,7 +354,7 @@ func (in *Ingester) ingestUser(ctx context.Context, tx *store.Tx, rec *record, s
 		}
 	}
 	for _, b := range results {
-		tr := store.ToolResult{ToolUseID: b.ToolUseID, Failed: b.IsError}
+		tr := store.ToolResult{ToolUseID: b.ToolUseID, TS: ts, Failed: b.IsError}
 		if len(results) == 1 { // toolUseResult describes the record's single result
 			tr.Action, tr.LinesAdded, tr.LinesRemoved = resultDetails(rec.ToolUseResult)
 		}
@@ -382,7 +382,12 @@ func (in *Ingester) ingestAssistant(ctx context.Context, tx *store.Tx, rec *reco
 			}
 		}
 		for part, m := range acts {
+			var call string
+			if part == 0 && b.Name == "Bash" {
+				call = bashCommand(b.Input)
+			}
 			if err := tx.AddAction(ctx, store.Action{
+				CallCommand: call,
 				SessionID:   sessionID,
 				PromptID:    promptID,
 				TS:          ts,
