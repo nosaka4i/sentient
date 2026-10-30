@@ -52,12 +52,14 @@ func (t *Tx) ExitProcess(ctx context.Context, execID, at string, code int) (bool
 }
 
 // AttributeProcess ties a process to an agent session and prompt. Zero for
-// either leaves it as it was.
+// either leaves it as it was. A process whose parent is attributed descends
+// from the parent's agent process; any other is an agent process itself.
 func (t *Tx) AttributeProcess(ctx context.Context, execID string, sessionID, promptID int64) error {
 	_, err := t.tx.ExecContext(ctx, `
-INSERT INTO process_attribution (exec_id, session_id, prompt_id) VALUES (?, ?, NULLIF(?, 0))
+INSERT INTO process_attribution (exec_id, session_id, prompt_id, root_exec_id) VALUES (?, ?, NULLIF(?, 0),
+  COALESCE((SELECT q.root_exec_id FROM processes p JOIN process_attribution q ON q.exec_id = p.parent_exec_id WHERE p.exec_id = ?), ?))
 ON CONFLICT (exec_id) DO UPDATE SET session_id = COALESCE(NULLIF(?, 0), session_id), prompt_id = COALESCE(NULLIF(?, 0), prompt_id)`,
-		execID, sessionID, promptID, sessionID, promptID)
+		execID, sessionID, promptID, execID, execID, sessionID, promptID)
 	if err != nil {
 		return fmt.Errorf("attribute process: %w", err)
 	}

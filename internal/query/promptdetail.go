@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -31,6 +32,30 @@ type PromptDetail struct {
 	// RepoRoot is the session's repo (empty if it has none), so views can
 	// show repo-relative paths.
 	RepoRoot string
+	Counts   EvidenceCounts
+}
+
+// EvidenceCounts says how the two logs relate for one prompt. Shell builtins
+// are left out of every number: the kernel can't see them.
+type EvidenceCounts struct {
+	// Watched: the kernel was recording while the prompt ran. Without it only
+	// AgentLog means anything.
+	//
+	// The numbers are meant to add up, and tests check that they do:
+	//   AgentLog  = Confirmed + Unverified + NotChecked + Pending
+	//   KernelLog = Confirmed + Unreported
+	Watched    bool
+	AgentLog   int64 // actions the agent logged (shell builtins left out)
+	KernelLog  int64 // what the kernel saw that is not background: confirmed + unreported
+	Confirmed  int64 // logged and seen by the kernel
+	Unverified int64 // logged commands the kernel did not see
+	NotChecked int64 // logged actions that are not commands (file tools, web): the kernel cannot be matched to them yet
+	Pending    int64 // logged commands of a prompt still running, not matched yet
+	Unreported int64 // seen by the kernel, in nobody's log, not a known background command
+	// Background is how many background commands the agent ran while the
+	// prompt did; they are not part of the prompt (see AgentID).
+	Background int64
+	AgentID    string // the agent process that ran them ("" when none did)
 }
 
 // DiffLine is one line of a file diff. Kind is "h" (hunk or note), "a"
@@ -64,23 +89,43 @@ type Step struct {
 	CallID, CallCommand string
 	Builtin             bool  // a shell builtin: it never execs, so only the log saw it
 	ActionID            int64 // the action row behind this step (0 for the prompt itself); alerts point at it
+	Alert               bool  // an alert is about this step
+	Unreported          bool  // the kernel saw it, the agent's log does not have it
+	Unverified          bool  // the agent logged it, the kernel did not see it
 }
 
 // maxDiffLines caps a file's diff; the rest is summarized.
 const maxDiffLines = 200
 
-// builtins are shell builtins that never exec (so the kernel never sees
-// them). Commands that exist both ways (echo, printf, test, kill) are left
-// out: the kernel may well see those.
+// builtins are the bash builtins: the shell runs them itself, so there is no
+// process and the kernel never sees them. That includes the ones that also
+// exist as programs (echo, printf, test, kill, pwd, true, false): typed as a bare
+// word, bash runs its own copy. Only an explicit path (/bin/echo) or `env` runs
+// the program, and then the first word is not the bare name. `exec` is not
+// here: it replaces the shell with a program, which the kernel does see.
 var builtins = map[string]bool{
 	"cd": true, "export": true, "source": true, ".": true, "alias": true, "unalias": true,
-	"unset": true, "set": true, "pushd": true, "popd": true, "ulimit": true, "umask": true,
+	"unset": true, "set": true, "pushd": true, "popd": true, "dirs": true, "ulimit": true, "umask": true,
 	"exit": true, "return": true, "shift": true, "eval": true, "trap": true, "wait": true,
-	"local": true, "declare": true, "readonly": true, "type": true, "hash": true,
+	"local": true, "declare": true, "typeset": true, "readonly": true, "type": true, "hash": true,
+	"echo": true, "printf": true, "test": true, "[": true, "[[": true, "pwd": true, "true": true,
+	"false": true, ":": true, "kill": true, "read": true, "builtin": true,
+	"let": true, "getopts": true, "break": true, "continue": true, "jobs": true, "bg": true,
+	"fg": true, "disown": true, "history": true, "fc": true, "times": true, "enable": true,
+	"help": true, "bind": true, "shopt": true, "compgen": true, "complete": true, "mapfile": true,
+	"readarray": true, "caller": true, "suspend": true, "logout": true,
 }
 
+var assignmentRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)
+
+// isBuiltin says whether the command a part runs is a shell builtin. Leading
+// VAR=value assignments belong to the command, so `A=1 echo x` is still echo.
+// (`command ls` runs a program, so `command` is not a builtin here.)
 func isBuiltin(command string) bool {
 	f := strings.Fields(command)
+	for len(f) > 0 && assignmentRE.MatchString(f[0]) {
+		f = f[1:]
+	}
 	return len(f) > 0 && builtins[f[0]]
 }
 
@@ -123,8 +168,16 @@ FROM prompts p JOIN sessions s ON s.id = p.session_id WHERE p.id = ?`, id).
 	if d.Activity, err = promptActivity(ctx, db, p, repoRoot != ""); err != nil {
 		return nil, err
 	}
-	if d.Steps, d.Files, err = promptSteps(ctx, db, p, repoRoot); err != nil {
+	if d.Counts.Watched, err = kernelWatched(ctx, db, p, now); err != nil {
 		return nil, err
+	}
+	if d.Steps, d.Files, d.Counts, err = promptSteps(ctx, db, p, repoRoot, d.Counts); err != nil {
+		return nil, err
+	}
+	if d.Counts.Watched {
+		if d.Counts.Background, d.Counts.AgentID, err = backgroundDuring(ctx, db, session, p, now); err != nil {
+			return nil, err
+		}
 	}
 	if d.Reply, d.ReplyAt, err = promptReply(ctx, db, session, seq, start); err != nil {
 		return nil, err
@@ -154,20 +207,86 @@ func promptActivity(ctx context.Context, db *sql.DB, p *PromptRow, hasRepo bool)
 	return out, nil
 }
 
-// promptSteps builds the trace and the files-changed list from the
-// prompt's actions.
-func promptSteps(ctx context.Context, db *sql.DB, p *PromptRow, repoRoot string) ([]Step, []FileChange, error) {
+// machineAction says whether a logged action is something done on this
+// machine, so the kernel can in principle have seen it. A web search runs
+// server-side and a subagent start is the agent's own bookkeeping.
+func machineAction(resource, action string) bool {
+	switch resource {
+	case "command", "file", "dir", "process", "network", "git", "launch item":
+		return true
+	case "web":
+		return action == "fetch"
+	}
+	return false
+}
+
+// kernelMatchable says whether the merge can pair a logged action with kernel
+// events: commands by their exec, file reads and writes by the agent process's
+// file events. The rest (a web fetch's connection, a file delete, ...) cannot
+// be compared yet.
+func kernelMatchable(resource, action string) bool {
+	switch resource {
+	case "command":
+		return true
+	case "file":
+		return action == "read" || action == "update" || action == "create"
+	}
+	return false
+}
+
+// promptEnd is when the prompt's activity stopped, or now while it runs.
+func promptEnd(p *PromptRow, now time.Time) time.Time {
+	if p.Running {
+		return now
+	}
+	return p.Started.Add(p.Duration)
+}
+
+// kernelWatched says whether the kernel recorded anything while the prompt ran.
+func kernelWatched(ctx context.Context, db *sql.DB, p *PromptRow, now time.Time) (bool, error) {
+	var seen int
+	err := db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM kernel_events WHERE ts >= ? AND ts <= ?)`,
+		dbtime.Format(p.Started), dbtime.Format(promptEnd(p, now))).Scan(&seen)
+	if err != nil {
+		return false, fmt.Errorf("kernel watched: %w", err)
+	}
+	return seen != 0, nil
+}
+
+// backgroundDuring counts the background commands the session's agent ran
+// while the prompt did, and names the agent process that ran most of them.
+func backgroundDuring(ctx context.Context, db *sql.DB, session int64, p *PromptRow, now time.Time) (int64, string, error) {
+	var n int64
+	var agent sql.NullString
+	err := db.QueryRowContext(ctx, `
+SELECT COUNT(*), (SELECT a2.root_exec_id FROM process_attribution a2 JOIN processes p2 ON p2.exec_id = a2.exec_id
+                  WHERE a2.session_id = ? AND COALESCE(a2.background, '') <> '' AND p2.started_at >= ? AND p2.started_at <= ?
+                  GROUP BY a2.root_exec_id ORDER BY COUNT(*) DESC LIMIT 1)
+FROM process_attribution a JOIN processes p ON p.exec_id = a.exec_id
+WHERE a.session_id = ? AND COALESCE(a.background, '') <> '' AND p.started_at >= ? AND p.started_at <= ?`,
+		session, dbtime.Format(p.Started), dbtime.Format(promptEnd(p, now)),
+		session, dbtime.Format(p.Started), dbtime.Format(promptEnd(p, now))).Scan(&n, &agent)
+	if err != nil {
+		return 0, "", fmt.Errorf("background commands: %w", err)
+	}
+	return n, agent.String, nil
+}
+
+// promptSteps builds the trace, the files-changed list and the evidence
+// counts from the prompt's actions.
+func promptSteps(ctx context.Context, db *sql.DB, p *PromptRow, repoRoot string, counts EvidenceCounts) ([]Step, []FileChange, EvidenceCounts, error) {
 	r, err := db.QueryContext(ctx, `
 SELECT a.ts, a.resource, a.action, COALESCE(a.path, ''), a.failed, a.evidence, COALESCE(a.tool_use_id, ''), a.part,
-       COALESCE(a.raw_record_id, 0), a.lines_added, a.lines_removed, a.id
+       COALESCE(a.raw_record_id, 0), a.lines_added, a.lines_removed, a.id,
+       EXISTS(SELECT 1 FROM alerts al WHERE al.action_id = a.id)
 FROM actions a WHERE a.prompt_id = ? ORDER BY a.ts, a.id`, p.ID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("steps: %w", err)
+		return nil, nil, counts, fmt.Errorf("steps: %w", err)
 	}
 	type act struct {
 		ts                     time.Time
 		resource, action, path string
-		failed                 bool
+		failed, alert          bool
 		evidence, toolUse      string
 		part                   int
 		rawID, added, removed  int64
@@ -178,16 +297,16 @@ FROM actions a WHERE a.prompt_id = ? ORDER BY a.ts, a.id`, p.ID)
 	for r.Next() {
 		var a act
 		var ts string
-		var failed int
-		if err := r.Scan(&ts, &a.resource, &a.action, &a.path, &failed, &a.evidence, &a.toolUse, &a.part, &a.rawID, &a.added, &a.removed, &a.id); err != nil {
+		var failed, alert int
+		if err := r.Scan(&ts, &a.resource, &a.action, &a.path, &failed, &a.evidence, &a.toolUse, &a.part, &a.rawID, &a.added, &a.removed, &a.id, &alert); err != nil {
 			r.Close()
-			return nil, nil, err
+			return nil, nil, counts, err
 		}
 		if a.ts, err = dbtime.Parse(ts); err != nil {
 			r.Close()
-			return nil, nil, err
+			return nil, nil, counts, err
 		}
-		a.failed = failed != 0
+		a.failed, a.alert = failed != 0, alert != 0
 		if a.toolUse != "" {
 			parts[a.toolUse]++
 		}
@@ -195,22 +314,26 @@ FROM actions a WHERE a.prompt_id = ? ORDER BY a.ts, a.id`, p.ID)
 	}
 	r.Close()
 	if err := r.Err(); err != nil {
-		return nil, nil, err
+		return nil, nil, counts, err
 	}
 
 	_, line := PromptLine(p.Text)
 	steps := []Step{{N: 1, Resource: "prompt", Action: "request", Path: Ellipsis(line, 120), Evidence: "log"}}
+	next := int64(2) // the number of the next numbered step
 	files := map[string]*FileChange{}
 	var fileOrder []string
 	seenCall := map[string]bool{}
 	for _, a := range acts {
+		offset := a.ts.Sub(p.Started)
+		if offset < 0 {
+			offset = 0
+		}
 		s := Step{
-			N: int64(len(steps) + 1), Offset: a.ts.Sub(p.Started),
+			N: next, Offset: offset,
 			Resource: a.resource, Action: a.action, Path: a.path, Failed: a.failed, Evidence: a.evidence, ActionID: a.id,
+			Alert: a.alert,
 		}
-		if s.Offset < 0 {
-			s.Offset = 0
-		}
+		next++
 		if a.resource == "command" && a.toolUse != "" && parts[a.toolUse] > 1 {
 			s.CallID = a.toolUse
 			if !seenCall[a.toolUse] {
@@ -220,6 +343,32 @@ FROM actions a WHERE a.prompt_id = ? ORDER BY a.ts, a.id`, p.ID)
 		}
 		if a.resource == "command" {
 			s.Builtin = isBuiltin(a.path)
+		}
+		switch a.evidence {
+		case "kernel":
+			s.Unreported = true
+			counts.Unreported++
+			counts.KernelLog++
+		case "both":
+			counts.AgentLog++
+			counts.KernelLog++
+			counts.Confirmed++
+		default: // log
+			// builtins have no process, and a web search or a subagent start is not
+			// something done on this machine: neither can be in the kernel's record
+			if !s.Builtin && machineAction(a.resource, a.action) {
+				counts.AgentLog++
+				switch {
+				case !kernelMatchable(a.resource, a.action), !counts.Watched:
+					// no way to compare it with the kernel (yet), or nothing was recording
+					counts.NotChecked++
+				case p.Running:
+					counts.Pending++ // may yet be matched
+				default:
+					s.Unverified = true
+					counts.Unverified++
+				}
+			}
 		}
 		steps = append(steps, s)
 
@@ -250,7 +399,7 @@ FROM actions a WHERE a.prompt_id = ? ORDER BY a.ts, a.id`, p.ID)
 		f.Diff = capDiff(f.Diff)
 		out = append(out, *f)
 	}
-	return steps, out, nil
+	return steps, out, counts, nil
 }
 
 // rawBlock is a content block of a stored agent record.

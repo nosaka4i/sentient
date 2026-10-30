@@ -17,9 +17,11 @@ func TestNoDeadInternalLinks(t *testing.T) {
 	src := &fakeSource{
 		st: fullStatus(), window: sampleWindow(), list: sampleSessionList(), activity: sampleActivity(),
 		health: healthReport(), detail: sampleDetail(), session: sampleSession(), alerts: sampleAlerts(), alert: ad,
+		agents: sampleAgents(), agent: sampleAgentDetail(), timeline: sampleTimeline(),
 	}
 	s := newTestServer(t, src)
 	pages := []string{"/", "/sessions", "/prompts", "/activity", "/health", "/prompt/7", "/session/404dabcd", "/alerts", "/alert/9",
+		"/agents", "/agent/root%2Fa", "/agent/root%2Fa?view=timeline&q=git",
 		"/alerts?status=all&sev=high",
 		"/activity?resource=file&action=update&days=7", "/sessions?days=0&sort=sess:asc", "/prompts?session=404dabcd"}
 	checked := map[string]bool{}

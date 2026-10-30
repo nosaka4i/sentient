@@ -70,11 +70,13 @@ func TestSessionPage(t *testing.T) {
 		`<span class="tag">Explore</span>`,
 		`<span>prompt 1</span>`,
 		`(no description)`,
-		`<meta http-equiv="refresh"`, // running
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page missing %q", want)
 		}
+	}
+	if strings.Contains(body, `<meta http-equiv="refresh"`) {
+		t.Error("a running session must not reload itself: it would fold away what the reader opened")
 	}
 	if t.Failed() {
 		t.Log(body)

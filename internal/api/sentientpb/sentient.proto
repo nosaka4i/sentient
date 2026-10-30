@@ -17,6 +17,14 @@ service Sentient {
   rpc Health(HealthRequest) returns (HealthResponse);
   // PromptDetail returns everything about one prompt (web /prompt/<id>).
   rpc PromptDetail(PromptDetailRequest) returns (PromptDetailResponse);
+  // ListAgents returns the agent processes sentient attributed (web /agents).
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse);
+  // AgentDetail returns one agent process and its background commands per
+  // command (web /agent/<id>).
+  rpc AgentDetail(AgentDetailRequest) returns (AgentDetailResponse);
+  // AgentTimeline returns an agent's background commands in time order,
+  // filtered by text and time window.
+  rpc AgentTimeline(AgentTimelineRequest) returns (AgentTimelineResponse);
   // PromptWindow returns the prompts of a time window, or of one session,
   // with their sessions (web /prompts, filtered in the browser).
   rpc PromptWindow(PromptWindowRequest) returns (PromptWindowResponse);
@@ -247,6 +255,84 @@ message Step {
   string call_command = 9;
   bool builtin = 10; // a shell builtin (never execs): evidence is log only
   int64 action_id = 11; // the action row behind this step (0 for the prompt itself)
+  bool alert = 12; // an alert is about this step
+  bool unreported = 13; // the kernel saw it, the agent's log does not have it
+  bool unverified = 14; // the agent logged it, the kernel did not see it
+}
+
+// EvidenceCounts says how the agent's log and the kernel's relate for a
+// prompt; shell builtins are left out of every number.
+message EvidenceCounts {
+  bool watched = 1; // the kernel was recording while the prompt ran
+  int64 agent_log = 2;
+  int64 kernel_log = 3; // confirmed + unreported
+  int64 unverified = 4;
+  int64 unreported = 5;
+  // Background commands the agent ran while the prompt did (not part of it),
+  // and the agent process that ran them.
+  int64 background = 6;
+  string agent_id = 7;
+  // agent_log = confirmed + unverified + not_checked + pending
+  // kernel_log = confirmed + unreported
+  int64 confirmed = 8;
+  int64 not_checked = 9; // logged actions that are not commands: not matched to the kernel yet
+  int64 pending = 10; // logged commands of a prompt still running
+}
+
+message AgentRow {
+  string id = 1; // the agent process's exec id
+  string agent = 2;
+  string repo = 3;
+  string version = 4;
+  google.protobuf.Timestamp started = 5;
+  google.protobuf.Timestamp stopped = 6; // unset while it runs
+  bool running = 7;
+  int64 background = 8; // background commands it ran
+}
+
+message ListAgentsRequest {}
+
+message ListAgentsResponse {
+  repeated AgentRow agents = 1;
+}
+
+message AgentDetailRequest {
+  string id = 1;
+}
+
+message BackgroundRun {
+  google.protobuf.Timestamp at = 1;
+  string command = 2;
+  string key = 3; // the group it belongs to
+}
+
+message BackgroundGroup {
+  string key = 1;
+  int64 count = 2;
+  google.protobuf.Timestamp first = 3;
+  google.protobuf.Timestamp last = 4;
+  repeated BackgroundRun latest = 5; // newest first
+}
+
+message AgentDetailResponse {
+  AgentRow agent = 1;
+  string dir = 2;
+  repeated string sessions = 3; // the agent's own session ids
+  repeated BackgroundGroup groups = 4;
+}
+
+message AgentTimelineRequest {
+  string id = 1;
+  string text = 2;
+  google.protobuf.Timestamp from = 3; // unset = unbounded
+  google.protobuf.Timestamp to = 4;
+  int32 offset = 5;
+  int32 limit = 6; // 0 = the server's default page
+}
+
+message AgentTimelineResponse {
+  repeated BackgroundRun runs = 1;
+  int64 total = 2; // runs matching the filter
 }
 
 message PromptDetailResponse {
@@ -258,6 +344,7 @@ message PromptDetailResponse {
   string reply = 6; // the agent's final message for the prompt
   google.protobuf.Timestamp reply_at = 7;
   string repo_root = 8; // empty if the session has no repo
+  EvidenceCounts counts = 9;
 }
 
 message HealthRequest {}

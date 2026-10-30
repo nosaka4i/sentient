@@ -164,7 +164,7 @@ func actionRows(ctx context.Context, db *sql.DB, where string, args []any, rows 
 	r, err := db.QueryContext(ctx, `
 SELECT a.resource, a.action, COALESCE(a.path, ''), a.failed, a.lines_added, a.lines_removed, COALESCE(s.repo_root, '')
 FROM actions a LEFT JOIN sessions s ON s.id = a.session_id
-WHERE `+where, args...)
+WHERE a.evidence <> 'kernel' AND (`+where+`)`, args...)
 	if err != nil {
 		return fmt.Errorf("actions: %w", err)
 	}

@@ -16,81 +16,9 @@
       {{- end}}
       <span>session <a class="sess" href="{{.Head.SessionHref}}" title="All prompts in this session">{{.Head.SessionShort}}</a></span>
       <span>{{.Head.Duration}}</span>
-      <span>{{.Head.Actions}} actions</span>
       <span>{{if .Head.Running}}<span class="state-running"><span class="running-dot" aria-hidden="true"></span>running</span>{{else}}<span class="state-done"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L19 7"/></svg>done</span>{{end}}</span>
     </p>
   </div>
-
-  <!-- WHAT HAPPENED -->
-  <section class="card" aria-labelledby="h-what">
-    <div class="card-head">
-      <h2 id="h-what">What happened</h2>
-      <span class="hint">{{.Actions}} actions in this prompt</span>
-    </div>
-    <div class="tiles">
-{{- template "tiles" .Tiles}}
-    </div>
-  </section>
-
-{{- if .Files}}
-
-  <!-- FILES CHANGED -->
-  <section class="card" id="files" aria-labelledby="h-files">
-    <div class="card-head">
-      <h2 id="h-files">Files changed <span class="count">({{len .Files}})</span></h2>
-      <span class="hint mono"><span class="add">+{{.FilesAdded}}</span> <span class="del">&minus;{{.FilesRemoved}}</span></span>
-    </div>
-    <ul class="files">
-{{- range .Files}}
-      <li>
-        <details{{if .Open}} open{{end}}>
-          <summary>
-            <svg class="tw" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
-            <span class="fpath">{{.Path}}{{if .Outside}} <span class="tag outside">outside repo</span>{{end}}</span>
-            <span class="stat"><span class="add">+{{.Added}}</span> <span class="del">&minus;{{.Removed}}</span></span>
-          </summary>
-          <div class="commit">{{.StepsLabel}} · <span class="ra"><span class="r">file</span><span class="sep">/</span>{{.Verb}}</span>{{if .By}} by {{.By}}{{end}} · {{.Clock}}</div>
-<pre class="diff">{{range .Diff}}<span class="{{.Class}}">{{.Prefix}}{{.Text}}</span>{{end}}</pre>
-        </details>
-      </li>
-{{- end}}
-    </ul>
-  </section>
-{{- end}}
-
-  <!-- TRACE -->
-  <section class="card collapsed" id="trace" aria-labelledby="h-trace">
-    <div class="card-head">
-      <h2 id="h-trace">Trace <span class="count">({{.StepCount}})</span></h2>
-      <button class="chip" id="trace-toggle" type="button" aria-expanded="false" aria-controls="trace-body" data-show="Show all {{.StepCount}} steps" data-hide="Hide steps">
-        <span class="lbl-txt">Show all {{.StepCount}} steps</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-    </div>
-    <div class="trace-body" id="trace-body" hidden>
-      <ol class="steps">
-{{- range .Steps}}
-{{- if .Call}}
-        <li>
-          <div class="step call">
-            <span class="n"></span><span class="t">{{.T}}</span>
-            <span class="k">Bash</span>
-            <span class="p">{{.Path}} <span class="note">· {{.CallNote}}</span></span>
-            <span class="d"></span><span class="ev"><span class="tag">{{.Ev}}</span></span>
-          </div>
-          <ol>
-{{- range .Children}}{{template "step" .}}{{end}}
-          </ol>
-        </li>
-{{- else}}{{template "step" .}}
-{{- end}}
-{{- end}}
-      </ol>
-{{- if .TraceMore}}
-      <div class="gap">&hellip; {{.TraceMore}} more steps not shown</div>
-{{- end}}
-    </div>
-  </section>
 
 {{- if .Reply}}
 
@@ -114,4 +42,100 @@
     </div>
   </section>
 {{- end}}
+
+  <!-- WHAT HAPPENED -->
+  <section class="card" aria-labelledby="h-what">
+    <div class="card-head">
+      <h2 id="h-what">What happened</h2>
+    </div>
+    <div class="tiles compact">
+      <a class="tile" href="#trace">
+        <span class="lbl"><b>agent log</b></span>
+        <span class="num">{{.Evidence.AgentLog}}</span>
+        <span class="sum">
+          {{- if and .Evidence.Watched .Evidence.Unverified}}<span class="tag unver" title="logged by the agent, but the kernel has no record of it">{{.Evidence.Unverified}} unverified</span> {{end}}
+          {{- if and .Evidence.Watched .Evidence.NotChecked}}<span class="tag" title="logged actions the kernel record cannot be compared with yet, such as web fetches">{{.Evidence.NotChecked}} not checked</span> {{end}}
+          {{- if .Evidence.Pending}}<span class="tag" title="commands of a prompt that is still running, not matched yet">{{.Evidence.Pending}} pending</span>{{end}}
+          {{- if not (or .Evidence.Unverified .Evidence.NotChecked .Evidence.Pending)}}&nbsp;{{end}}</span>
+      </a>
+{{- if .Evidence.Watched}}
+      <a class="tile" href="#trace">
+        <span class="lbl"><b>kernel log</b></span>
+        <span class="num">{{.Evidence.KernelLog}}</span>
+        <span class="sum" title="seen by the kernel, not in the agent's log">{{if .Evidence.Unreported}}<span class="tag unrep">{{.Evidence.Unreported}} unreported</span>{{else}}&nbsp;{{end}}</span>
+      </a>
+{{- end}}
+{{- template "tiles" .Tiles}}
+    </div>
+{{- if .Evidence.BackgroundHref}}
+    <p class="bglink"><a href="{{.Evidence.BackgroundHref}}">{{.Evidence.Background}} background commands</a> ran while the agent worked on this prompt &rarr;</p>
+{{- end}}
+  </section>
+
+{{- if .Files}}
+
+  <!-- FILES CHANGED -->
+  <section class="card collapsed" id="files" aria-labelledby="h-files">
+    <div class="card-head">
+      <h2 id="h-files">Files changed <span class="count">({{len .Files}})</span></h2>
+      <span class="hint mono"><span class="add">+{{.FilesAdded}}</span> <span class="del">&minus;{{.FilesRemoved}}</span></span>
+      <button class="chip" id="files-toggle" type="button" aria-expanded="false" aria-controls="files-body" data-show="Show {{len .Files}} file{{if ne (len .Files) 1}}s{{end}}" data-hide="Hide files">
+        <span class="lbl-txt">Show {{len .Files}} file{{if ne (len .Files) 1}}s{{end}}</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+    <div class="trace-body" id="files-body" hidden>
+    <ul class="files">
+{{- range .Files}}
+      <li>
+        <details{{if .Open}} open{{end}}>
+          <summary>
+            <svg class="tw" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+            <span class="fpath">{{.Path}}{{if .Outside}} <span class="tag outside">outside repo</span>{{end}}</span>
+            <span class="stat"><span class="add">+{{.Added}}</span> <span class="del">&minus;{{.Removed}}</span></span>
+          </summary>
+          <div class="commit">{{.StepsLabel}} · <span class="ra"><span class="r">file</span><span class="sep">/</span>{{.Verb}}</span>{{if .By}} by {{.By}}{{end}} · {{.Clock}}</div>
+<pre class="diff">{{range .Diff}}<span class="{{.Class}}">{{.Prefix}}{{.Text}}</span>{{end}}</pre>
+        </details>
+      </li>
+{{- end}}
+    </ul>
+    </div>
+  </section>
+{{- end}}
+
+  <!-- TRACE -->
+  <section class="card collapsed" id="trace" aria-labelledby="h-trace">
+    <div class="card-head">
+      <h2 id="h-trace">Trace <span class="count">({{.StepCount}})</span></h2>
+      <button class="chip" id="trace-toggle" type="button" aria-expanded="false" aria-controls="trace-body" data-show="Show all {{.StepCount}} steps" data-hide="Hide steps">
+        <span class="lbl-txt">Show all {{.StepCount}} steps</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+    <div class="trace-body" id="trace-body" hidden>
+      <ol class="steps">
+{{- range .Steps}}
+{{- if .Group}}{{template "group" .}}
+{{- else if .Call}}
+        <li>
+          <div class="step call">
+            <span class="n"></span><span class="t">{{.T}}</span>
+            <span class="k">Bash</span>
+            <span class="p">{{.Path}} <span class="note">· {{.CallNote}}</span></span>
+            <span class="d"></span>
+          </div>
+          <ol>
+{{- range .Children}}{{template "step" .}}{{end}}
+          </ol>
+        </li>
+{{- else}}{{template "step" .}}
+{{- end}}
+{{- end}}
+      </ol>
+{{- if .TraceMore}}
+      <div class="gap">&hellip; {{.TraceMore}} more steps not shown</div>
+{{- end}}
+    </div>
+  </section>
 {{end}}

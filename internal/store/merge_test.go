@@ -42,7 +42,7 @@ func TestMergeQueries(t *testing.T) {
 	tx, _ := st.Begin(ctx)
 	defer tx.Rollback()
 
-	calls, err := tx.OpenCalls(ctx)
+	calls, err := tx.OpenCalls(ctx, 1)
 	if err != nil || len(calls) != 1 || calls[0].ToolUseID != "t1" || calls[0].SessionID != sid || len(calls[0].Parts) != 1 || calls[0].Parts[0].Text != "ls" {
 		t.Fatalf("OpenCalls = %+v, %v", calls, err)
 	}
@@ -75,7 +75,7 @@ func TestMergeQueries(t *testing.T) {
 	if shells, _ := tx.FreeShells(ctx); len(shells) != 0 {
 		t.Errorf("a linked shell is still free: %+v", shells)
 	}
-	if calls, _ := tx.OpenCalls(ctx); len(calls) != 1 || calls[0].Shell != "sh" {
+	if calls, _ := tx.OpenCalls(ctx, 1); len(calls) != 1 || calls[0].Shell != "sh" {
 		t.Errorf("open linked call = %+v", calls)
 	}
 	un, err := tx.Unexplained(ctx)
@@ -94,13 +94,13 @@ func TestMergeQueries(t *testing.T) {
 		t.Errorf("a child that has an action is still offered: %+v", kids)
 	}
 
-	if err := tx.SettleCall(ctx, "t1"); err != nil {
+	if err := tx.SettleCall(ctx, "t1", 1); err != nil {
 		t.Fatal(err)
 	}
-	if calls, _ := tx.OpenCalls(ctx); len(calls) != 0 {
+	if calls, _ := tx.OpenCalls(ctx, 1); len(calls) != 0 {
 		t.Errorf("a settled call is still open: %+v", calls)
 	}
-	if err := tx.SettleCall(ctx, "other"); err != nil { // a call never linked
+	if err := tx.SettleCall(ctx, "other", 1); err != nil { // a call never linked
 		t.Fatal(err)
 	}
 }
@@ -139,7 +139,7 @@ func TestMergeQueriesReportStoreErrors(t *testing.T) {
 	ctx := context.Background()
 	tx, _ := st.Begin(ctx)
 	tx.tx.ExecContext(ctx, `DROP TABLE call_links`)
-	if _, err := tx.OpenCalls(ctx); err == nil {
+	if _, err := tx.OpenCalls(ctx, 1); err == nil {
 		t.Error("OpenCalls")
 	}
 	if _, err := tx.FreeShells(ctx); err == nil {
@@ -148,7 +148,7 @@ func TestMergeQueriesReportStoreErrors(t *testing.T) {
 	if err := tx.LinkCall(ctx, "t", "s"); err == nil {
 		t.Error("LinkCall")
 	}
-	if err := tx.SettleCall(ctx, "t"); err == nil {
+	if err := tx.SettleCall(ctx, "t", 1); err == nil {
 		t.Error("SettleCall")
 	}
 	if _, err := tx.Unexplained(ctx); err == nil {

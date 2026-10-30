@@ -1,0 +1,31 @@
+{{define "content"}}
+  <a class="back" href="/">&larr; Dashboard</a>
+
+  <div class="page-title">
+    <h1>Agents</h1>
+    <p class="sub">Background commands run by the agent.</p>
+  </div>
+
+  <section class="card" aria-labelledby="h-agents">
+    <div class="card-head">
+      <h2 id="h-agents">Agent processes <span class="count">({{len .Rows}})</span></h2>
+    </div>
+{{- if .Rows}}
+    <div class="ahead"><span></span><span>Agent · repo</span><span>Started</span><span>Stopped</span><span class="r">Background commands</span><span></span></div>
+    <ul class="alist">
+{{- range .Rows}}
+      <li><a class="arow" href="{{.Href}}">
+        <span>{{if .Running}}<span class="okdot" title="running"></span>{{end}}</span>
+        <span><b>{{.Agent}}</b>{{if .Repo}} · <span class="where">{{.Repo}}</span>{{end}}</span>
+        <span>{{.Started}}</span>
+        <span>{{if .Running}}<span class="state-ok">running</span>{{else}}{{.Stopped}}{{end}}</span>
+        <span class="r">{{.Background}}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      </a></li>
+{{- end}}
+    </ul>
+{{- else}}
+    <p class="nodata">No agent process has been seen yet. Agents show up here once kernel capture is on and an agent runs.</p>
+{{- end}}
+  </section>
+{{end}}

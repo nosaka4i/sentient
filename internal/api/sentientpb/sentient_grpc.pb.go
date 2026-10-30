@@ -26,6 +26,9 @@ const (
 	Sentient_Status_FullMethodName        = "/sentient.v1.Sentient/Status"
 	Sentient_Health_FullMethodName        = "/sentient.v1.Sentient/Health"
 	Sentient_PromptDetail_FullMethodName  = "/sentient.v1.Sentient/PromptDetail"
+	Sentient_ListAgents_FullMethodName    = "/sentient.v1.Sentient/ListAgents"
+	Sentient_AgentDetail_FullMethodName   = "/sentient.v1.Sentient/AgentDetail"
+	Sentient_AgentTimeline_FullMethodName = "/sentient.v1.Sentient/AgentTimeline"
 	Sentient_PromptWindow_FullMethodName  = "/sentient.v1.Sentient/PromptWindow"
 	Sentient_SessionDetail_FullMethodName = "/sentient.v1.Sentient/SessionDetail"
 	Sentient_SessionList_FullMethodName   = "/sentient.v1.Sentient/SessionList"
@@ -45,6 +48,14 @@ type SentientClient interface {
 	Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error)
 	// PromptDetail returns everything about one prompt (web /prompt/<id>).
 	PromptDetail(ctx context.Context, in *PromptDetailRequest, opts ...grpc.CallOption) (*PromptDetailResponse, error)
+	// ListAgents returns the agent processes sentient attributed (web /agents).
+	ListAgents(ctx context.Context, in *ListAgentsRequest, opts ...grpc.CallOption) (*ListAgentsResponse, error)
+	// AgentDetail returns one agent process and its background commands per
+	// command (web /agent/<id>).
+	AgentDetail(ctx context.Context, in *AgentDetailRequest, opts ...grpc.CallOption) (*AgentDetailResponse, error)
+	// AgentTimeline returns an agent's background commands in time order,
+	// filtered by text and time window.
+	AgentTimeline(ctx context.Context, in *AgentTimelineRequest, opts ...grpc.CallOption) (*AgentTimelineResponse, error)
 	// PromptWindow returns the prompts of a time window, or of one session,
 	// with their sessions (web /prompts, filtered in the browser).
 	PromptWindow(ctx context.Context, in *PromptWindowRequest, opts ...grpc.CallOption) (*PromptWindowResponse, error)
@@ -96,6 +107,36 @@ func (c *sentientClient) PromptDetail(ctx context.Context, in *PromptDetailReque
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PromptDetailResponse)
 	err := c.cc.Invoke(ctx, Sentient_PromptDetail_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sentientClient) ListAgents(ctx context.Context, in *ListAgentsRequest, opts ...grpc.CallOption) (*ListAgentsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAgentsResponse)
+	err := c.cc.Invoke(ctx, Sentient_ListAgents_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sentientClient) AgentDetail(ctx context.Context, in *AgentDetailRequest, opts ...grpc.CallOption) (*AgentDetailResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AgentDetailResponse)
+	err := c.cc.Invoke(ctx, Sentient_AgentDetail_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sentientClient) AgentTimeline(ctx context.Context, in *AgentTimelineRequest, opts ...grpc.CallOption) (*AgentTimelineResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AgentTimelineResponse)
+	err := c.cc.Invoke(ctx, Sentient_AgentTimeline_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -182,6 +223,14 @@ type SentientServer interface {
 	Health(context.Context, *HealthRequest) (*HealthResponse, error)
 	// PromptDetail returns everything about one prompt (web /prompt/<id>).
 	PromptDetail(context.Context, *PromptDetailRequest) (*PromptDetailResponse, error)
+	// ListAgents returns the agent processes sentient attributed (web /agents).
+	ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error)
+	// AgentDetail returns one agent process and its background commands per
+	// command (web /agent/<id>).
+	AgentDetail(context.Context, *AgentDetailRequest) (*AgentDetailResponse, error)
+	// AgentTimeline returns an agent's background commands in time order,
+	// filtered by text and time window.
+	AgentTimeline(context.Context, *AgentTimelineRequest) (*AgentTimelineResponse, error)
 	// PromptWindow returns the prompts of a time window, or of one session,
 	// with their sessions (web /prompts, filtered in the browser).
 	PromptWindow(context.Context, *PromptWindowRequest) (*PromptWindowResponse, error)
@@ -217,6 +266,15 @@ func (UnimplementedSentientServer) Health(context.Context, *HealthRequest) (*Hea
 }
 func (UnimplementedSentientServer) PromptDetail(context.Context, *PromptDetailRequest) (*PromptDetailResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PromptDetail not implemented")
+}
+func (UnimplementedSentientServer) ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListAgents not implemented")
+}
+func (UnimplementedSentientServer) AgentDetail(context.Context, *AgentDetailRequest) (*AgentDetailResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AgentDetail not implemented")
+}
+func (UnimplementedSentientServer) AgentTimeline(context.Context, *AgentTimelineRequest) (*AgentTimelineResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AgentTimeline not implemented")
 }
 func (UnimplementedSentientServer) PromptWindow(context.Context, *PromptWindowRequest) (*PromptWindowResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PromptWindow not implemented")
@@ -310,6 +368,60 @@ func _Sentient_PromptDetail_Handler(srv interface{}, ctx context.Context, dec fu
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SentientServer).PromptDetail(ctx, req.(*PromptDetailRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Sentient_ListAgents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAgentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SentientServer).ListAgents(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Sentient_ListAgents_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SentientServer).ListAgents(ctx, req.(*ListAgentsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Sentient_AgentDetail_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AgentDetailRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SentientServer).AgentDetail(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Sentient_AgentDetail_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SentientServer).AgentDetail(ctx, req.(*AgentDetailRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Sentient_AgentTimeline_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AgentTimelineRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SentientServer).AgentTimeline(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Sentient_AgentTimeline_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SentientServer).AgentTimeline(ctx, req.(*AgentTimelineRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -458,6 +570,18 @@ var Sentient_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PromptDetail",
 			Handler:    _Sentient_PromptDetail_Handler,
+		},
+		{
+			MethodName: "ListAgents",
+			Handler:    _Sentient_ListAgents_Handler,
+		},
+		{
+			MethodName: "AgentDetail",
+			Handler:    _Sentient_AgentDetail_Handler,
+		},
+		{
+			MethodName: "AgentTimeline",
+			Handler:    _Sentient_AgentTimeline_Handler,
 		},
 		{
 			MethodName: "PromptWindow",

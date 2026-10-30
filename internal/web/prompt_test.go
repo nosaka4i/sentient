@@ -38,8 +38,11 @@ func sampleDetail() *query.PromptDetail {
 			{N: 2, Offset: time.Minute, Resource: "file", Action: "update", Path: "/w/nosaka/ios/Config.plist", Evidence: "log"},
 			{N: 3, Offset: 2 * time.Minute, Resource: "command", Action: "execute", Path: "cd ios", Evidence: "log", CallID: "b1", CallCommand: "cd ios && ls", Builtin: true},
 			{N: 4, Resource: "command", Action: "execute", Path: "ls", Failed: true, Evidence: "log", CallID: "b1"},
-			{N: 5, Offset: 3 * time.Minute, Resource: "command", Action: "execute", Path: "pwd", Evidence: "log"},
+			{N: 5, Offset: 3 * time.Minute, Resource: "command", Action: "execute", Path: "pwd", Evidence: "log", Unverified: true},
+			{N: 6, Offset: 4 * time.Minute, Resource: "command", Action: "execute", Path: "id", Evidence: "kernel", Unreported: true},
+			{N: 7, Offset: 6 * time.Minute, Resource: "file", Action: "update", Path: "/home/u/.zshrc", Evidence: "both", Alert: true},
 		},
+		Counts:  query.EvidenceCounts{Watched: true, AgentLog: 6, KernelLog: 3, Confirmed: 2, Unverified: 1, NotChecked: 2, Pending: 1, Unreported: 1, Background: 47, AgentID: "root/a"},
 		Reply:   "Done: changed `Config.plist` <fast>.\n\nSecond paragraph.",
 		ReplyAt: started.Add(12 * time.Minute),
 	}
@@ -64,10 +67,21 @@ func TestPromptPage(t *testing.T) {
 		`<span class="repo">nosaka</span>`,
 		`<a class="sess" href="/session/404dabcd"`,
 		`&ndash;`, // the end time
-		`5 actions`,
 		`<span class="state-done">`,
-		`5 actions in this prompt`,
-		`<a class="tile zero" href="#trace">`, // zero tiles are dimmed and link to the trace
+		// the agent log / kernel log / background tiles, with their exceptions called out
+		`<span class="lbl"><b>agent log</b></span>
+        <span class="num">6</span>`,
+		`>1 unverified</span>`,
+		`>2 not checked</span>`,
+		`>1 pending</span>`,
+		`<span class="lbl"><b>kernel log</b></span>
+        <span class="num">3</span>`,
+		`<span class="tag unrep">1 unreported</span>`,
+		// background commands are not a tile: one quiet line links to the agent's timeline for the prompt
+		`<a href="/agent/root%2Fa?from=`,
+		`47 background commands</a> ran while the agent worked on this prompt`,
+		`<a class="tile zero" href="#trace">`, // zero tiles link to the trace (and are hidden)
+		`href="#files"`,                       // the file tiles open the files drawer
 		`<a class="sublink warn" href="#trace">1 failed</a>`,
 		// files: the first is open, repo-relative path, diff escaped; the second is outside
 		`<details open>`,
@@ -80,7 +94,15 @@ func TestPromptPage(t *testing.T) {
 		`<span class="h">@@ Edit @@</span>`,
 		`<span class=""> same</span>`,
 		// trace: collapsed, a call header with its commands nested, builtin noted, failure tagged
-		`Show all 5 steps`,
+		`Show all 7 steps`,
+		`<li class="step unclaimed">`,
+		`<span class="note">· not in the agent&#39;s log</span>`,
+		`<span class="note">· not seen by the kernel</span>`,
+		`<li class="step flagged">`,
+		// the files are in a drawer, closed
+		`id="files-toggle"`,
+		`Show 2 files`,
+		`<div class="trace-body" id="files-body" hidden>`,
 		`<span class="p">cd ios &amp;&amp; ls <span class="note">· 1 tool call, 2 commands</span></span>`,
 		`<span class="note">· shell builtin, never execs</span>`,
 		`<span class="tag fail">failed</span>`,
@@ -117,7 +139,6 @@ func TestPromptPageRunningAndSparse(t *testing.T) {
 	s := newTestServer(t, &fakeSource{detail: d})
 	_, body := get(t, s, "/prompt/7", "localhost")
 	for _, want := range []string{
-		`<meta http-equiv="refresh"`, // a running prompt reloads
 		`<span class="state-running">`,
 		`Show all 1 steps`,
 	} {
@@ -125,7 +146,7 @@ func TestPromptPageRunningAndSparse(t *testing.T) {
 			t.Errorf("page missing %q", want)
 		}
 	}
-	for _, bad := range []string{`Files changed`, `Agent's reply`, `Show full prompt`, `class="repo"`} {
+	for _, bad := range []string{`Files changed`, `Agent's reply`, `Show full prompt`, `class="repo"`, `<meta http-equiv="refresh"`} {
 		if strings.Contains(body, bad) {
 			t.Errorf("page should not contain %q", bad)
 		}

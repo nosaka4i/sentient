@@ -87,6 +87,7 @@ func TestPromptLine(t *testing.T) {
 		{"<pasted_content>\na\nb\nc\n</pasted_content>\nthis crash log is from the reminder screen", 3, "this crash log is from the reminder screen"},
 		{"tunnel is spewing:\n\n<pasted_content id=\"057e\">x\ny</pasted_content>", 2, "tunnel is spewing:"},
 		{"<pasted_content>only</pasted_content>", 1, ""},
+		{"<pasted_content id=\"057e\">a\nb</pasted_content id=\"057e\">\nwhy", 2, "why"}, // the id repeats on the closing tag
 		{"<pasted_content></pasted_content>hi", 0, "hi"},
 		{"", 0, ""},
 	}

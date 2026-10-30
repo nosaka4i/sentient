@@ -230,6 +230,38 @@ CREATE TABLE call_links (
 );
 CREATE UNIQUE INDEX actions_exec ON actions(exec_id) WHERE exec_id IS NOT NULL;
 `,
+	// 9: background commands belong to the agent process, not to a prompt.
+	// root_exec_id is the agent process a process descends from; background is
+	// the group key of a known background command ('' = checked, it is not one,
+	// NULL = not checked yet). Both derive from the processes and can be rebuilt.
+	`
+ALTER TABLE process_attribution ADD COLUMN root_exec_id TEXT;
+ALTER TABLE process_attribution ADD COLUMN background TEXT;
+ALTER TABLE process_attribution ADD COLUMN background_rules INTEGER; -- the rules version that checked it
+WITH RECURSIVE tree(exec_id, root) AS (
+	SELECT a.exec_id, a.exec_id FROM process_attribution a JOIN processes p ON p.exec_id = a.exec_id
+	WHERE NOT EXISTS (SELECT 1 FROM process_attribution b WHERE b.exec_id = p.parent_exec_id)
+	UNION ALL
+	SELECT p.exec_id, t.root FROM tree t
+	JOIN processes p ON p.parent_exec_id = t.exec_id
+	JOIN process_attribution a ON a.exec_id = p.exec_id
+)
+UPDATE process_attribution SET root_exec_id = (SELECT root FROM tree WHERE tree.exec_id = process_attribution.exec_id);
+CREATE INDEX process_attribution_root ON process_attribution(root_exec_id, background);
+`,
+	// 10: the version of the call matching that settled a call. A newer
+	// matcher looks again at calls an older one gave up on. Derived, rebuildable.
+	`
+ALTER TABLE call_links ADD COLUMN matcher INTEGER;
+CREATE INDEX processes_pid ON processes(pid, parent_exec_id);
+`,
+	// 11: a logged file action (Read, Edit, Write) confirmed by a kernel event of
+	// the agent process rather than by an exec. One event confirms one action.
+	`
+ALTER TABLE actions ADD COLUMN kernel_event_id INTEGER REFERENCES kernel_events(id);
+CREATE UNIQUE INDEX actions_kernel_event ON actions(kernel_event_id) WHERE kernel_event_id IS NOT NULL;
+CREATE INDEX call_links_shell ON call_links(shell_exec_id);
+`,
 }
 
 // SchemaVersion is the version the code expects.

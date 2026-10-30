@@ -162,6 +162,7 @@ func Run(ctx context.Context, cfg Config) error {
 	mon := newMonitor(st, cfg, log)
 	srv := api.NewServer(st.DB)
 	srv.SetHealth(mon.report)
+	srv.SetLogger(log)
 
 	var wg sync.WaitGroup
 	errc := make(chan error, 6)

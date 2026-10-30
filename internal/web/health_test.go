@@ -45,10 +45,13 @@ func TestHealthPage(t *testing.T) {
 	}
 	for _, want := range []string{
 		`<title>sentient · health</title>`,
+		`<meta http-equiv="refresh" content="30">`, // a status page with nothing to open: it keeps itself current
 		`<a class="icon-btn" href="/health" aria-current="page"`,
 		`<main class="wrap sub">`,
 		`<a class="back" href="/">&larr; Dashboard</a>`,
-		`<span class="okdot" role="img" aria-label="ok"></span>All systems normal`,
+		// one warning (passwordless sudo): the headline must not say "normal"
+		`<span class="okdot warn" role="img" aria-label="warning"></span>Running, with 1 warning`,
+		`last checked <time`,
 		`<strong>1 warning</strong>`,
 		`Agent account <span class="mono">'ubuntu'</span> has passwordless sudo`,
 		`href="https://github.com/nosaka4i/sentient#passwordless-sudo"`,
@@ -83,6 +86,29 @@ func TestHealthPage(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("health page missing %q", want)
 		}
+	}
+}
+
+// The headline says what the line under it counts: normal only with no warnings,
+// a hollow dot for warnings, a red one for a critical problem.
+func TestHealthHeadlineFollowsTheWarnings(t *testing.T) {
+	clean := healthReport()
+	clean.Sudo = health.Sudo{Checked: true} // no passwordless sudo: nothing to warn about
+	_, body := get(t, newTestServer(t, &fakeSource{health: clean}), "/health", "127.0.0.1:7357")
+	for _, want := range []string{`<span class="okdot" role="img" aria-label="ok"></span>All systems normal`, `no warnings`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("clean page missing %q", want)
+		}
+	}
+	if strings.Contains(body, `okdot warn`) || strings.Contains(body, `okdot bad`) {
+		t.Error("a clean page shows a warning dot")
+	}
+
+	two := healthReport() // sudo, plus unknown record types
+	two.Ingest[0].Unknown = 3
+	_, body = get(t, newTestServer(t, &fakeSource{health: two}), "/health", "127.0.0.1:7357")
+	if !strings.Contains(body, `okdot warn`) || !strings.Contains(body, `Running, with 2 warnings`) || strings.Contains(body, `All systems normal`) {
+		t.Errorf("two warnings: wrong headline")
 	}
 }
 

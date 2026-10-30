@@ -105,7 +105,15 @@ The goal is a rich web UI; the CLI comes first and shares its foundation.
   live in the URL, `.mocks/sessions-01.html`) and activity (every
   resource/action count of a window as tiles, plus the events of the
   selected tile, `.mocks/activity-01.html`; the dashboard tiles link to it).
-  The header links Sessions, Prompts and Health. Responses are gzipped and
+  The header links Dashboard, Sessions, Prompts, Agents and Health. **Agents**
+  (`/agents`, `/agent/<id>`; mocks `agents-12`, `agent-06`, `agent-07`) lists
+  the agent processes and, per agent, the background commands it runs on its own
+  (git polling, helper runs of its own binary): grouped per command, or as a
+  timeline filtered by text and time window. They are not part of any prompt
+  (see `tetragon-integration.md`); a prompt links to the agent's timeline for its
+  window. **Pages do not reload themselves**: a reload folds away what the reader
+  opened. (Backlog `fd3e854`: an optional "new activity" notice.) The prompt
+  page's trace and files-changed list are collapsed drawers. Responses are gzipped and
   static files revalidate by ETag. **The prompts page is the exception:** it is a
   shell plus `static/prompts.js`. The server returns a *window* of prompts as
   compact JSON (`/prompts/data`: the last N days, default 3, widened to the
@@ -276,7 +284,9 @@ sessions       (id PK, agent, agent_session_id, repo_root, cwd, started_at, ende
 prompts        (id PK, session_id FK, seq, text, started_at, ended_at)
 processes      (exec_id PK, pid, parent_exec_id, binary, argv, cwd, uid,
                 started_at, exited_at, exit_code)   -- index of exec/exit events
-process_attribution (exec_id PK, session_id FK, prompt_id FK, attribution)  -- derived links
+process_attribution (exec_id PK, session_id FK, prompt_id FK, attribution,
+                root_exec_id,            -- the agent process it descends from
+                background, background_rules)  -- group key of a background command, rules version; derived links
 -- kernel_events and raw_log_records reject UPDATE/DELETE (triggers); see storage-design.md
 kernel_events  (id PK, exec_id FK, ts, type, payload JSON, prev_hash, hash)
 raw_log_records(id PK, session_id FK, ts, source_file, record JSON, prev_hash, hash)

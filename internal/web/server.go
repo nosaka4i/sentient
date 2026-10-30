@@ -25,8 +25,8 @@ import (
 	assets "github.com/nosaka4i/sentient/web"
 )
 
-// RefreshSeconds is how often pages reload themselves (until live updates
-// over SSE land).
+// RefreshSeconds is how often the "sentientd is not reachable" page checks again.
+// No other page reloads itself: it would fold away what the reader has opened.
 const RefreshSeconds = 30
 
 // Source is what the pages need from sentientd (api.Client).
@@ -34,6 +34,9 @@ type Source interface {
 	Status(ctx context.Context, from, to time.Time) (*query.Status, string, error)
 	Health(ctx context.Context) (*health.Report, error)
 	PromptDetail(ctx context.Context, id int64) (*query.PromptDetail, error)
+	ListAgents(ctx context.Context) ([]query.AgentRow, error)
+	AgentDetail(ctx context.Context, id string) (*query.AgentDetail, error)
+	AgentTimeline(ctx context.Context, id string, f query.TimelineFilter) (*query.Timeline, error)
 	PromptWindow(ctx context.Context, req query.WindowRequest) (*query.PromptWindow, error)
 	SessionDetail(ctx context.Context, sessionID string) (*query.SessionDetail, error)
 	SessionList(ctx context.Context, days int) (*query.SessionList, error)
@@ -61,7 +64,7 @@ func New(src Source, socket string, log *slog.Logger) (*Server, error) {
 	}
 	home, _ := os.UserHomeDir()
 	s := &Server{src: src, socket: socket, now: time.Now, home: home, log: log, pages: map[string]*template.Template{}}
-	for _, page := range []string{"activity", "alert", "alerts", "dashboard", "health", "prompt", "prompts", "session", "sessions", "down"} {
+	for _, page := range []string{"activity", "agent", "agents", "alert", "alerts", "dashboard", "health", "prompt", "prompts", "session", "sessions", "down"} {
 		t, err := template.ParseFS(assets.FS, "templates/layout.html", "templates/"+page+".html")
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", page, err)
@@ -88,6 +91,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /prompts/data", s.promptsData)
 	mux.HandleFunc("GET /session/{id}", s.session)
 	mux.HandleFunc("GET /sessions", s.sessions)
+	mux.HandleFunc("GET /agents", s.agents)
+	mux.HandleFunc("GET /agent/{id}", s.agent)
 	mux.HandleFunc("GET /activity", s.activity)
 	mux.HandleFunc("GET /alerts", s.alerts)
 	mux.HandleFunc("GET /alert/{id}", s.alert)
@@ -155,7 +160,7 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := dashboardPage{
-		page:         page{Title: "status", Nav: "dashboard", Version: version.Version, Refresh: RefreshSeconds, Live: true},
+		page:         page{Title: "status", Nav: "dashboard", Version: version.Version},
 		Tiles:        tiles(st.Activity),
 		PromptsTotal: st.PromptsTotal,
 	}

@@ -52,6 +52,29 @@ type Server struct {
 	db     *sql.DB
 	stats  *Stats
 	health HealthFunc
+	log    *slog.Logger
+}
+
+// SetLogger sets where failed requests are logged. The error counts on the
+// Health page say that a request failed; the log says which one and why.
+func (s *Server) SetLogger(l *slog.Logger) { s.log = l }
+
+// logInterceptor logs a request that failed for a reason on our side: an
+// internal error, an unknown one, or a timeout. A caller's mistake (not found,
+// bad argument) is not logged, and neither is a cancelled request.
+func (s *Server) logInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		start := time.Now()
+		resp, err := handler(ctx, req)
+		if err != nil && s.log != nil {
+			switch code := status.Code(err); code {
+			case codes.Internal, codes.Unknown, codes.DeadlineExceeded, codes.Unavailable, codes.DataLoss:
+				s.log.Error("api request failed", "method", filepath.Base(info.FullMethod), "code", code.String(),
+					"err", err, "took", time.Since(start).Round(time.Millisecond))
+			}
+		}
+		return resp, err
+	}
 }
 
 // HealthFunc builds the health report (everything except the API's own
@@ -158,7 +181,7 @@ func Listen(path, group string, log *slog.Logger) (net.Listener, error) {
 // srv's Stats.
 func Serve(ctx context.Context, lis net.Listener, srv *Server) error {
 	g := grpc.NewServer(
-		grpc.UnaryInterceptor(srv.stats.UnaryInterceptor()),
+		grpc.ChainUnaryInterceptor(srv.stats.UnaryInterceptor(), srv.logInterceptor()),
 		grpc.StatsHandler(srv.stats.StatsHandler()),
 	)
 	sentientpb.RegisterSentientServer(g, srv)

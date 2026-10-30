@@ -1,7 +1,7 @@
 # Builds are throttled: the dev box has ~2 GB RAM and compiling
 # modernc.org/sqlite and gRPC in parallel runs it out of memory.
 GO       ?= GOFLAGS=-p=1 GOMAXPROCS=1 go
-VERSION  ?= 0.0.1
+VERSION  ?= 0.0.2
 LDFLAGS  := -X github.com/nosaka4i/sentient/internal/version.Version=$(VERSION)
 TOOLS    := .claudetmp/tools
 

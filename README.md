@@ -7,7 +7,7 @@ See [docs/brief.md](docs/brief.md) for the product brief and
 Two binaries: `sentientd` (the monitor; root, started by systemd) and `sen`
 (the CLI; runs as you and asks `sentientd` over a Unix socket).
 
-## Install (v0.1)
+## Install (v0.0.2)
 
 Manual steps for now; a package or `sen install` can come later.
 

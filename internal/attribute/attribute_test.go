@@ -173,6 +173,77 @@ func TestOnlyAgentRootsStartASession(t *testing.T) {
 	}
 }
 
+func TestDescendantsRecordTheAgentProcessTheyBelongTo(t *testing.T) {
+	f := newFixture(t)
+	f.session("a", "/work", 2, 30)
+	f.proc("root", "", claude, "/work", 0)
+	f.proc("sh", "root", "/bin/sh", "/work", 10)
+	f.proc("rm", "sh", "/usr/bin/rm", "/work", 35)
+	if _, err := f.att().Once(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"root", "sh", "rm"} {
+		var root string
+		if err := f.st.DB.QueryRow(`SELECT root_exec_id FROM process_attribution WHERE exec_id = ?`, id).Scan(&root); err != nil {
+			t.Fatal(err)
+		}
+		if root != "root" {
+			t.Errorf("%s belongs to %q, want the agent process", id, root)
+		}
+	}
+}
+
+func TestTheAgentBinaryRunningAsRipgrepIsNotAnAgent(t *testing.T) {
+	f := newFixture(t)
+	f.session("a", "/work", 1, 60)
+	tx, _ := f.st.Begin(f.ctx)
+	if err := tx.AddProcess(f.ctx, store.Process{ExecID: "rg", Collector: "tetragon", PID: 1, Binary: claude, Argv: `["-G","--ignore-files","--hidden","-I","--exclude-dir=.git"]`, Cwd: "/work", StartedAt: ts(5)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	// still running, and long past the brief-run limit: the arguments say it is a tool
+	if n, err := f.att().Once(f.ctx); err != nil || n != 0 {
+		t.Fatalf("Once = %d, %v", n, err)
+	}
+	if s, _, _ := f.get("rg"); s != 0 {
+		t.Error("ripgrep was taken for an agent")
+	}
+}
+
+func TestABriefRunOfTheAgentBinaryIsNotAnAgent(t *testing.T) {
+	f := newFixture(t)
+	f.session("a", "/work", 1, 60)
+	f.proc("rg", "", claude, "/work", 5)     // the Grep tool re-running the binary as ripgrep
+	f.proc("agent", "", claude, "/work", 6)  // a real agent that is still running
+	f.proc("slow", "", claude, "/work", 7)   // exited, but only after a real session's worth
+	f.proc("future", "", claude, "/work", 8) // exit time unknown: still counts
+	tx, err := f.st.Begin(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for exec, secs := range map[string]int{"rg": 5, "slow": 7 + 300} {
+		if _, err := tx.ExitProcess(f.ctx, exec, ts(secs), 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.att().Once(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if s, _, _ := f.get("rg"); s != 0 {
+		t.Error("a run that exited at once was taken for an agent")
+	}
+	for _, id := range []string{"agent", "slow", "future"} {
+		if s, _, _ := f.get(id); s == 0 {
+			t.Errorf("%s was not attributed", id)
+		}
+	}
+}
+
 func TestARootOnlyMatchesActivityAfterItStarted(t *testing.T) {
 	f := newFixture(t)
 	f.session("early", "/work", 1)

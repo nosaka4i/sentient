@@ -137,7 +137,7 @@ func finishPrompt(ctx context.Context, db *sql.DB, p *PromptRow, start string, e
 const systemAction = `(a.resource IN ('file', 'dir', 'command', 'process', 'network', 'git', 'launch item')
 	OR (a.resource = 'web' AND a.action = 'fetch'))`
 
-var pastedRE = regexp.MustCompile(`(?s)<pasted_content[^>]*>(.*?)</pasted_content>`)
+var pastedRE = regexp.MustCompile(`(?s)<pasted_content[^>]*>(.*?)</pasted_content[^>]*>`)
 
 // PromptLine reduces a prompt to what a table row shows: the number of
 // pasted lines (Claude Code wraps pastes in <pasted_content>), and the

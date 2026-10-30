@@ -56,10 +56,13 @@ func TestPromptDetailConversion(t *testing.T) {
 		Steps: []query.Step{
 			{N: 1, Resource: "prompt", Action: "request", Path: "t", Evidence: "log"},
 			{N: 2, Offset: 5 * time.Second, Resource: "command", Action: "execute", Path: "cd x", Failed: true, Evidence: "log", CallID: "b1", CallCommand: "cd x && ls", Builtin: true},
+			{N: 3, Offset: 6 * time.Second, Resource: "command", Action: "execute", Path: "id", Evidence: "kernel", Unreported: true, Alert: true},
+			{N: 4, Offset: 7 * time.Second, Resource: "command", Action: "execute", Path: "curl", Evidence: "log", Unverified: true},
 		},
 		Reply:    "done",
 		ReplyAt:  at.Add(time.Minute),
 		RepoRoot: "/w/r",
+		Counts:   query.EvidenceCounts{Watched: true, AgentLog: 3, KernelLog: 2, Confirmed: 1, NotChecked: 1, Pending: 1, Unverified: 1, Unreported: 1, Background: 3, AgentID: "root"},
 	}
 	out := promptDetailFromProto(promptDetailToProto(in))
 	if !reflect.DeepEqual(in, out) {

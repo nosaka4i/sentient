@@ -49,6 +49,25 @@ func startServer(t *testing.T) string {
 	tx.AppendRaw(ctx, store.RawRecord{SourceFile: "f", Unknown: true, Record: "{bad"})
 	tx.AddPrompt(ctx, sid, "hi", "2026-10-17T09:00:00.000000000Z")
 	tx.AddAction(ctx, store.Action{SessionID: sid, TS: "2026-10-17T09:01:00.000000000Z", Resource: "file", Action: "read", Path: "/w/a", Evidence: "log"})
+	// an agent process, running, with two background commands
+	for _, p := range []store.Process{
+		{ExecID: "root", Collector: "tetragon", PID: 1, Binary: "/opt/claude/versions/2.1.9", Cwd: "/w", StartedAt: "2026-10-17T08:00:00.000000000Z"},
+		{ExecID: "g1", Collector: "tetragon", PID: 2, ParentExecID: "root", Binary: "/usr/bin/git", Argv: `["status","--short"]`, StartedAt: "2026-10-17T09:02:00.000000000Z"},
+		{ExecID: "g2", Collector: "tetragon", PID: 3, ParentExecID: "root", Binary: "/usr/bin/git", Argv: `["config","--get","remote.origin.url"]`, StartedAt: "2026-10-17T09:03:00.000000000Z"},
+	} {
+		if err := tx.AddProcess(ctx, p); err != nil {
+			t.Fatal(err)
+		}
+		if err := tx.AttributeProcess(ctx, p.ExecID, sid, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tx.SetBackground(ctx, "g1", "git status", 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.SetBackground(ctx, "g2", "git config --get", 1); err != nil {
+		t.Fatal(err)
+	}
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}

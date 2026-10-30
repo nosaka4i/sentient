@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -25,6 +26,7 @@ type promptPage struct {
 	page
 	Head                     promptHead
 	Tiles                    []tile
+	Evidence                 evidenceView
 	Actions                  int64
 	Files                    []fileView
 	FilesAdded, FilesRemoved int64
@@ -73,12 +75,36 @@ type stepView struct {
 	Path     string
 	Note     string
 	Failed   bool
-	Flagged  bool // the step an alert is about (the alert page)
-	Ev       string
+	Flagged  bool // an alert is about this step
+	Unrep    bool // the kernel saw it, the agent's log does not have it
 	Call     bool // a Bash call header: Path holds the whole command line
 	CallNote string
 	Children []stepView
 	Prompt   bool
+	// Group: every run of one background command, as one row.
+	Group    bool
+	Runs     []runView
+	RunsMore int
+}
+
+type runView struct {
+	T, Path string
+}
+
+// evidenceView is the agent log / kernel log tiles above the trace. A count
+// of what the kernel saw means nothing when it was not recording, so then only
+// the agent log is shown.
+type evidenceView struct {
+	Watched                bool
+	AgentLog, KernelLog    int64
+	Unverified, Unreported int64
+	// the rest of the agent log, so it adds up: confirmed + unverified +
+	// not checked (file tools, web) + pending (a running prompt)
+	NotChecked, Pending int64
+	// Background commands the agent ran while the prompt did, and the agent's
+	// timeline for the prompt's window.
+	Background     int64
+	BackgroundHref string
 }
 
 func (s *Server) prompt(w http.ResponseWriter, r *http.Request) {
@@ -120,10 +146,6 @@ func newPromptPage(d *query.PromptDetail, now time.Time, home string) promptPage
 		page: page{Title: "prompt", Version: version.Version, Sub: true},
 		Head: head, Actions: d.Prompt.Actions,
 	}
-	if d.Prompt.Running {
-		p.Refresh = RefreshSeconds // a finished prompt doesn't change; don't reload it
-		p.Live = true
-	}
 	if !d.HistoryBegins.IsZero() {
 		p.Since = &since{
 			ISO:  d.HistoryBegins.In(now.Location()).Format("2006-01-02T15:04"),
@@ -132,9 +154,26 @@ func newPromptPage(d *query.PromptDetail, now time.Time, home string) promptPage
 		}
 	}
 
+	p.Evidence = evidenceView{
+		Watched: d.Counts.Watched, AgentLog: d.Counts.AgentLog, KernelLog: d.Counts.KernelLog,
+		Unverified: d.Counts.Unverified, Unreported: d.Counts.Unreported, Background: d.Counts.Background,
+		NotChecked: d.Counts.NotChecked, Pending: d.Counts.Pending,
+	}
+	if d.Counts.Background > 0 && d.Counts.AgentID != "" {
+		end := now
+		if !d.Prompt.Running {
+			end = d.Prompt.Started.Add(d.Prompt.Duration)
+		}
+		end = end.Add(time.Second) // the link's times have no fraction of a second
+		v := url.Values{"view": {"timeline"}, "from": {d.Prompt.Started.UTC().Format(time.RFC3339)}, "to": {end.UTC().Format(time.RFC3339)}}
+		p.Evidence.BackgroundHref = "/agent/" + url.PathEscape(d.Counts.AgentID) + "?" + v.Encode()
+	}
 	p.Tiles = tiles(d.Activity)
 	for i := range p.Tiles {
 		p.Tiles[i].Href = "#trace"
+		if t := p.Tiles[i]; t.Resource == "file" && (t.Action == "create" || t.Action == "update" || t.Action == "delete") {
+			p.Tiles[i].Href = "#files" // the changes are in the files drawer
+		}
 		if p.Tiles[i].SubHref != "" {
 			p.Tiles[i].SubHref = "#trace"
 		}
@@ -233,39 +272,32 @@ func buildTrace(steps []query.Step) ([]stepView, int, int) {
 			out = append(out, newStepView(s, true))
 			continue
 		}
-		g := stepView{Call: true, T: offsetLabel(s.Offset), Ev: "log", Path: s.CallCommand}
+		g := stepView{Call: true, T: offsetLabel(s.Offset), Path: s.CallCommand}
 		for ; i < len(steps) && steps[i].CallID == s.CallID; i++ {
 			g.Children = append(g.Children, newStepView(steps[i], false))
 		}
 		i-- // the loop's own increment steps past the group
 		g.CallNote = fmt.Sprintf("1 tool call, %d commands", len(g.Children))
-		if allBoth(g.Children) {
-			g.Ev = "both"
-		}
 		out = append(out, g)
 	}
 	return out, len(steps), more
 }
 
-func allBoth(steps []stepView) bool {
-	for _, s := range steps {
-		if s.Ev != "both" {
-			return false
-		}
-	}
-	return len(steps) > 0
-}
-
 func newStepView(s query.Step, top bool) stepView {
 	v := stepView{
-		N: strconv.FormatInt(s.N, 10), Res: s.Resource, Act: s.Action, Path: s.Path, Failed: s.Failed, Ev: s.Evidence,
-		Prompt: s.Resource == "prompt",
+		N: strconv.FormatInt(s.N, 10), Res: s.Resource, Act: s.Action, Path: s.Path, Failed: s.Failed,
+		Prompt: s.Resource == "prompt", Flagged: s.Alert, Unrep: s.Unreported,
 	}
 	if top {
 		v.T = offsetLabel(s.Offset)
 	}
-	if s.Builtin {
+	switch {
+	case s.Builtin:
 		v.Note = "shell builtin, never execs"
+	case s.Unverified:
+		v.Note = "not seen by the kernel"
+	case s.Unreported:
+		v.Note = "not in the agent's log"
 	}
 	return v
 }

@@ -69,11 +69,12 @@ case "$SERVICE" in
     # sentientd as root, reading Tetragon's socket (root-only), into a scratch
     # database so it never touches real data. After Ctrl-C, give yourself the
     # files back to inspect them: sudo chown -R "$USER": $DEV_DIR/kdata
+    # The socket gets your group, so `sen serve` (as you) can reach the root daemon.
     need_bin sentientd
     cd "$REPO_ROOT"
     KDATA="${SENTIENT_KERNEL_DIR:-$DEV_DIR/kdata}"
     mkdir -p "$KDATA"
-    sudo bin/sentientd --tetragon --home "$HOME" --data-dir "$KDATA" --socket "$KDATA/s.sock" --socket-group "" 2>&1 | tee -a "$LOG_DIR/sentientd-kernel.log"
+    sudo bin/sentientd --tetragon --home "$HOME" --data-dir "$KDATA" --socket "$KDATA/s.sock" --socket-group "$(id -gn)" 2>&1 | tee -a "$LOG_DIR/sentientd-kernel.log"
     ;;
 
   serve)

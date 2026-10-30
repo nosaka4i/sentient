@@ -10,6 +10,7 @@ import (
 type ProcessRef struct {
 	ExecID       string
 	Binary       string
+	Argv         string // JSON array
 	Cwd          string
 	StartedAt    string
 	ExitedAt     string // "" while running
@@ -19,7 +20,7 @@ type ProcessRef struct {
 // UnattributedProcesses lists processes not yet tied to a session.
 func (t *Tx) UnattributedProcesses(ctx context.Context) ([]ProcessRef, error) {
 	rows, err := t.tx.QueryContext(ctx, `
-SELECT p.exec_id, p.binary, COALESCE(p.cwd, ''), p.started_at, COALESCE(p.exited_at, ''), COALESCE(q.binary, '')
+SELECT p.exec_id, p.binary, COALESCE(p.argv, ''), COALESCE(p.cwd, ''), p.started_at, COALESCE(p.exited_at, ''), COALESCE(q.binary, '')
 FROM processes p LEFT JOIN processes q ON q.exec_id = p.parent_exec_id
 WHERE NOT EXISTS (SELECT 1 FROM process_attribution a WHERE a.exec_id = p.exec_id)`)
 	if err != nil {
@@ -29,7 +30,7 @@ WHERE NOT EXISTS (SELECT 1 FROM process_attribution a WHERE a.exec_id = p.exec_i
 	var out []ProcessRef
 	for rows.Next() {
 		var r ProcessRef
-		if err := rows.Scan(&r.ExecID, &r.Binary, &r.Cwd, &r.StartedAt, &r.ExitedAt, &r.ParentBinary); err != nil {
+		if err := rows.Scan(&r.ExecID, &r.Binary, &r.Argv, &r.Cwd, &r.StartedAt, &r.ExitedAt, &r.ParentBinary); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -69,9 +70,9 @@ GROUP BY r.session_id ORDER BY s.started_at, r.session_id`, cwd, from, to)
 // "ambiguous".
 func (t *Tx) AttributeRoot(ctx context.Context, execID string, sessionID int64, how string) error {
 	_, err := t.tx.ExecContext(ctx, `
-INSERT INTO process_attribution (exec_id, session_id, attribution) VALUES (?, ?, ?)
+INSERT INTO process_attribution (exec_id, session_id, attribution, root_exec_id) VALUES (?, ?, ?, ?)
 ON CONFLICT (exec_id) DO UPDATE SET session_id = excluded.session_id, attribution = excluded.attribution`,
-		execID, sessionID, how)
+		execID, sessionID, how, execID)
 	if err != nil {
 		return fmt.Errorf("attribute root: %w", err)
 	}
@@ -88,12 +89,12 @@ func (t *Tx) AttributeDescendants(ctx context.Context) (int, error) {
 	total := 0
 	for i := 0; i < maxProcessDepth; i++ {
 		res, err := t.tx.ExecContext(ctx, `
-INSERT INTO process_attribution (exec_id, session_id, prompt_id, attribution)
+INSERT INTO process_attribution (exec_id, session_id, prompt_id, attribution, root_exec_id)
 SELECT p.exec_id, q.session_id,
   (SELECT pr.id FROM prompts pr
    WHERE pr.session_id = q.session_id AND pr.started_at <= p.started_at
    ORDER BY pr.started_at DESC, pr.seq DESC LIMIT 1),
-  q.attribution
+  q.attribution, q.root_exec_id
 FROM processes p JOIN process_attribution q ON q.exec_id = p.parent_exec_id
 WHERE NOT EXISTS (SELECT 1 FROM process_attribution a WHERE a.exec_id = p.exec_id)`)
 		if err != nil {

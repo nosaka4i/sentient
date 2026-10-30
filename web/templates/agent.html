@@ -1,0 +1,56 @@
+{{define "content"}}
+  <a class="back" href="/agents">&larr; Agents</a>
+
+  <div class="page-title">
+    <h1>{{if .Running}}<span class="okdot" title="running"></span> {{end}}{{.Heading}} <span class="when">· {{.When}}</span></h1>
+{{- if .Sessions}}
+    <p class="sub">sessions {{range .Sessions}}<a class="sess" href="{{.Href}}">{{.Short}}</a> {{end}}</p>
+{{- end}}
+  </div>
+
+  <section class="card" aria-labelledby="h-bg">
+    <div class="card-head">
+      <h2 id="h-bg">Background commands <span class="count">({{.Count}})</span></h2>
+      <span class="seg" role="group" aria-label="View">
+        <a href="{{.CommandHref}}"{{if not .Timeline}} aria-pressed="true"{{end}}>By command</a>
+        <a href="{{.TimelineHref}}"{{if .Timeline}} aria-pressed="true"{{end}}>Timeline</a>
+      </span>
+    </div>
+{{- if .Timeline}}
+    <form class="tools" method="get">
+      <input type="hidden" name="view" value="timeline">
+      {{- if .From}}<input type="hidden" name="from" value="{{.From}}">{{end}}
+      {{- if .To}}<input type="hidden" name="to" value="{{.To}}">{{end}}
+      <input type="search" name="q" value="{{.Q}}" placeholder="Filter commands" aria-label="Filter commands">
+      {{- if .FromLabel}}
+      <span class="chipx">{{.FromLabel}} <a href="{{.ClearWindow}}" aria-label="Show all times" title="Show all times">&times;</a></span>
+      {{- end}}
+      <span class="count2">{{.Matching}}</span>
+    </form>
+{{- if .Rows}}
+    <ol class="tl">
+{{- range .Rows}}
+      <li><span class="t">{{.T}}</span><span class="c">{{.Pre}}{{if .Match}}<mark>{{.Match}}</mark>{{end}}{{.Post}}</span></li>
+{{- end}}
+    </ol>
+    <div class="pager">
+      <span>{{.PageLabel}}</span>
+      {{- if .PrevHref}}<a href="{{.PrevHref}}">&larr; Previous</a>{{end}}
+      {{- if .NextHref}}<a href="{{.NextHref}}">Next &rarr;</a>{{end}}
+    </div>
+{{- else}}
+    <p class="nodata">No background command matches.</p>
+{{- end}}
+{{- else}}
+{{- if .Groups}}
+    <div class="trace-body">
+      <ol class="steps">
+{{- range .Groups}}{{template "group" .}}{{end}}
+      </ol>
+    </div>
+{{- else}}
+    <p class="nodata">This agent has run no background commands.</p>
+{{- end}}
+{{- end}}
+  </section>
+{{end}}

@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/nosaka4i/sentient/internal/background"
 	"github.com/nosaka4i/sentient/internal/dbtime"
 	"github.com/nosaka4i/sentient/internal/store"
 )
@@ -26,6 +27,11 @@ const (
 
 // slack allows for the log and the kernel disagreeing about the clock a little.
 const slack = 5 * time.Second
+
+// minAgentLife is how long an agent process lives at least. The agent's binary
+// also runs briefly on its own (the Grep tool re-runs it as ripgrep); with no
+// recorded parent those runs look like agents, but they exit within a second.
+const minAgentLife = 10 * time.Second
 
 // bornWithin is how soon after an agent process starts its session's first
 // record appears. A session that began later than that belongs to a later
@@ -102,6 +108,9 @@ func (a *Attributor) Once(ctx context.Context) (int, error) {
 		if !a.IsAgent(p.Binary) || (p.ParentBinary != "" && a.IsAgent(p.ParentBinary)) {
 			continue // not an agent, or a helper the agent started: its parent decides
 		}
+		if background.IsToolRun(p.Argv) {
+			continue // the agent's binary running a tool (ripgrep), not an agent
+		}
 		start, err := dbtime.Parse(p.StartedAt)
 		if err != nil {
 			continue
@@ -110,6 +119,9 @@ func (a *Attributor) Once(ctx context.Context) (int, error) {
 		if p.ExitedAt != "" {
 			if e, err := dbtime.Parse(p.ExitedAt); err == nil {
 				end = e
+				if e.Sub(start) < minAgentLife {
+					continue // a one-off run of the binary (a helper, --version), not an agent session
+				}
 			}
 		}
 		hits, err := tx.SessionsActive(ctx, p.Cwd, dbtime.Format(start.Add(-slack)), dbtime.Format(end.Add(slack)))

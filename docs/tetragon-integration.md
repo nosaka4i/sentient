@@ -115,7 +115,7 @@ and `AddGap`.
      `actions.evidence` to `both` and `exec_id`. Parts with no match stay `log`
      (never run, denied, or the kernel was not watching).
    - A direct child of a matched wrapper shell that matches no part, and a
-     direct child of the agent itself (the routine commands below), become
+     direct child of the agent itself (the background commands below), become
      `kernel` command actions. So does a wrapper shell no call matched, as one
      action showing the command it ran (its children are not listed
      separately). Grandchildren (a compiler under `go test`) stay in the
@@ -129,30 +129,76 @@ and `AddGap`.
      kernel was being watched, or when the kernel has been seen past its end.
      Calls logged before this existed have no stored command and are not merged.
 
-**Routine commands of the agent itself** (backlog `00b522e`, to do). Claude
-Code runs commands on its own that are in no tool call: in one session 296
-`git` runs (the same hardened `git -c core.askPass= ... status` form) and 319
-helper copies of the `claude` binary. The log has none of them, only the text
-of about ten status snapshots. They are evidence of what the harness does
-unasked, so nothing is filtered: all of it is stored. The views group
-identical commands from the agent's own process into one row with a count and
-time range, per subcommand, so a new one (`git fetch`, `git config`) is a new
-row the first time it runs. Their file and network events stay attached to the
-process. The signatures that may be grouped are a short list in the repo that
-contributors can extend; a command that matches none is shown as an action. A
-kernel exec with no log match that is not grouped becomes an `evidence:
-kernel` action.
+**Background commands of the agent itself** (built: `internal/background`,
+`docs/design.md` "Agents"). Claude Code runs commands on its own that are in no
+tool call: in one session 296 `git` runs (the same hardened `git -c
+core.askPass= ... status` form) and 319 helper copies of the `claude` binary.
+The log has none of them. They are evidence of what the harness does unasked,
+so nothing is filtered: all of it is stored. They belong to the agent process,
+not to a prompt or a session: they fire on their own clock (about every 15
+seconds for the git polling), so tying one to the prompt that happened to be
+current would be wrong, and one agent process can host several sessions. The
+agent is the root process of an attributed tree (`process_attribution.root_exec_id`);
+a later exec of the same pid with the old one as parent (the agent restarted in
+place, e.g. an update) is the same agent. A direct child of the agent whose
+command matches a rule gets a group key (`process_attribution.background`:
+`git status`, `git config --get`, `claude itself` ...); a command that matches
+none stays a kernel action on the prompt it ran during, labelled unreported, so
+an unknown command can never hide in the agent view. Rules live in
+`internal/background` and carry a version: a process is checked once per version,
+so adding a rule reaches what was recorded before it. The pages are `/agents`,
+`/agent/<id>` (per command, or a timeline with a text and time-window filter)
+and a one-line link on each prompt to the agent's timeline for that prompt's
+window. Their file and network events stay attached to the process.
 
-**Built-in tools.** Edit, Write and Read run inside the agent process, so the
-kernel reports only "this process created or opened this path", not which tool
-or prompt. The merge pairs the log's tool call with the kernel event by path
-and time (about 2 seconds). A kernel write with no log call, or a log edit
-with no kernel event, is a mismatch to flag (a gap or an agent started before
-the policy explains the second). Not yet checked against a live Edit; whether
-a write is distinguishable from a read in `security_file_open` is open.
+Two more things the kernel reports that are not commands: the agent's binary
+run as ripgrep (`-G ...`, the Grep and Glob tools) is not an agent, and a shell's
+forks for pipelines arrive as execs with the parent's own binary and arguments;
+both are filtered (`background.IsToolRun`, `store.notFork`). Pairing the ripgrep
+runs with the logged Grep and Glob calls is backlog `e4f0b40`.
+
+**Built-in tools** (built: `internal/merge` `mergeFiles`, `store.FileEvent`).
+Edit, Write and Read run inside the agent process, so there is no exec to pair
+with. The kernel reports the agent process's file events instead: a Read is a
+`file_open` of the path; a write is a `file_create` of `<path>.tmp.<pid>.<hash>`
+beside it, a `file_setmode`, and a `file_rename` of that temp file over the path
+(Claude Code writes atomically), so the target is the path without the
+`.tmp.…` suffix. The merge pairs a logged call with the first unclaimed such
+event of an agent process of the session, inside the call's window (issued to
+result, plus the usual slack; a call still waiting for approval has no end, so
+it stays open). One kernel event confirms one action: two edits of one file
+need two renames. The link is `actions.kernel_event_id`. Web fetches and file
+deletes are not matched yet; the page counts them as "not checked".
+
+**What the two tiles mean.** The kernel sees what the agent does on the machine,
+so it is the larger set: everything the agent logs as a machine action should be
+in it. *Confirmed* is both; *unreported* is the kernel only; *unverified* is the
+log only and should be empty, so it is a finding (a command that was not found
+or not approved, or a shape the matching misses). A web search, a subagent start
+and a shell builtin (`echo`, `cd`, `printf`, `test`, `pwd` ... bash runs them
+itself, no process) are not machine actions the kernel can see and are left out
+of the agent log count. The sums are checked in tests: agent log = confirmed +
+unverified + not checked + pending, kernel log = confirmed + unreported.
+
+**Shapes of a Bash call the matching has to know** (each seen in real data):
+- a command with a heredoc, or with a `<` in its text, keeps its own stdin, so
+  the wrapper has no ` < /dev/null`: the command ends at ` && pwd -P >| /tmp/…`;
+- a pipeline forks a subshell per stage, reported as an exec of the wrapper's
+  own binary and arguments, then replaced by the stage's program (same pid, same
+  parent): neither the fork nor the replaced stub is a command;
+- every process is first reported as an exec of its parent's binary (a stub)
+  before the program it runs, same pid and parent: the stub is not a command;
+- the shell's `grep` and `find` are Claude Code's own binary run as `ugrep` and
+  `bfs` (see `knowledge-base`), with no parent recorded: matched to a logged
+  `grep`/`find` by the wrapper's lifetime and directory, on the command with the
+  injected flags removed;
+- globs, variables, `~` and brace lists are expanded by the shell before the
+  kernel sees the arguments: matched as a pattern, or by program name;
+- the matching is versioned (`call_links.matcher`), so an improvement reopens
+  calls an older version gave up on.
 
 **Log-only counts.** Without the kernel collector the totals are what the
-agent reported, a lower bound: no routine commands, no files a command
+agent reported, a lower bound: no background commands, no files a command
 touched, nothing the model did not route through a tool. Pages that show totals
 say so.
 

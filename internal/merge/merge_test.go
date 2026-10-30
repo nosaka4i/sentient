@@ -24,6 +24,15 @@ type fixture struct {
 	pid int64
 }
 
+var pidSeq int64
+
+// nextPID gives each test process its own pid: a child with its parent's pid is
+// the same program run again (see store.Unexplained).
+func nextPID() int64 {
+	pidSeq++
+	return pidSeq
+}
+
 // newFixture has one session with a prompt at t0 and an agent root process
 // "root" attributed to it.
 func newFixture(t *testing.T) *fixture {
@@ -66,7 +75,7 @@ func (f *fixture) proc(execID, parent, binary string, argv []string, start int) 
 	f.t.Helper()
 	j, _ := json.Marshal(argv)
 	f.tx(func(tx *store.Tx) error {
-		if err := tx.AddProcess(f.ctx, store.Process{ExecID: execID, Collector: "tetragon", PID: 1, ParentExecID: parent, Binary: binary, Argv: string(j), StartedAt: ts(start)}); err != nil {
+		if err := tx.AddProcess(f.ctx, store.Process{ExecID: execID, Collector: "tetragon", PID: nextPID(), ParentExecID: parent, Binary: binary, Argv: string(j), StartedAt: ts(start)}); err != nil {
 			return err
 		}
 		return tx.AttributeProcess(f.ctx, execID, f.sid, f.pid)
@@ -261,26 +270,71 @@ func TestAPartWithNoExecStaysLogOnly(t *testing.T) {
 	}
 }
 
-func TestRoutineCommandsOfTheAgentAreKernelActions(t *testing.T) {
+func TestUnexplainedCommandsOfTheAgentAreKernelActions(t *testing.T) {
 	f := newFixture(t)
-	f.proc("git", "root", "/usr/bin/git", []string{"-c", "core.askPass=", "status", "--short"}, 10)
+	f.proc("id", "root", "/usr/bin/id", []string{"-u"}, 10)
 	f.seen(30)
 	f.merge()
-	ev, x, ok := f.action("git -c core.askPass= status --short")
-	if !ok || ev != "kernel" || x != "git" {
-		t.Errorf("routine git = %q %q %v", ev, x, ok)
+	ev, x, ok := f.action("id -u")
+	if !ok || ev != "kernel" || x != "id" {
+		t.Errorf("unexplained id = %q %q %v", ev, x, ok)
 	}
 	if n := f.count(`SELECT action_count FROM prompts WHERE id = ?`, f.pid); n != 0 {
-		t.Errorf("prompt action count = %d: routine commands are counted by the views, not here", n)
+		t.Errorf("prompt action count = %d: kernel-only commands are not counted here", n)
 	}
 	if f.merge() != 0 {
 		t.Error("a second pass added the action again")
 	}
 }
 
+func TestBackgroundCommandsBelongToTheAgentNotAPrompt(t *testing.T) {
+	f := newFixture(t)
+	f.proc("git", "root", "/usr/bin/git", []string{"-c", "core.askPass=", "status", "--short"}, 10)
+	f.proc("cfg", "root", "/usr/bin/git", []string{"config", "--get", "remote.origin.url"}, 11)
+	f.proc("push", "root", "/usr/bin/git", []string{"push"}, 12) // not housekeeping
+	f.seen(30)
+	f.merge()
+
+	for exec, key := range map[string]string{"git": "git status", "cfg": "git config --get", "push": ""} {
+		var got *string
+		if err := f.st.DB.QueryRow(`SELECT background FROM process_attribution WHERE exec_id = ?`, exec).Scan(&got); err != nil {
+			t.Fatal(err)
+		}
+		if got == nil || *got != key {
+			t.Errorf("%s: background = %v, want %q", exec, got, key)
+		}
+	}
+	if _, _, ok := f.action("git -c core.askPass= status --short"); ok {
+		t.Error("a background command became an action")
+	}
+	if ev, _, ok := f.action("git push"); !ok || ev != "kernel" {
+		t.Errorf("an unknown git command = %q %v, want a kernel action", ev, ok)
+	}
+	var root string
+	f.st.DB.QueryRow(`SELECT root_exec_id FROM process_attribution WHERE exec_id = 'git'`).Scan(&root)
+	if root != "root" {
+		t.Errorf("root_exec_id = %q, want the agent process", root)
+	}
+
+	// a kernel action recorded before the rules knew the command is dropped
+	f.tx(func(tx *store.Tx) error {
+		if err := tx.AddProcess(f.ctx, store.Process{ExecID: "old", Collector: "tetragon", PID: nextPID(), ParentExecID: "root", Binary: "/usr/bin/git", Argv: `["rev-parse","HEAD"]`, StartedAt: ts(13)}); err != nil {
+			return err
+		}
+		if err := tx.AttributeProcess(f.ctx, "old", f.sid, f.pid); err != nil {
+			return err
+		}
+		return tx.AddKernelAction(f.ctx, store.Action{SessionID: f.sid, PromptID: f.pid, ExecID: "old", TS: ts(13), Resource: "command", Action: "execute", Path: "git rev-parse HEAD"})
+	})
+	f.merge()
+	if _, _, ok := f.action("git rev-parse HEAD"); ok {
+		t.Error("an action for a now-known background command was kept")
+	}
+}
+
 func TestAKernelExecWaitsForTheLogToReachIt(t *testing.T) {
 	f := newFixture(t)
-	f.proc("git", "root", "/usr/bin/git", []string{"status"}, 100)
+	f.proc("git", "root", "/usr/bin/id", []string{}, 100)
 	f.tx(func(tx *store.Tx) error {
 		_, err := tx.AppendKernel(f.ctx, store.KernelEvent{ExecID: "git", TS: ts(101), Type: "exec", Payload: "{}"})
 		return err
@@ -370,8 +424,13 @@ func TestTextHelpers(t *testing.T) {
 		}
 	}
 	argvJSON := `["-c","source /s && eval 'echo hi' < /dev/null && pwd -P >| /tmp/c"]`
-	if got := shellCommand(argvJSON); got != "'echo hi'" {
+	if got := shellCommand(argvJSON); got != "echo hi" {
 		t.Errorf("shellCommand = %q", got)
+	}
+	// a heredoc keeps its own stdin: the wrapper has no < /dev/null (seen in real data)
+	heredoc := `["-c","source /s && eval 'cat > f <<'\"'\"'EOF'\"'\"'\nbody\nEOF\nls | head' && pwd -P >| /tmp/c"]`
+	if got := shellCommand(heredoc); !strings.HasSuffix(got, "ls | head") || strings.Contains(got, "pwd -P") {
+		t.Errorf("shellCommand(heredoc) = %q", got)
 	}
 	for _, in := range []string{`["-c","ls"]`, `["ls"]`, `not json`} {
 		if got := shellCommand(in); got != "" {

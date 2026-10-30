@@ -39,6 +39,7 @@
         <a href="/"{{if eq .Nav "dashboard"}} aria-current="page"{{end}}>Dashboard</a>
         <a href="/sessions"{{if eq .Nav "sessions"}} aria-current="page"{{end}}>Sessions</a>
         <a href="/prompts"{{if eq .Nav "prompts"}} aria-current="page"{{end}}>Prompts</a>
+        <a href="/agents"{{if eq .Nav "agents"}} aria-current="page"{{end}}>Agents</a>
       </nav>
       <a class="icon-btn" href="/health"{{if eq .Nav "health"}} aria-current="page"{{end}} aria-label="Health" title="Health: sentient's own status">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
@@ -72,11 +73,32 @@
 
 {{/* one row of a trace: the prompt page and the alert page share it */}}
 {{define "step"}}
-        <li class="step{{if .Flagged}} effect flagged{{end}}">
+        <li class="step{{if .Flagged}} flagged{{else if .Unrep}} unclaimed{{end}}">
           <span class="n">{{.N}}</span><span class="t">{{.T}}</span>
           <span class="k ra"><span class="r">{{.Res}}</span><span class="sep">/</span>{{.Act}}</span>
           <span class="p">{{.Path}}{{if .Note}} <span class="note">· {{.Note}}</span>{{end}}{{if .Failed}} <span class="tag fail">failed</span>{{end}}{{if .Flagged}} <span class="tag hi">flagged</span>{{end}}</span>
-          <span class="d"></span><span class="ev"><span class="tag">{{.Ev}}</span></span>
+          <span class="d"></span>
+        </li>
+{{- end}}
+
+{{define "group"}}
+        <li class="bg">
+          <details>
+            <summary class="step bg">
+              <span class="n">&middot;</span><span class="t">{{.T}}</span>
+              <span class="k ra"><span class="r">{{.Res}}</span><span class="sep">/</span>{{.Act}}</span>
+              <span class="p"><span class="chev">&#9656;</span>{{.Path}} <span class="note">&middot; {{.Note}}</span></span>
+              <span class="d"></span>
+            </summary>
+            <ul class="bg-list">
+{{- range .Runs}}
+              <li><span class="t">{{.T}}</span>{{.Path}}</li>
+{{- end}}
+{{- if .RunsMore}}
+              <li><span class="t"></span>&hellip; {{.RunsMore}} more</li>
+{{- end}}
+            </ul>
+          </details>
         </li>
 {{- end}}
 

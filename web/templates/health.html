@@ -9,8 +9,8 @@
 
   <!-- VERDICT -->
   <div class="verdict">
-    <h1><span class="okdot{{if not .OK}} bad{{end}}" role="img" aria-label="{{if .OK}}ok{{else}}problem{{end}}"></span>{{.Headline}}</h1>
-    <p class="sub">Recording agent logs · kernel capture not set up yet · {{if .Warnings}}<strong>{{len .Warnings}} warning{{if ne (len .Warnings) 1}}s{{end}}</strong>{{else}}no warnings{{end}} · checked <time datetime="{{.Checked.ISO}}">{{.Checked.Date}}</time></p>
+    <h1><span class="okdot{{if not .OK}} bad{{else if .Warnings}} warn{{end}}" role="img" aria-label="{{if not .OK}}problem{{else if .Warnings}}warning{{else}}ok{{end}}"></span>{{.Headline}}</h1>
+    <p class="sub">Recording agent logs · kernel capture not set up yet · {{if .Warnings}}<strong>{{len .Warnings}} warning{{if ne (len .Warnings) 1}}s{{end}}</strong>{{else}}no warnings{{end}} · last checked <time datetime="{{.Checked.ISO}}">{{.Checked.Date}}</time></p>
 {{- range .Warnings}}
     <div class="notice{{if .Critical}} critical{{end}}" role="note">
       <span class="sev sev-medium">{{if .Critical}}Critical{{else}}Warning{{end}}</span>

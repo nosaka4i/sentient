@@ -97,9 +97,6 @@ func newSessionPage(d *query.SessionDetail, now time.Time, home string) sessionP
 	}
 
 	p := sessionPage{page: page{Title: "session " + h.Short, Version: version.Version, Sub: true}, Head: h}
-	if d.Running {
-		p.Refresh, p.Live = RefreshSeconds, true
-	}
 	p.Since = sinceOf(d.HistoryBegins, now)
 
 	p.Tiles = tiles(d.Activity)

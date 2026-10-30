@@ -163,7 +163,7 @@ func TestAlertDetailPage(t *testing.T) {
 		`<span class="d">-&lt;old&gt;</span>`,
 		// the trace: two steps either side of step 4, the flagged one marked, and what was left out
 		`&hellip; 1 earlier step</li>`,
-		`<li class="step effect flagged">`,
+		`<li class="step flagged">`,
 		`<span class="tag hi">flagged</span>`,
 		`&hellip; 1 more step</li>`,
 		// evidence, escaped

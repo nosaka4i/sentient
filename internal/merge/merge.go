@@ -14,12 +14,18 @@ import (
 	"encoding/json"
 	"log/slog"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
+	"github.com/nosaka4i/sentient/internal/background"
 	"github.com/nosaka4i/sentient/internal/dbtime"
 	"github.com/nosaka4i/sentient/internal/store"
 )
+
+// matcherVersion changes whenever the matching of calls to execs does. A call
+// is settled under a version; a newer one looks at it again.
+const matcherVersion = 2
 
 // slack allows for the log and the kernel disagreeing about the clock a little.
 const slack = 5 * time.Second
@@ -54,13 +60,21 @@ func (m *Merger) Once(ctx context.Context) (int, error) {
 	}
 	defer tx.Rollback()
 
+	n, err := classifyBackground(ctx, tx)
+	if err != nil {
+		return 0, err
+	}
 	first, last, err := tx.KernelRange(ctx)
 	if err != nil {
 		return 0, err
 	}
-	n := 0
 	if last != "" {
 		k, err := mergeCalls(ctx, tx, first, last)
+		if err != nil {
+			return 0, err
+		}
+		n += k
+		k, err = mergeFiles(ctx, tx, first, last)
 		if err != nil {
 			return 0, err
 		}
@@ -77,10 +91,40 @@ func (m *Merger) Once(ctx context.Context) (int, error) {
 	return n, nil
 }
 
+// classifyBackground checks the agent roots' new children against the
+// background rules and drops the kernel-only actions the rules now explain.
+func classifyBackground(ctx context.Context, tx *store.Tx) (int, error) {
+	if err := tx.MarkStubs(ctx, background.RulesVersion); err != nil {
+		return 0, err
+	}
+	procs, err := tx.UncheckedBackground(ctx, background.RulesVersion)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, p := range procs {
+		key, ok := background.Key(background.CommandLine(p.Binary, p.Argv))
+		if !ok {
+			key = ""
+		}
+		if err := tx.SetBackground(ctx, p.ExecID, key, background.RulesVersion); err != nil {
+			return n, err
+		}
+		if ok {
+			n++
+		}
+	}
+	dropped, err := tx.DropBackgroundActions(ctx)
+	if err != nil {
+		return n, err
+	}
+	return n + int(dropped), nil
+}
+
 // mergeCalls matches open Bash calls to wrapper shells and pairs their parts
 // with the shells' children, and settles the calls nothing can change any more.
 func mergeCalls(ctx context.Context, tx *store.Tx, kernelFirst, kernelLast string) (int, error) {
-	calls, err := tx.OpenCalls(ctx)
+	calls, err := tx.OpenCalls(ctx, matcherVersion)
 	if err != nil {
 		return 0, err
 	}
@@ -100,7 +144,7 @@ func mergeCalls(ctx context.Context, tx *store.Tx, kernelFirst, kernelLast strin
 	for _, c := range calls {
 		if end := callEnd(c); end != "" && end < kernelFirst {
 			// over before the kernel was being watched: nothing to find
-			if err := tx.SettleCall(ctx, c.ToolUseID); err != nil {
+			if err := tx.SettleCall(ctx, c.ToolUseID, matcherVersion); err != nil {
 				return n, err
 			}
 			continue
@@ -131,10 +175,71 @@ func mergeCalls(ctx context.Context, tx *store.Tx, kernelFirst, kernelLast strin
 			// nothing the call started can still arrive once the kernel has
 			// been seen past its end
 			if t, err := dbtime.Parse(end); err == nil && dbtime.Format(t.Add(slack)) < kernelLast {
-				if err := tx.SettleCall(ctx, c.ToolUseID); err != nil {
+				if err := tx.SettleCall(ctx, c.ToolUseID, matcherVersion); err != nil {
 					return n, err
 				}
 			}
+		}
+	}
+	return n, nil
+}
+
+// mergeFiles confirms logged file tool calls (Read, Edit, Write) against what the
+// kernel saw the agent process do (store.FileEvent), and settles the ones nothing
+// can change any more. A call's window is from when it was issued to when its
+// result was logged (or its prompt ended); one kernel event confirms one action.
+func mergeFiles(ctx context.Context, tx *store.Tx, kernelFirst, kernelLast string) (int, error) {
+	files, err := tx.OpenFileActions(ctx, matcherVersion)
+	if err != nil || len(files) == 0 {
+		return 0, err
+	}
+	pids := map[int64][]int64{} // session -> agent pids
+	n := 0
+	settle := map[string]bool{}
+	for _, f := range files {
+		end := f.ResultTS
+		if end == "" || (f.PromptEnd != "" && f.PromptEnd < end) {
+			end = f.PromptEnd
+		}
+		if end != "" && end < kernelFirst {
+			settle[f.ToolUseID] = true // over before the kernel was being watched
+			continue
+		}
+		ps, ok := pids[f.SessionID]
+		if !ok {
+			if ps, err = tx.AgentPIDs(ctx, f.SessionID); err != nil {
+				return n, err
+			}
+			pids[f.SessionID] = ps
+		}
+		from, to := "", kernelLast
+		if t, err := dbtime.Parse(f.TS); err == nil {
+			from = dbtime.Format(t.Add(-slack))
+		}
+		if end != "" {
+			if t, err := dbtime.Parse(end); err == nil {
+				to = dbtime.Format(t.Add(slack))
+			}
+		}
+		if from != "" {
+			id, err := tx.FileEvent(ctx, ps, f.Action, f.Path, from, to)
+			if err != nil {
+				return n, err
+			}
+			if id != 0 {
+				if err := tx.LinkFile(ctx, f.ActionID, id); err != nil {
+					return n, err
+				}
+				n++
+			}
+		}
+		if end != "" && to < kernelLast {
+			settle[f.ToolUseID] = true // the kernel has been seen past the call's end
+		}
+	}
+	for id := range settle {
+		if err := tx.SettleCall(ctx, id, matcherVersion); err != nil {
+			return n, err
 		}
 	}
 	return n, nil
@@ -178,15 +283,25 @@ func pairParts(ctx context.Context, tx *store.Tx, c store.CallRef) (int, error) 
 	if err != nil {
 		return 0, err
 	}
+	// the shell's grep and find run as the agent's binary with no parent recorded
+	tools, err := tx.ToolRuns(ctx, c.Shell)
+	if err != nil {
+		return 0, err
+	}
+	kids = append(kids, tools...)
 	used := make([]bool, len(kids))
 	n := 0
 	for _, p := range c.Parts {
 		if p.ExecID != "" {
 			continue
 		}
-		want := norm(partCommand(p.Text))
+		text := partCommand(p.Text)
+		want, matches := norm(text), exactMatch
+		if re := expansion(text); re != nil {
+			matches = re // the shell expanded something the log shows unexpanded
+		}
 		for i, k := range kids {
-			if used[i] || norm(procCommand(k)) != want {
+			if used[i] || !matches(want, norm(ranCommand(k))) {
 				continue
 			}
 			if err := tx.LinkPart(ctx, p.ActionID, k.ExecID); err != nil {
@@ -198,6 +313,37 @@ func pairParts(ctx context.Context, tx *store.Tx, c store.CallRef) (int, error) 
 		}
 	}
 	return n, nil
+}
+
+// exactMatch says two normalized command lines are the same.
+func exactMatch(want, got string) bool { return want == got }
+
+// expansion returns a matcher for a command whose text the shell rewrites
+// before running it: a glob (`internal/api/*.go` becomes the list of files),
+// a variable, `~`, a command substitution or a brace list. The log shows what
+// the agent typed, the kernel what ran, so a glob is matched as a pattern and
+// the other expansions by the program alone. nil when the text has none.
+func expansion(text string) func(want, got string) bool {
+	switch {
+	case strings.ContainsAny(text, "*?"):
+		pat := regexp.QuoteMeta(norm(text))
+		pat = strings.NewReplacer(`\*`, `.*`, `\?`, `.`).Replace(pat)
+		re, err := regexp.Compile("^" + pat + "$")
+		if err != nil {
+			return nil
+		}
+		return func(_, got string) bool { return re.MatchString(got) }
+	case strings.ContainsAny(text, "$~`{"):
+		prog := ""
+		if f := strings.Fields(text); len(f) > 0 {
+			prog = norm(f[0])
+		}
+		if prog == "" || strings.ContainsAny(prog, "$~`{") {
+			return nil
+		}
+		return func(_, got string) bool { return strings.HasPrefix(got, prog) }
+	}
+	return nil
 }
 
 // kernelOnly turns processes the log does not explain into actions.
@@ -246,6 +392,13 @@ func procCommand(p store.ProcRef) string {
 	return strings.TrimSpace(filepath.Base(p.Binary) + " " + strings.Join(argv(p.Argv), " "))
 }
 
+// ranCommand is the command a process ran as the agent's log would show it:
+// the shell's grep and find are the agent's own binary under another name, so
+// they are shown as the command that was typed.
+func ranCommand(p store.ProcRef) string {
+	return background.EffectiveCommand(p.Binary, p.Argv)
+}
+
 // shellCommand extracts the command a Claude Code wrapper shell evals from the
 // shell's arguments ("" when it is not such a wrapper).
 func shellCommand(argvJSON string) string {
@@ -262,8 +415,15 @@ func shellCommand(argvJSON string) string {
 	s = s[i+len(open):]
 	if j := strings.LastIndex(s, " < /dev/null"); j >= 0 {
 		s = s[:j]
+	} else if j := strings.LastIndex(s, " && pwd -P >| "); j >= 0 {
+		// a command with a heredoc keeps its own stdin, so the wrapper adds no < /dev/null
+		s = s[:j]
 	}
-	return strings.TrimSpace(s)
+	s = strings.TrimSpace(s)
+	if len(s) >= 2 && s[0] == '\'' && s[len(s)-1] == '\'' {
+		s = s[1 : len(s)-1] // eval's own quoting
+	}
+	return s
 }
 
 // partCommand drops leading VAR=value assignments and a directory in the

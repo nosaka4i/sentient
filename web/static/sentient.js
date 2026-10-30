@@ -12,23 +12,24 @@
     });
   }
 
-  // prompt page: show/hide the trace, expand/collapse the reply
-  var tBtn = document.getElementById('trace-toggle');
-  var tBody = document.getElementById('trace-body');
-  var tCard = document.getElementById('trace');
-  if (tBtn && tBody) {
-    var setTrace = function (open) {
-      tBody.hidden = !open;
-      if (tCard) tCard.classList.toggle('collapsed', !open);
-      tBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      tBtn.querySelector('.lbl-txt').textContent = open ? tBtn.dataset.hide : tBtn.dataset.show;
+  // prompt page: drawers (the trace, the files changed) open and close from
+  // their button; a tile linking to #<name> opens the drawer
+  ['trace', 'files'].forEach(function (name) {
+    var btn = document.getElementById(name + '-toggle');
+    var body = document.getElementById(name + '-body');
+    var card = document.getElementById(name);
+    if (!btn || !body) return;
+    var set = function (open) {
+      body.hidden = !open;
+      if (card) card.classList.toggle('collapsed', !open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      btn.querySelector('.lbl-txt').textContent = open ? btn.dataset.hide : btn.dataset.show;
     };
-    tBtn.addEventListener('click', function () { setTrace(tBody.hidden); });
-    // a tile links to #trace: open it
-    document.querySelectorAll('a[href="#trace"]').forEach(function (a) {
-      a.addEventListener('click', function () { setTrace(true); });
+    btn.addEventListener('click', function () { set(body.hidden); });
+    document.querySelectorAll('a[href="#' + name + '"]').forEach(function (a) {
+      a.addEventListener('click', function () { set(true); });
     });
-  }
+  });
   var rBtn = document.getElementById('reply-toggle');
   var rBody = document.getElementById('reply-body');
   if (rBtn && rBody) {

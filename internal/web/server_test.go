@@ -40,6 +40,11 @@ type fakeSource struct {
 	err         error
 	from, to    time.Time
 	asked       int64 // the prompt id last requested
+	agents      []query.AgentRow
+	agent       *query.AgentDetail
+	timeline    *query.Timeline
+	timelineReq query.TimelineFilter // the timeline filter last asked for
+	askedAgent  string
 	// the window request last made, and the session id last requested
 	windowReq    query.WindowRequest
 	askedSession string
@@ -48,6 +53,20 @@ type fakeSource struct {
 func (f *fakeSource) PromptDetail(ctx context.Context, id int64) (*query.PromptDetail, error) {
 	f.asked = id
 	return f.detail, f.err
+}
+
+func (f *fakeSource) ListAgents(ctx context.Context) ([]query.AgentRow, error) {
+	return f.agents, f.err
+}
+
+func (f *fakeSource) AgentDetail(ctx context.Context, id string) (*query.AgentDetail, error) {
+	f.askedAgent = id
+	return f.agent, f.err
+}
+
+func (f *fakeSource) AgentTimeline(ctx context.Context, id string, flt query.TimelineFilter) (*query.Timeline, error) {
+	f.askedAgent, f.timelineReq = id, flt
+	return f.timeline, f.err
 }
 
 func (f *fakeSource) PromptWindow(ctx context.Context, req query.WindowRequest) (*query.PromptWindow, error) {
@@ -147,7 +166,6 @@ func TestDashboard(t *testing.T) {
 		t.Errorf("window = %v..%v, want the last 24h", src.from, src.to)
 	}
 	for _, want := range []string{
-		`<meta http-equiv="refresh" content="30">`,
 		`History from <time datetime="` + now.Add(-(30*time.Hour + 28*time.Minute)).Format("2006-01-02T15:04") + `">Oct 6 09:12</time> (1d 6h ago)`,
 		`Needs attention <span class="count">(0)</span>`,
 		`Nothing needs your attention`,

@@ -82,9 +82,15 @@ func newHealthPage(rep *health.Report, now time.Time) healthPage {
 			p.OK = false
 		}
 	}
-	p.Headline = "All systems normal"
-	if !p.OK {
+	switch n := len(p.Warnings); {
+	case !p.OK:
 		p.Headline = "Integrity check failed"
+	case n == 1:
+		p.Headline = "Running, with 1 warning" // not "normal": the line under it lists a warning
+	case n > 1:
+		p.Headline = fmt.Sprintf("Running, with %d warnings", n)
+	default:
+		p.Headline = "All systems normal"
 	}
 
 	d := rep.Daemon

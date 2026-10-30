@@ -185,7 +185,23 @@ func TestEditDiffEdgeCases(t *testing.T) {
 		t.Errorf("short diff changed: %+v", got)
 	}
 
-	if isBuiltin("") || !isBuiltin("cd ios") || isBuiltin("echo hi") {
-		t.Error("isBuiltin misclassified")
+	for cmd, want := range map[string]bool{
+		"":                  false,
+		"cd ios":            true,
+		"echo hi":           true, // bash runs its own echo: no process for the kernel to see
+		"printf %s x":       true,
+		"pwd":               true,
+		"GOFLAGS=-p=1 echo": true, // the assignment belongs to the command
+		"A=1 B=2 test -f x": true,
+		"/bin/echo hi":      false, // an explicit path runs the program
+		"ls":                false,
+		"command ls":        false, // runs a program
+		"exec ls":           false, // replaces the shell: the kernel sees ls
+		"A=1 go test":       false,
+		"A=1":               false,
+	} {
+		if got := isBuiltin(cmd); got != want {
+			t.Errorf("isBuiltin(%q) = %v, want %v", cmd, got, want)
+		}
 	}
 }
