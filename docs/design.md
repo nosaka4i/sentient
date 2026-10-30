@@ -465,7 +465,9 @@ can point at its evidence.
 
 - [brief.md](brief.md), [use-cases.md](use-cases.md), [mocks/cli/](mocks/cli/),
   [tetragon.md](tetragon.md), [ideas/agent-linux.md](ideas/agent-linux.md)
-  (the prevention half: a hardened Linux for agents).
+  (the prevention half: a hardened Linux for agents),
+  [capture-verbosity.md](capture-verbosity.md) (how much of the kernel stream is recorded),
+  [storage-design.md](storage-design.md).
 - Deferred: macOS collector (Swift system extension; Endpoint Security
   entitlement to apply for); user-defined rules (e.g. "agent must not
   commit"); web UI; other agents (Codex CLI, Gemini CLI); Windows;

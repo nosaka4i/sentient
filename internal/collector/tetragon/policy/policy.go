@@ -5,7 +5,6 @@ package policy
 
 import (
 	_ "embed"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -79,20 +78,9 @@ func Discover(homes []string) []string {
 	return out
 }
 
-// Render returns the policy for the given agent binaries (see Discover),
+// Render returns the policy for the given agent binaries (see Discover) at the
+// Complete level (every event, nothing left out); RenderWith takes a level,
 // matched as exact paths with their children followed.
 func Render(binaries []string) (string, error) {
-	if len(binaries) == 0 {
-		return "", fmt.Errorf("policy: no agent binaries")
-	}
-	for _, b := range binaries {
-		if !strings.HasPrefix(b, "/") || strings.ContainsAny(b, "\"\\\n\r") {
-			return "", fmt.Errorf("policy: %q is not an absolute path", b)
-		}
-	}
-	var b strings.Builder
-	if err := tmpl.Execute(&b, struct{ Binaries []string }{binaries}); err != nil {
-		return "", err
-	}
-	return b.String(), nil
+	return RenderWith(Options{Binaries: binaries, Verbosity: Complete})
 }

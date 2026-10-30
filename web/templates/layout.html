@@ -36,10 +36,12 @@
     {{if .Since}}<div class="since">History from <time datetime="{{.Since.ISO}}">{{.Since.Date}}</time> ({{.Since.Ago}})</div>{{end}}
     <div class="top-right">
       <nav class="nav" aria-label="Pages">
-        <a href="/"{{if eq .Nav "dashboard"}} aria-current="page"{{end}}>Dashboard</a>
-        <a href="/sessions"{{if eq .Nav "sessions"}} aria-current="page"{{end}}>Sessions</a>
-        <a href="/prompts"{{if eq .Nav "prompts"}} aria-current="page"{{end}}>Prompts</a>
-        <a href="/agents"{{if eq .Nav "agents"}} aria-current="page"{{end}}>Agents</a>
+        <a class="icon-btn" href="/"{{if eq .Nav "dashboard"}} aria-current="page"{{end}} aria-label="Dashboard" title="Dashboard">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
+        </a>
+        <a class="ic" href="/sessions"{{if eq .Nav "sessions"}} aria-current="page"{{end}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Sessions</a>
+        <a class="ic" href="/prompts"{{if eq .Nav "prompts"}} aria-current="page"{{end}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>Prompts</a>
+        <a class="ic" href="/agents"{{if eq .Nav "agents"}} aria-current="page"{{end}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V5"/><circle cx="12" cy="4" r="1"/><circle cx="9" cy="14" r="1" fill="currentColor"/><circle cx="15" cy="14" r="1" fill="currentColor"/></svg>Agents</a>
       </nav>
       <a class="icon-btn" href="/health"{{if eq .Nav "health"}} aria-current="page"{{end}} aria-label="Health" title="Health: sentient's own status">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>

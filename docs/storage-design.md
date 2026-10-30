@@ -54,7 +54,7 @@ In order of payoff, none of them lossy to the evidence:
 
 1. **Compress the record text** (zstd, per record or per block) in `raw_log_records`. JSON compresses 5 to 10 times. Hash input stays the original bytes, so verification decompresses first.
 2. **Large tool results by reference.** Records over a threshold (for example 20 KB: file snapshots, big command output) are stored once, compressed, content-addressed by hash, and the chained record holds the hash. Identical snapshots are stored once.
-3. **Kernel `file_open` volume.** 94% of the events. The collector already drops library and `/proc` noise; options are recording opens of regular files outside the repo and home only as a counted summary per process, or de-duplicating repeated opens of one path by one process within a window. Decided with the alert rules, because rules read opens.
+3. **Kernel `file_open` volume.** 83% of the events (measured 2026-10-30), and about 65% of all events are opens of build caches, toolchains, system libraries and `/proc/<pid>/stat`. Nothing filters them today: neither the policy nor the collector. Handled by a verbosity setting: see [capture-verbosity.md](capture-verbosity.md).
 4. **Import throttle.** A short pause between batches caps the import's write rate, so a large backlog drains over minutes without saturating a small disk.
 5. **Retention.** Stage 2 below.
 
@@ -92,7 +92,7 @@ The collector subscribes first and the import runs behind it; the in-memory queu
 - **One log table for all agents or per agent.** Leaning one with an `agent` column.
 - **Triggers vs retention.** Triggers block deletes, so stage 2 expiry drops whole segment files rather than rows.
 - **Segment size and rollover trigger**, and who verifies a chain across segments (daemon hourly, or `sen verify`).
-- **`file_open` policy** (summary or de-dup), decided with the rules in `docs/rules.md`.
+- **Capture verbosity:** its own questions (names, Tetragon operator behaviour, raw-export caps, free-space threshold) are in [capture-verbosity.md](capture-verbosity.md).
 - **Migration.** Reshape the existing `sentient.db` in place (migration 7), or start fresh and re-import (the transcripts are still on disk).
 - **Backup.** A consistent snapshot of one file (SQLite `VACUUM INTO`).
 
@@ -100,4 +100,5 @@ The collector subscribes first and the import runs behind it; the in-memory queu
 
 - `docs/tetragon-integration.md` (what the collector and the merge write; the merge and attribution links move to link tables).
 - `docs/design.md` "Store" (the original single-database layout).
-- Backlog: `1d2c2b3` (this design), `889e10d` (split files, now stage 2), `6efed70` (retention), `bce526c` (Parquet), `00b522e` (grouping routine commands).
+- [capture-verbosity.md](capture-verbosity.md) (how much of the kernel stream is recorded: levels, the noise list, estimated size).
+- Backlog: `1d2c2b3` (this design), `889e10d` (split files, now stage 2), `6efed70` (retention), `bce526c` (Parquet), `00b522e` (grouping background commands), `bbee4b1` (capture verbosity).

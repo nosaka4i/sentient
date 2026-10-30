@@ -116,6 +116,8 @@ header.top .wrap {
 .nav a { color: var(--text-2); font-size: 13.5px; padding: 5px 10px; border-radius: 8px; }
 .nav a:hover { background: var(--hover); color: var(--text); }
 .nav a[aria-current="page"] { color: var(--text); background: var(--hover); }
+.nav a.ic { display: inline-flex; align-items: center; gap: 6px; }
+.nav a.ic svg { flex: none; }
 .live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-3); }
 .live .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
 .icon-btn {

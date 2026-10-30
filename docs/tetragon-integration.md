@@ -414,6 +414,7 @@ edits, the nearest logged edit by path and time still settles it.
 ## Related and deferred
 
 - `docs/rules.md`: the alert rules that consume kernel evidence.
+- [capture-verbosity.md](capture-verbosity.md): how much of the kernel stream is recorded (the file-read confirmation of built-in tools needs the repo opens kept).
 - Backlog: file effects of a command (`65d950c`), adapter interface for Codex
   (`2aa3ed9`), compressing raw records (`6efed70`), database backup
   (`477932f`).

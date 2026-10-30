@@ -202,14 +202,18 @@ func TestHeaderNavMarksTheCurrentPage(t *testing.T) {
 	s := newTestServer(t, &fakeSource{st: fullStatus(), list: sampleSessionList(), window: sampleWindow(), health: healthReport()})
 	for path, current := range map[string]string{"/": "Dashboard", "/sessions": "Sessions", "/prompts": "Prompts", "/health": ""} {
 		_, body := get(t, s, path, "localhost")
-		for _, link := range []string{`<a href="/"`, `<a href="/sessions"`, `<a href="/prompts"`, `<a class="brand" href="/"`} {
+		for _, link := range []string{`<a class="icon-btn" href="/"`, `<a class="ic" href="/sessions"`, `<a class="ic" href="/prompts"`, `<a class="brand" href="/"`} {
 			if !strings.Contains(body, link) {
 				t.Errorf("%s: header has no %s link", path, link)
 			}
 		}
-		marked := regexp.MustCompile(`<a href="/[a-z]*" aria-current="page">([A-Za-z]+)</a>`).FindStringSubmatch(body)
+		// the home icon carries its name in aria-label; the other pages are text links
+		marked := regexp.MustCompile(`<a (?:class="(?:icon-btn|ic)" )?href="/[a-z]*" aria-current="page"(?: aria-label="Dashboard")?[^>]*>(?:<svg.*?</svg>)?\s*([A-Za-z]*)`).FindStringSubmatch(body)
+		home := strings.Contains(body, `<a class="icon-btn" href="/" aria-current="page" aria-label="Dashboard"`)
 		switch {
-		case current == "" && marked != nil, current != "" && (marked == nil || marked[1] != current):
+		case current == "Dashboard" && !home, current != "Dashboard" && home:
+			t.Errorf("%s: home icon marked current = %v, want %v", path, home, current == "Dashboard")
+		case current != "" && current != "Dashboard" && (marked == nil || marked[1] != current):
 			t.Errorf("%s: current page marked as %v, want %q", path, marked, current)
 		}
 	}

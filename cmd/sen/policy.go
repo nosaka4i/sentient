@@ -12,7 +12,7 @@ import (
 func newPolicyCmd() *cobra.Command {
 	var homes []string
 	var check bool
-	var policyFile string
+	var policyFile, verbosity string
 	cmd := &cobra.Command{
 		Use:   "policy",
 		Short: "Print the Tetragon policy sentient needs (does not install it)",
@@ -21,6 +21,10 @@ process tree to sentient. It only prints; nothing is installed or changed. Insta
 
   sen policy | sudo tee /etc/tetragon/tetragon.tp.d/sentient.yaml
   sudo systemctl restart tetragon
+
+--verbosity says how much the kernel reports (see docs/capture-verbosity.md): essential,
+the default, leaves out the opens of build caches, toolchains and system libraries;
+extended and complete ask for everything. Run sentientd at the same level.
 
 The policy names the agent binaries installed now, so run it again, and restart
 Tetragon, after the agent updates.
@@ -58,7 +62,11 @@ no privileges and exits 1 when anything is wrong.`,
 			if len(bins) == 0 {
 				return fmt.Errorf("no agent found under %v (use --home for another user's home)", homes)
 			}
-			p, err := policy.Render(bins)
+			level, err := policy.ParseVerbosity(verbosity)
+			if err != nil {
+				return err
+			}
+			p, err := policy.RenderWith(policy.Options{Binaries: bins, Verbosity: level, Noise: policy.DetectNoise(homes, policy.SystemEnv())})
 			if err != nil {
 				return err
 			}
@@ -68,6 +76,7 @@ no privileges and exits 1 when anything is wrong.`,
 	}
 	cmd.Flags().BoolVar(&check, "check", false, "check the installed policy against the agents installed and running now; exit 1 if anything is wrong")
 	cmd.Flags().StringVar(&policyFile, "policy-file", policy.DefaultPolicyFile, "the installed policy --check reads")
+	cmd.Flags().StringVar(&verbosity, "verbosity", "essential", "how much the kernel reports: essential (leaves out build caches, toolchains and system libraries), extended or complete")
 	cmd.Flags().StringSliceVar(&homes, "home", nil, "home directory whose agent installs the policy names; repeatable (default your home)")
 	return cmd
 }

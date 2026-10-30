@@ -54,7 +54,7 @@ func TestAgentsPage(t *testing.T) {
 		`<span class="where">nosaka</span>`,
 		`<span class="r">1,204</span>`,
 		`<span class="r">8,310</span>`,
-		`<a href="/agents" aria-current="page">Agents</a>`,
+		`<a class="ic" href="/agents" aria-current="page">`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page missing %q", want)
