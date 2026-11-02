@@ -434,6 +434,16 @@ message HealthResponse {
     repeated string passwordless = 3;
   }
   Sudo sudo = 10;
+
+  message Capture {
+    bool enabled = 1; // the kernel collector is on
+    string level = 2; // as sentientd runs: essential | extended | complete
+    bool policy_known = 3;
+    string policy_level = 4;
+    string policy_file = 5;
+    google.protobuf.Timestamp policy_installed = 6; // unset if unknown
+  }
+  Capture capture = 11;
 }
 
 message StatusRequest {

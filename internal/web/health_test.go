@@ -181,3 +181,81 @@ func TestFormatters(t *testing.T) {
 		t.Error("agentName")
 	}
 }
+
+func captureBody(t *testing.T, mutate func(*health.Report)) string {
+	t.Helper()
+	rep := healthReport()
+	mutate(rep)
+	resp, body := get(t, newTestServer(t, &fakeSource{health: rep}), "/health", "127.0.0.1:7357")
+	if resp.StatusCode != 200 {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+	return body
+}
+
+func TestHealthCaptureCardMatching(t *testing.T) {
+	body := captureBody(t, func(r *health.Report) {
+		r.Capture = health.Capture{Enabled: true, Level: "essential", PolicyKnown: true, PolicyLevel: "essential",
+			PolicyFile: "/etc/tetragon/tetragon.tp.d/sentient.yaml", PolicyInstalled: now.Add(-48 * time.Hour)}
+	})
+	for _, want := range []string{
+		`<h2 id="h-cap">Capture</h2>`, `on · essential`,
+		`<span class="num txt">essential</span>`, `default · build caches, toolchains and system libraries are not recorded`,
+		`matches sentientd · installed `,
+		`<span class="lbl"><b>disk</b> free</span>`, `of 240 GB · 49% free`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("page lacks %q", want)
+		}
+	}
+	for _, bad := range []string{`warnstate`, `does not match`, `The Tetragon policy records at`} {
+		if strings.Contains(body, bad) {
+			t.Errorf("page has %q although the levels agree", bad)
+		}
+	}
+}
+
+func TestHealthCaptureCardMismatch(t *testing.T) {
+	body := captureBody(t, func(r *health.Report) {
+		r.Capture = health.Capture{Enabled: true, Level: "essential", PolicyKnown: true, PolicyLevel: "complete", PolicyFile: "/p.yaml"}
+	})
+	for _, want := range []string{
+		`The Tetragon policy records at complete, sentientd is set to essential`,
+		`class="tile warnstate"`, `does not match sentientd · sen policy --verbosity essential`,
+		`<span class="okdot warn"></span>on · essential`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("page lacks %q", want)
+		}
+	}
+}
+
+func TestHealthCaptureCardOffAndUnknown(t *testing.T) {
+	body := captureBody(t, func(r *health.Report) { r.Capture = health.Capture{Level: "essential"} })
+	if !strings.Contains(body, `<section class="card muted" aria-labelledby="h-cap">`) || !strings.Contains(body, `sentientd was started without --tetragon`) ||
+		!strings.Contains(body, `<span class="state-off">off</span>`) {
+		t.Errorf("capture off:\n%s", body)
+	}
+	body = captureBody(t, func(r *health.Report) {
+		r.Capture = health.Capture{Enabled: true, Level: "complete", PolicyFile: "/opt/p.yaml"}
+	})
+	for _, want := range []string{`everything the policy reports is stored`, `no verbosity header in `, `rerun sen policy and install it`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("unknown policy: page lacks %q", want)
+		}
+	}
+	body = captureBody(t, func(r *health.Report) {
+		r.Capture = health.Capture{Enabled: true, Level: "extended", PolicyKnown: true, PolicyLevel: "extended"}
+		r.Storage = health.Storage{}
+	})
+	if !strings.Contains(body, `per-command counts are not built yet`) || !strings.Contains(body, `<span class="sum">unknown</span>`) {
+		t.Errorf("extended, unknown disk")
+	}
+	body = captureBody(t, func(r *health.Report) {
+		r.Capture = health.Capture{Enabled: true, Level: "essential", PolicyKnown: true, PolicyLevel: "essential"}
+		r.Storage.FreeBytes = 60_000_000_000
+	})
+	if !strings.Contains(body, `class="tile warnstate"`) || !strings.Contains(body, `60 GB`) {
+		t.Errorf("disk at 75%% used is not shaded")
+	}
+}

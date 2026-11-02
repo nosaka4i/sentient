@@ -136,3 +136,50 @@ func TestRunRejectsAnUnknownVerbosity(t *testing.T) {
 		t.Errorf("err = %v", err)
 	}
 }
+
+func TestCaptureReport(t *testing.T) {
+	installed := time.Date(2026, 11, 2, 0, 59, 0, 0, time.UTC)
+	mtime := func(string) time.Time { return installed }
+	file := func(text string) func(string) ([]byte, error) {
+		return func(p string) ([]byte, error) {
+			if p != "/p.yaml" {
+				return nil, os.ErrNotExist
+			}
+			return []byte(text), nil
+		}
+	}
+	cfg := Config{Tetragon: "unix:///x", Verbosity: policy.Essential, PolicyFile: "/p.yaml"}
+
+	c := captureReport(cfg, file(installedPolicy(t, policy.Complete)), mtime)
+	if !c.Enabled || c.Level != "essential" || !c.PolicyKnown || c.PolicyLevel != "complete" || !c.PolicyInstalled.Equal(installed) || c.PolicyFile != "/p.yaml" {
+		t.Errorf("mismatching policy: %+v", c)
+	}
+	if c = captureReport(cfg, file("apiVersion: v1\n"), mtime); c.PolicyKnown || !c.Enabled {
+		t.Errorf("headerless policy: %+v", c)
+	}
+	if c = captureReport(cfg, func(string) ([]byte, error) { return nil, os.ErrNotExist }, mtime); c.PolicyKnown {
+		t.Errorf("missing policy: %+v", c)
+	}
+	off := cfg
+	off.Tetragon = ""
+	if c = captureReport(off, file(installedPolicy(t, policy.Complete)), mtime); c.Enabled || c.PolicyKnown {
+		t.Errorf("capture off: %+v", c)
+	}
+	none := Config{Tetragon: "unix:///x", Verbosity: policy.Essential}
+	if c = captureReport(none, func(string) ([]byte, error) { return nil, os.ErrNotExist }, mtime); c.PolicyFile != policy.DefaultPolicyFile {
+		t.Errorf("default policy file = %q", c.PolicyFile)
+	}
+}
+
+func TestFileModTime(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "f")
+	if !fileModTime(p).IsZero() {
+		t.Error("missing file has a time")
+	}
+	if err := os.WriteFile(p, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if time.Since(fileModTime(p)) > time.Minute {
+		t.Error("fresh file is old")
+	}
+}

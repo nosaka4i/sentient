@@ -9,6 +9,10 @@ import (
 	"github.com/nosaka4i/sentient/internal/collector/tetragon/policy"
 )
 
+// noiseEnv is the machine the noise locations are detected on; tests replace
+// it so they do not run the real go command.
+var noiseEnv = policy.SystemEnv
+
 func newPolicyCmd() *cobra.Command {
 	var homes []string
 	var check bool
@@ -66,7 +70,7 @@ no privileges and exits 1 when anything is wrong.`,
 			if err != nil {
 				return err
 			}
-			p, err := policy.RenderWith(policy.Options{Binaries: bins, Verbosity: level, Noise: policy.DetectNoise(homes, policy.SystemEnv())})
+			p, err := policy.RenderWith(policy.Options{Binaries: bins, Verbosity: level, Noise: policy.DetectNoise(homes, noiseEnv())})
 			if err != nil {
 				return err
 			}

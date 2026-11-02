@@ -22,6 +22,11 @@ type healthPage struct {
 	Warnings []health.Warning
 	Checked  since
 
+	Capture      []htile
+	CaptureOn    bool   // the kernel collector is on
+	CaptureWarn  bool   // the policy and sentientd disagree, or the disk is filling
+	CaptureState string // the card's header chip
+
 	Daemon    []htile
 	DaemonOn  string // hint: sentientd · user
 	API       []htile
@@ -48,6 +53,7 @@ type htile struct {
 	SumMono          bool
 	Go               bool // "→" after the summary
 	Wide, Muted      bool
+	Warn             bool // shaded: something here needs a look
 	Href             string
 	Title            string
 }
@@ -92,6 +98,8 @@ func newHealthPage(rep *health.Report, now time.Time) healthPage {
 	default:
 		p.Headline = "All systems normal"
 	}
+
+	p.Capture, p.CaptureOn, p.CaptureWarn, p.CaptureState = captureCard(rep, now)
 
 	d := rep.Daemon
 	p.DaemonOn = "sentientd · " + d.User
@@ -299,4 +307,52 @@ func shortPath(p string) string {
 		parts = parts[len(parts)-2:]
 	}
 	return strings.Join(parts, "/")
+}
+
+// levelNote is what each capture level means, for the card's first tile.
+var levelNote = map[string]string{
+	"essential": "build caches, toolchains and system libraries are not recorded",
+	"extended":  "build noise is not stored (per-command counts are not built yet)",
+	"complete":  "everything the policy reports is stored",
+}
+
+// captureCard is the Capture card: the level sentientd runs at, the level the
+// installed policy was made for, and the disk. It also returns whether the
+// kernel collector is on, whether anything needs a look, and the header chip.
+func captureCard(rep *health.Report, now time.Time) (tiles []htile, on, warn bool, state string) {
+	c := rep.Capture
+	if !c.Enabled {
+		return []htile{{Label: "kernel capture", Num: "off", NumTxt: true, Wide: true, Muted: true,
+			Sum: "sentientd was started without --tetragon, so only the agents' own logs are recorded"}}, false, false, "off"
+	}
+	level := htile{Label: "level", Num: c.Level, NumTxt: true, Sum: levelNote[c.Level]}
+	if c.Level == "essential" {
+		level.Sum = "default · " + level.Sum
+	}
+	policy := htile{Label: "policy", LabelRest: "/ installed", Num: "unknown", NumTxt: true,
+		Sum: "no verbosity header in " + shortPath(c.PolicyFile) + ", or sentientd cannot read it · rerun sen policy and install it"}
+	if c.PolicyKnown {
+		policy.Num = c.PolicyLevel
+		installed := ""
+		if !c.PolicyInstalled.IsZero() {
+			installed = " · installed " + render.Date(c.PolicyInstalled, now)
+		}
+		if c.PolicyLevel == c.Level {
+			policy.Check, policy.Sum = true, "matches sentientd"+installed
+		} else {
+			policy.Warn, warn = true, true
+			policy.Sum = "does not match sentientd · sen policy --verbosity " + c.Level + installed
+		}
+	}
+	disk := htile{Label: "disk", LabelRest: "free", Num: "—", Sum: "unknown"}
+	if s := rep.Storage; s.SizeBytes > 0 {
+		free := s.FreeBytes * 100 / s.SizeBytes
+		disk.Num = humanize.Bytes(uint64(s.FreeBytes))
+		disk.Sum = fmt.Sprintf("of %s · %d%% free", humanize.Bytes(uint64(s.SizeBytes)), free)
+		if 100-free >= 70 {
+			disk.Warn, warn = true, true
+		}
+	}
+	state = "on · " + c.Level
+	return []htile{level, policy, disk}, true, warn, state
 }

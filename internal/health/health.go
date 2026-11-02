@@ -6,6 +6,8 @@ package health
 import (
 	"strconv"
 	"time"
+
+	"github.com/dustin/go-humanize"
 )
 
 // Report is sentient's health at CheckedAt.
@@ -21,6 +23,7 @@ type Report struct {
 	Agents    []Agent
 	Live      []LiveSession
 	Sudo      Sudo
+	Capture   Capture
 }
 
 // Daemon is sentientd's own process.
@@ -83,6 +86,17 @@ type Integrity struct {
 	GapTracking bool // monitor gaps need kernel capture (not yet)
 }
 
+// Capture is what sentient records of the kernel's events
+// (docs/capture-verbosity.md).
+type Capture struct {
+	Enabled         bool   // the kernel collector is on
+	Level           string // essential | extended | complete, as sentientd runs
+	PolicyKnown     bool   // the installed policy was readable and says its level
+	PolicyLevel     string
+	PolicyFile      string
+	PolicyInstalled time.Time // the policy file's modification time (zero if unknown)
+}
+
 // Agent is an agent detected from its logs.
 type Agent struct {
 	Agent   string
@@ -132,11 +146,28 @@ func (r *Report) Warnings() []Warning {
 			Why:  "Stored verbatim but not interpreted; the agent's log format may have changed. See the sentientd log.",
 		})
 	}
-	if r.Storage.SizeBytes > 0 && r.Storage.FreeBytes*10 < r.Storage.SizeBytes {
+	if c := r.Capture; c.Enabled && c.PolicyKnown && c.PolicyLevel != c.Level {
 		w = append(w, Warning{
-			What: "Disk almost full",
-			Why:  "Less than 10% free on the filesystem holding sentient's data.",
+			What: "The Tetragon policy records at " + c.PolicyLevel + ", sentientd is set to " + c.Level,
+			Why: "Rerun sen policy --verbosity " + c.Level + ", install it and restart Tetragon. Until then sentientd keeps only what " + c.Level +
+				" allows, so the database stays the size you asked for, but Tetragon still does the extra work.",
 		})
+	}
+	if s := r.Storage; s.SizeBytes > 0 {
+		used := 100 - s.FreeBytes*100/s.SizeBytes
+		ours := "sentient's database is " + humanize.Bytes(uint64(s.DBBytes)) + ". "
+		switch {
+		case used >= 90:
+			w = append(w, Warning{Critical: true,
+				What: "Disk almost full",
+				Why:  ours + strconv.FormatInt(used, 10) + "% of the filesystem holding sentient's data is used. Free space; recording does not stop by itself yet.",
+			})
+		case used >= 70:
+			w = append(w, Warning{
+				What: "Disk filling up",
+				Why:  ours + strconv.FormatInt(used, 10) + "% of the filesystem holding sentient's data is used.",
+			})
+		}
 	}
 	return w
 }

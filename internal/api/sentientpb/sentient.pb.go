@@ -2903,6 +2903,7 @@ type HealthResponse struct {
 	Agents        []*HealthResponse_Agent       `protobuf:"bytes,8,rep,name=agents,proto3" json:"agents,omitempty"`
 	Live          []*HealthResponse_LiveSession `protobuf:"bytes,9,rep,name=live,proto3" json:"live,omitempty"`
 	Sudo          *HealthResponse_Sudo          `protobuf:"bytes,10,opt,name=sudo,proto3" json:"sudo,omitempty"`
+	Capture       *HealthResponse_Capture       `protobuf:"bytes,11,opt,name=capture,proto3" json:"capture,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3003,6 +3004,13 @@ func (x *HealthResponse) GetLive() []*HealthResponse_LiveSession {
 func (x *HealthResponse) GetSudo() *HealthResponse_Sudo {
 	if x != nil {
 		return x.Sudo
+	}
+	return nil
+}
+
+func (x *HealthResponse) GetCapture() *HealthResponse_Capture {
+	if x != nil {
+		return x.Capture
 	}
 	return nil
 }
@@ -4041,6 +4049,90 @@ func (x *HealthResponse_Sudo) GetPasswordless() []string {
 	return nil
 }
 
+type HealthResponse_Capture struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Enabled         bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"` // the kernel collector is on
+	Level           string                 `protobuf:"bytes,2,opt,name=level,proto3" json:"level,omitempty"`      // as sentientd runs: essential | extended | complete
+	PolicyKnown     bool                   `protobuf:"varint,3,opt,name=policy_known,json=policyKnown,proto3" json:"policy_known,omitempty"`
+	PolicyLevel     string                 `protobuf:"bytes,4,opt,name=policy_level,json=policyLevel,proto3" json:"policy_level,omitempty"`
+	PolicyFile      string                 `protobuf:"bytes,5,opt,name=policy_file,json=policyFile,proto3" json:"policy_file,omitempty"`
+	PolicyInstalled *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=policy_installed,json=policyInstalled,proto3" json:"policy_installed,omitempty"` // unset if unknown
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *HealthResponse_Capture) Reset() {
+	*x = HealthResponse_Capture{}
+	mi := &file_sentient_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HealthResponse_Capture) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HealthResponse_Capture) ProtoMessage() {}
+
+func (x *HealthResponse_Capture) ProtoReflect() protoreflect.Message {
+	mi := &file_sentient_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HealthResponse_Capture.ProtoReflect.Descriptor instead.
+func (*HealthResponse_Capture) Descriptor() ([]byte, []int) {
+	return file_sentient_proto_rawDescGZIP(), []int{37, 8}
+}
+
+func (x *HealthResponse_Capture) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *HealthResponse_Capture) GetLevel() string {
+	if x != nil {
+		return x.Level
+	}
+	return ""
+}
+
+func (x *HealthResponse_Capture) GetPolicyKnown() bool {
+	if x != nil {
+		return x.PolicyKnown
+	}
+	return false
+}
+
+func (x *HealthResponse_Capture) GetPolicyLevel() string {
+	if x != nil {
+		return x.PolicyLevel
+	}
+	return ""
+}
+
+func (x *HealthResponse_Capture) GetPolicyFile() string {
+	if x != nil {
+		return x.PolicyFile
+	}
+	return ""
+}
+
+func (x *HealthResponse_Capture) GetPolicyInstalled() *timestamppb.Timestamp {
+	if x != nil {
+		return x.PolicyInstalled
+	}
+	return nil
+}
+
 var File_sentient_proto protoreflect.FileDescriptor
 
 const file_sentient_proto_rawDesc = "" +
@@ -4309,7 +4401,7 @@ const file_sentient_proto_rawDesc = "" +
 	"\n" +
 	"NamedCount\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05count\x18\x02 \x01(\x03R\x05count\"\xe0\x11\n" +
+	"\x05count\x18\x02 \x01(\x03R\x05count\"\x89\x14\n" +
 	"\x0eHealthResponse\x129\n" +
 	"\n" +
 	"checked_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\tcheckedAt\x12A\n" +
@@ -4322,7 +4414,8 @@ const file_sentient_proto_rawDesc = "" +
 	"\x06agents\x18\b \x03(\v2!.sentient.v1.HealthResponse.AgentR\x06agents\x12;\n" +
 	"\x04live\x18\t \x03(\v2'.sentient.v1.HealthResponse.LiveSessionR\x04live\x124\n" +
 	"\x04sudo\x18\n" +
-	" \x01(\v2 .sentient.v1.HealthResponse.SudoR\x04sudo\x1a\x90\x02\n" +
+	" \x01(\v2 .sentient.v1.HealthResponse.SudoR\x04sudo\x12=\n" +
+	"\acapture\x18\v \x01(\v2#.sentient.v1.HealthResponse.CaptureR\acapture\x1a\x90\x02\n" +
 	"\x06Daemon\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x124\n" +
 	"\astarted\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\astarted\x12\x1f\n" +
@@ -4383,7 +4476,15 @@ const file_sentient_proto_rawDesc = "" +
 	"\x04Sudo\x12\x18\n" +
 	"\achecked\x18\x01 \x01(\bR\achecked\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\x12\"\n" +
-	"\fpasswordless\x18\x03 \x03(\tR\fpasswordless\"\x8e\x01\n" +
+	"\fpasswordless\x18\x03 \x03(\tR\fpasswordless\x1a\xe7\x01\n" +
+	"\aCapture\x12\x18\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled\x12\x14\n" +
+	"\x05level\x18\x02 \x01(\tR\x05level\x12!\n" +
+	"\fpolicy_known\x18\x03 \x01(\bR\vpolicyKnown\x12!\n" +
+	"\fpolicy_level\x18\x04 \x01(\tR\vpolicyLevel\x12\x1f\n" +
+	"\vpolicy_file\x18\x05 \x01(\tR\n" +
+	"policyFile\x12E\n" +
+	"\x10policy_installed\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x0fpolicyInstalled\"\x8e\x01\n" +
 	"\rStatusRequest\x12.\n" +
 	"\x04from\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x04from\x12*\n" +
 	"\x02to\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x02to\x12!\n" +
@@ -4448,7 +4549,7 @@ func file_sentient_proto_rawDescGZIP() []byte {
 	return file_sentient_proto_rawDescData
 }
 
-var file_sentient_proto_msgTypes = make([]protoimpl.MessageInfo, 50)
+var file_sentient_proto_msgTypes = make([]protoimpl.MessageInfo, 51)
 var file_sentient_proto_goTypes = []any{
 	(*Alert)(nil),                      // 0: sentient.v1.Alert
 	(*AlertListRequest)(nil),           // 1: sentient.v1.AlertListRequest
@@ -4500,64 +4601,65 @@ var file_sentient_proto_goTypes = []any{
 	(*HealthResponse_Agent)(nil),       // 47: sentient.v1.HealthResponse.Agent
 	(*HealthResponse_LiveSession)(nil), // 48: sentient.v1.HealthResponse.LiveSession
 	(*HealthResponse_Sudo)(nil),        // 49: sentient.v1.HealthResponse.Sudo
-	(*timestamppb.Timestamp)(nil),      // 50: google.protobuf.Timestamp
-	(*durationpb.Duration)(nil),        // 51: google.protobuf.Duration
+	(*HealthResponse_Capture)(nil),     // 50: sentient.v1.HealthResponse.Capture
+	(*timestamppb.Timestamp)(nil),      // 51: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),        // 52: google.protobuf.Duration
 }
 var file_sentient_proto_depIdxs = []int32{
-	50, // 0: sentient.v1.Alert.at:type_name -> google.protobuf.Timestamp
-	50, // 1: sentient.v1.Alert.reviewed_at:type_name -> google.protobuf.Timestamp
-	50, // 2: sentient.v1.AlertListResponse.history_begins:type_name -> google.protobuf.Timestamp
+	51, // 0: sentient.v1.Alert.at:type_name -> google.protobuf.Timestamp
+	51, // 1: sentient.v1.Alert.reviewed_at:type_name -> google.protobuf.Timestamp
+	51, // 2: sentient.v1.AlertListResponse.history_begins:type_name -> google.protobuf.Timestamp
 	0,  // 3: sentient.v1.AlertListResponse.alerts:type_name -> sentient.v1.Alert
-	50, // 4: sentient.v1.AlertDetailResponse.history_begins:type_name -> google.protobuf.Timestamp
+	51, // 4: sentient.v1.AlertDetailResponse.history_begins:type_name -> google.protobuf.Timestamp
 	0,  // 5: sentient.v1.AlertDetailResponse.alert:type_name -> sentient.v1.Alert
-	50, // 6: sentient.v1.ActivityEvent.at:type_name -> google.protobuf.Timestamp
-	50, // 7: sentient.v1.ActivityListResponse.history_begins:type_name -> google.protobuf.Timestamp
-	50, // 8: sentient.v1.ActivityListResponse.from:type_name -> google.protobuf.Timestamp
-	50, // 9: sentient.v1.ActivityListResponse.to:type_name -> google.protobuf.Timestamp
+	51, // 6: sentient.v1.ActivityEvent.at:type_name -> google.protobuf.Timestamp
+	51, // 7: sentient.v1.ActivityListResponse.history_begins:type_name -> google.protobuf.Timestamp
+	51, // 8: sentient.v1.ActivityListResponse.from:type_name -> google.protobuf.Timestamp
+	51, // 9: sentient.v1.ActivityListResponse.to:type_name -> google.protobuf.Timestamp
 	39, // 10: sentient.v1.ActivityListResponse.rows:type_name -> sentient.v1.ActivityRow
 	8,  // 11: sentient.v1.ActivityListResponse.events:type_name -> sentient.v1.ActivityEvent
 	13, // 12: sentient.v1.SessionListRow.summary:type_name -> sentient.v1.SessionSummary
-	50, // 13: sentient.v1.SessionListResponse.history_begins:type_name -> google.protobuf.Timestamp
+	51, // 13: sentient.v1.SessionListResponse.history_begins:type_name -> google.protobuf.Timestamp
 	11, // 14: sentient.v1.SessionListResponse.sessions:type_name -> sentient.v1.SessionListRow
-	50, // 15: sentient.v1.SessionSummary.started:type_name -> google.protobuf.Timestamp
-	50, // 16: sentient.v1.SessionSummary.last_activity:type_name -> google.protobuf.Timestamp
-	50, // 17: sentient.v1.PromptWindowRequest.before:type_name -> google.protobuf.Timestamp
-	50, // 18: sentient.v1.PromptWindowResponse.history_begins:type_name -> google.protobuf.Timestamp
+	51, // 15: sentient.v1.SessionSummary.started:type_name -> google.protobuf.Timestamp
+	51, // 16: sentient.v1.SessionSummary.last_activity:type_name -> google.protobuf.Timestamp
+	51, // 17: sentient.v1.PromptWindowRequest.before:type_name -> google.protobuf.Timestamp
+	51, // 18: sentient.v1.PromptWindowResponse.history_begins:type_name -> google.protobuf.Timestamp
 	40, // 19: sentient.v1.PromptWindowResponse.prompts:type_name -> sentient.v1.Prompt
 	13, // 20: sentient.v1.PromptWindowResponse.sessions:type_name -> sentient.v1.SessionSummary
-	50, // 21: sentient.v1.PromptWindowResponse.oldest:type_name -> google.protobuf.Timestamp
+	51, // 21: sentient.v1.PromptWindowResponse.oldest:type_name -> google.protobuf.Timestamp
 	14, // 22: sentient.v1.PromptWindowResponse.menu:type_name -> sentient.v1.SessionOption
-	50, // 23: sentient.v1.Subagent.at:type_name -> google.protobuf.Timestamp
-	50, // 24: sentient.v1.SessionDetailResponse.history_begins:type_name -> google.protobuf.Timestamp
-	50, // 25: sentient.v1.SessionDetailResponse.started:type_name -> google.protobuf.Timestamp
-	50, // 26: sentient.v1.SessionDetailResponse.last_activity:type_name -> google.protobuf.Timestamp
+	51, // 23: sentient.v1.Subagent.at:type_name -> google.protobuf.Timestamp
+	51, // 24: sentient.v1.SessionDetailResponse.history_begins:type_name -> google.protobuf.Timestamp
+	51, // 25: sentient.v1.SessionDetailResponse.started:type_name -> google.protobuf.Timestamp
+	51, // 26: sentient.v1.SessionDetailResponse.last_activity:type_name -> google.protobuf.Timestamp
 	40, // 27: sentient.v1.SessionDetailResponse.prompts:type_name -> sentient.v1.Prompt
 	39, // 28: sentient.v1.SessionDetailResponse.activity:type_name -> sentient.v1.ActivityRow
 	18, // 29: sentient.v1.SessionDetailResponse.subagents:type_name -> sentient.v1.Subagent
-	50, // 30: sentient.v1.FileChange.first:type_name -> google.protobuf.Timestamp
+	51, // 30: sentient.v1.FileChange.first:type_name -> google.protobuf.Timestamp
 	21, // 31: sentient.v1.FileChange.diff:type_name -> sentient.v1.DiffLine
-	51, // 32: sentient.v1.Step.offset:type_name -> google.protobuf.Duration
-	50, // 33: sentient.v1.AgentRow.started:type_name -> google.protobuf.Timestamp
-	50, // 34: sentient.v1.AgentRow.stopped:type_name -> google.protobuf.Timestamp
+	52, // 32: sentient.v1.Step.offset:type_name -> google.protobuf.Duration
+	51, // 33: sentient.v1.AgentRow.started:type_name -> google.protobuf.Timestamp
+	51, // 34: sentient.v1.AgentRow.stopped:type_name -> google.protobuf.Timestamp
 	25, // 35: sentient.v1.ListAgentsResponse.agents:type_name -> sentient.v1.AgentRow
-	50, // 36: sentient.v1.BackgroundRun.at:type_name -> google.protobuf.Timestamp
-	50, // 37: sentient.v1.BackgroundGroup.first:type_name -> google.protobuf.Timestamp
-	50, // 38: sentient.v1.BackgroundGroup.last:type_name -> google.protobuf.Timestamp
+	51, // 36: sentient.v1.BackgroundRun.at:type_name -> google.protobuf.Timestamp
+	51, // 37: sentient.v1.BackgroundGroup.first:type_name -> google.protobuf.Timestamp
+	51, // 38: sentient.v1.BackgroundGroup.last:type_name -> google.protobuf.Timestamp
 	29, // 39: sentient.v1.BackgroundGroup.latest:type_name -> sentient.v1.BackgroundRun
 	25, // 40: sentient.v1.AgentDetailResponse.agent:type_name -> sentient.v1.AgentRow
 	30, // 41: sentient.v1.AgentDetailResponse.groups:type_name -> sentient.v1.BackgroundGroup
-	50, // 42: sentient.v1.AgentTimelineRequest.from:type_name -> google.protobuf.Timestamp
-	50, // 43: sentient.v1.AgentTimelineRequest.to:type_name -> google.protobuf.Timestamp
+	51, // 42: sentient.v1.AgentTimelineRequest.from:type_name -> google.protobuf.Timestamp
+	51, // 43: sentient.v1.AgentTimelineRequest.to:type_name -> google.protobuf.Timestamp
 	29, // 44: sentient.v1.AgentTimelineResponse.runs:type_name -> sentient.v1.BackgroundRun
-	50, // 45: sentient.v1.PromptDetailResponse.history_begins:type_name -> google.protobuf.Timestamp
+	51, // 45: sentient.v1.PromptDetailResponse.history_begins:type_name -> google.protobuf.Timestamp
 	40, // 46: sentient.v1.PromptDetailResponse.prompt:type_name -> sentient.v1.Prompt
 	39, // 47: sentient.v1.PromptDetailResponse.activity:type_name -> sentient.v1.ActivityRow
 	22, // 48: sentient.v1.PromptDetailResponse.files:type_name -> sentient.v1.FileChange
 	23, // 49: sentient.v1.PromptDetailResponse.steps:type_name -> sentient.v1.Step
-	50, // 50: sentient.v1.PromptDetailResponse.reply_at:type_name -> google.protobuf.Timestamp
+	51, // 50: sentient.v1.PromptDetailResponse.reply_at:type_name -> google.protobuf.Timestamp
 	24, // 51: sentient.v1.PromptDetailResponse.counts:type_name -> sentient.v1.EvidenceCounts
-	50, // 52: sentient.v1.HealthResponse.checked_at:type_name -> google.protobuf.Timestamp
-	50, // 53: sentient.v1.HealthResponse.history_begins:type_name -> google.protobuf.Timestamp
+	51, // 52: sentient.v1.HealthResponse.checked_at:type_name -> google.protobuf.Timestamp
+	51, // 53: sentient.v1.HealthResponse.history_begins:type_name -> google.protobuf.Timestamp
 	42, // 54: sentient.v1.HealthResponse.daemon:type_name -> sentient.v1.HealthResponse.Daemon
 	43, // 55: sentient.v1.HealthResponse.api:type_name -> sentient.v1.HealthResponse.API
 	44, // 56: sentient.v1.HealthResponse.storage:type_name -> sentient.v1.HealthResponse.Storage
@@ -4566,57 +4668,59 @@ var file_sentient_proto_depIdxs = []int32{
 	47, // 59: sentient.v1.HealthResponse.agents:type_name -> sentient.v1.HealthResponse.Agent
 	48, // 60: sentient.v1.HealthResponse.live:type_name -> sentient.v1.HealthResponse.LiveSession
 	49, // 61: sentient.v1.HealthResponse.sudo:type_name -> sentient.v1.HealthResponse.Sudo
-	50, // 62: sentient.v1.StatusRequest.from:type_name -> google.protobuf.Timestamp
-	50, // 63: sentient.v1.StatusRequest.to:type_name -> google.protobuf.Timestamp
-	50, // 64: sentient.v1.Prompt.started:type_name -> google.protobuf.Timestamp
-	51, // 65: sentient.v1.Prompt.duration:type_name -> google.protobuf.Duration
-	50, // 66: sentient.v1.StatusResponse.history_begins:type_name -> google.protobuf.Timestamp
-	39, // 67: sentient.v1.StatusResponse.activity:type_name -> sentient.v1.ActivityRow
-	40, // 68: sentient.v1.StatusResponse.prompts:type_name -> sentient.v1.Prompt
-	50, // 69: sentient.v1.HealthResponse.Daemon.started:type_name -> google.protobuf.Timestamp
-	51, // 70: sentient.v1.HealthResponse.Daemon.cpu_window:type_name -> google.protobuf.Duration
-	50, // 71: sentient.v1.HealthResponse.API.since:type_name -> google.protobuf.Timestamp
-	51, // 72: sentient.v1.HealthResponse.API.p50:type_name -> google.protobuf.Duration
-	51, // 73: sentient.v1.HealthResponse.API.p95:type_name -> google.protobuf.Duration
-	51, // 74: sentient.v1.HealthResponse.API.p99:type_name -> google.protobuf.Duration
-	36, // 75: sentient.v1.HealthResponse.API.errors_by_code:type_name -> sentient.v1.NamedCount
-	36, // 76: sentient.v1.HealthResponse.API.methods:type_name -> sentient.v1.NamedCount
-	50, // 77: sentient.v1.HealthResponse.IngestAgent.last_record:type_name -> google.protobuf.Timestamp
-	50, // 78: sentient.v1.HealthResponse.Integrity.checked_at:type_name -> google.protobuf.Timestamp
-	50, // 79: sentient.v1.HealthResponse.Integrity.full_at:type_name -> google.protobuf.Timestamp
-	51, // 80: sentient.v1.HealthResponse.Integrity.interval:type_name -> google.protobuf.Duration
-	50, // 81: sentient.v1.HealthResponse.LiveSession.last_activity:type_name -> google.protobuf.Timestamp
-	38, // 82: sentient.v1.Sentient.Status:input_type -> sentient.v1.StatusRequest
-	35, // 83: sentient.v1.Sentient.Health:input_type -> sentient.v1.HealthRequest
-	20, // 84: sentient.v1.Sentient.PromptDetail:input_type -> sentient.v1.PromptDetailRequest
-	26, // 85: sentient.v1.Sentient.ListAgents:input_type -> sentient.v1.ListAgentsRequest
-	28, // 86: sentient.v1.Sentient.AgentDetail:input_type -> sentient.v1.AgentDetailRequest
-	32, // 87: sentient.v1.Sentient.AgentTimeline:input_type -> sentient.v1.AgentTimelineRequest
-	15, // 88: sentient.v1.Sentient.PromptWindow:input_type -> sentient.v1.PromptWindowRequest
-	17, // 89: sentient.v1.Sentient.SessionDetail:input_type -> sentient.v1.SessionDetailRequest
-	10, // 90: sentient.v1.Sentient.SessionList:input_type -> sentient.v1.SessionListRequest
-	7,  // 91: sentient.v1.Sentient.ActivityList:input_type -> sentient.v1.ActivityListRequest
-	1,  // 92: sentient.v1.Sentient.AlertList:input_type -> sentient.v1.AlertListRequest
-	3,  // 93: sentient.v1.Sentient.AlertDetail:input_type -> sentient.v1.AlertDetailRequest
-	5,  // 94: sentient.v1.Sentient.ReviewAlert:input_type -> sentient.v1.ReviewAlertRequest
-	41, // 95: sentient.v1.Sentient.Status:output_type -> sentient.v1.StatusResponse
-	37, // 96: sentient.v1.Sentient.Health:output_type -> sentient.v1.HealthResponse
-	34, // 97: sentient.v1.Sentient.PromptDetail:output_type -> sentient.v1.PromptDetailResponse
-	27, // 98: sentient.v1.Sentient.ListAgents:output_type -> sentient.v1.ListAgentsResponse
-	31, // 99: sentient.v1.Sentient.AgentDetail:output_type -> sentient.v1.AgentDetailResponse
-	33, // 100: sentient.v1.Sentient.AgentTimeline:output_type -> sentient.v1.AgentTimelineResponse
-	16, // 101: sentient.v1.Sentient.PromptWindow:output_type -> sentient.v1.PromptWindowResponse
-	19, // 102: sentient.v1.Sentient.SessionDetail:output_type -> sentient.v1.SessionDetailResponse
-	12, // 103: sentient.v1.Sentient.SessionList:output_type -> sentient.v1.SessionListResponse
-	9,  // 104: sentient.v1.Sentient.ActivityList:output_type -> sentient.v1.ActivityListResponse
-	2,  // 105: sentient.v1.Sentient.AlertList:output_type -> sentient.v1.AlertListResponse
-	4,  // 106: sentient.v1.Sentient.AlertDetail:output_type -> sentient.v1.AlertDetailResponse
-	6,  // 107: sentient.v1.Sentient.ReviewAlert:output_type -> sentient.v1.ReviewAlertResponse
-	95, // [95:108] is the sub-list for method output_type
-	82, // [82:95] is the sub-list for method input_type
-	82, // [82:82] is the sub-list for extension type_name
-	82, // [82:82] is the sub-list for extension extendee
-	0,  // [0:82] is the sub-list for field type_name
+	50, // 62: sentient.v1.HealthResponse.capture:type_name -> sentient.v1.HealthResponse.Capture
+	51, // 63: sentient.v1.StatusRequest.from:type_name -> google.protobuf.Timestamp
+	51, // 64: sentient.v1.StatusRequest.to:type_name -> google.protobuf.Timestamp
+	51, // 65: sentient.v1.Prompt.started:type_name -> google.protobuf.Timestamp
+	52, // 66: sentient.v1.Prompt.duration:type_name -> google.protobuf.Duration
+	51, // 67: sentient.v1.StatusResponse.history_begins:type_name -> google.protobuf.Timestamp
+	39, // 68: sentient.v1.StatusResponse.activity:type_name -> sentient.v1.ActivityRow
+	40, // 69: sentient.v1.StatusResponse.prompts:type_name -> sentient.v1.Prompt
+	51, // 70: sentient.v1.HealthResponse.Daemon.started:type_name -> google.protobuf.Timestamp
+	52, // 71: sentient.v1.HealthResponse.Daemon.cpu_window:type_name -> google.protobuf.Duration
+	51, // 72: sentient.v1.HealthResponse.API.since:type_name -> google.protobuf.Timestamp
+	52, // 73: sentient.v1.HealthResponse.API.p50:type_name -> google.protobuf.Duration
+	52, // 74: sentient.v1.HealthResponse.API.p95:type_name -> google.protobuf.Duration
+	52, // 75: sentient.v1.HealthResponse.API.p99:type_name -> google.protobuf.Duration
+	36, // 76: sentient.v1.HealthResponse.API.errors_by_code:type_name -> sentient.v1.NamedCount
+	36, // 77: sentient.v1.HealthResponse.API.methods:type_name -> sentient.v1.NamedCount
+	51, // 78: sentient.v1.HealthResponse.IngestAgent.last_record:type_name -> google.protobuf.Timestamp
+	51, // 79: sentient.v1.HealthResponse.Integrity.checked_at:type_name -> google.protobuf.Timestamp
+	51, // 80: sentient.v1.HealthResponse.Integrity.full_at:type_name -> google.protobuf.Timestamp
+	52, // 81: sentient.v1.HealthResponse.Integrity.interval:type_name -> google.protobuf.Duration
+	51, // 82: sentient.v1.HealthResponse.LiveSession.last_activity:type_name -> google.protobuf.Timestamp
+	51, // 83: sentient.v1.HealthResponse.Capture.policy_installed:type_name -> google.protobuf.Timestamp
+	38, // 84: sentient.v1.Sentient.Status:input_type -> sentient.v1.StatusRequest
+	35, // 85: sentient.v1.Sentient.Health:input_type -> sentient.v1.HealthRequest
+	20, // 86: sentient.v1.Sentient.PromptDetail:input_type -> sentient.v1.PromptDetailRequest
+	26, // 87: sentient.v1.Sentient.ListAgents:input_type -> sentient.v1.ListAgentsRequest
+	28, // 88: sentient.v1.Sentient.AgentDetail:input_type -> sentient.v1.AgentDetailRequest
+	32, // 89: sentient.v1.Sentient.AgentTimeline:input_type -> sentient.v1.AgentTimelineRequest
+	15, // 90: sentient.v1.Sentient.PromptWindow:input_type -> sentient.v1.PromptWindowRequest
+	17, // 91: sentient.v1.Sentient.SessionDetail:input_type -> sentient.v1.SessionDetailRequest
+	10, // 92: sentient.v1.Sentient.SessionList:input_type -> sentient.v1.SessionListRequest
+	7,  // 93: sentient.v1.Sentient.ActivityList:input_type -> sentient.v1.ActivityListRequest
+	1,  // 94: sentient.v1.Sentient.AlertList:input_type -> sentient.v1.AlertListRequest
+	3,  // 95: sentient.v1.Sentient.AlertDetail:input_type -> sentient.v1.AlertDetailRequest
+	5,  // 96: sentient.v1.Sentient.ReviewAlert:input_type -> sentient.v1.ReviewAlertRequest
+	41, // 97: sentient.v1.Sentient.Status:output_type -> sentient.v1.StatusResponse
+	37, // 98: sentient.v1.Sentient.Health:output_type -> sentient.v1.HealthResponse
+	34, // 99: sentient.v1.Sentient.PromptDetail:output_type -> sentient.v1.PromptDetailResponse
+	27, // 100: sentient.v1.Sentient.ListAgents:output_type -> sentient.v1.ListAgentsResponse
+	31, // 101: sentient.v1.Sentient.AgentDetail:output_type -> sentient.v1.AgentDetailResponse
+	33, // 102: sentient.v1.Sentient.AgentTimeline:output_type -> sentient.v1.AgentTimelineResponse
+	16, // 103: sentient.v1.Sentient.PromptWindow:output_type -> sentient.v1.PromptWindowResponse
+	19, // 104: sentient.v1.Sentient.SessionDetail:output_type -> sentient.v1.SessionDetailResponse
+	12, // 105: sentient.v1.Sentient.SessionList:output_type -> sentient.v1.SessionListResponse
+	9,  // 106: sentient.v1.Sentient.ActivityList:output_type -> sentient.v1.ActivityListResponse
+	2,  // 107: sentient.v1.Sentient.AlertList:output_type -> sentient.v1.AlertListResponse
+	4,  // 108: sentient.v1.Sentient.AlertDetail:output_type -> sentient.v1.AlertDetailResponse
+	6,  // 109: sentient.v1.Sentient.ReviewAlert:output_type -> sentient.v1.ReviewAlertResponse
+	97, // [97:110] is the sub-list for method output_type
+	84, // [84:97] is the sub-list for method input_type
+	84, // [84:84] is the sub-list for extension type_name
+	84, // [84:84] is the sub-list for extension extendee
+	0,  // [0:84] is the sub-list for field type_name
 }
 
 func init() { file_sentient_proto_init() }
@@ -4630,7 +4734,7 @@ func file_sentient_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sentient_proto_rawDesc), len(file_sentient_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   50,
+			NumMessages:   51,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

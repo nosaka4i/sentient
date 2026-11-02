@@ -65,6 +65,10 @@ func healthToProto(r *health.Report) *pb.HealthResponse {
 			BadRecordId: in.BadRecordID, Interval: durationpb.New(in.Interval), GapTracking: in.GapTracking,
 		},
 		Sudo: &pb.HealthResponse_Sudo{Checked: r.Sudo.Checked, Reason: r.Sudo.Reason, Passwordless: r.Sudo.Passwordless},
+		Capture: &pb.HealthResponse_Capture{
+			Enabled: r.Capture.Enabled, Level: r.Capture.Level, PolicyKnown: r.Capture.PolicyKnown,
+			PolicyLevel: r.Capture.PolicyLevel, PolicyFile: r.Capture.PolicyFile, PolicyInstalled: ts(r.Capture.PolicyInstalled),
+		},
 	}
 	for _, g := range r.Ingest {
 		resp.Ingest = append(resp.Ingest, &pb.HealthResponse_IngestAgent{
@@ -107,6 +111,11 @@ func healthFromProto(p *pb.HealthResponse) *health.Report {
 			BadRecordID: in.GetBadRecordId(), Interval: in.GetInterval().AsDuration(), GapTracking: in.GetGapTracking(),
 		},
 		Sudo: health.Sudo{Checked: p.GetSudo().GetChecked(), Reason: p.GetSudo().GetReason(), Passwordless: p.GetSudo().GetPasswordless()},
+		Capture: health.Capture{
+			Enabled: p.GetCapture().GetEnabled(), Level: p.GetCapture().GetLevel(),
+			PolicyKnown: p.GetCapture().GetPolicyKnown(), PolicyLevel: p.GetCapture().GetPolicyLevel(),
+			PolicyFile: p.GetCapture().GetPolicyFile(), PolicyInstalled: fromTS(p.GetCapture().GetPolicyInstalled()),
+		},
 	}
 	for _, g := range p.GetIngest() {
 		r.Ingest = append(r.Ingest, health.IngestAgent{

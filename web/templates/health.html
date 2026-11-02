@@ -1,4 +1,4 @@
-{{define "htile"}}{{if .Href}}<a class="tile{{if .Wide}} wide{{end}}{{if .Muted}} muted{{end}}" href="{{.Href}}"{{if .Title}} title="{{.Title}}"{{end}}>{{else}}<div class="tile{{if .Wide}} wide{{end}}{{if .Muted}} muted{{end}}">{{end}}
+{{define "htile"}}{{if .Href}}<a class="tile{{if .Wide}} wide{{end}}{{if .Muted}} muted{{end}}{{if .Warn}} warnstate{{end}}" href="{{.Href}}"{{if .Title}} title="{{.Title}}"{{end}}>{{else}}<div class="tile{{if .Wide}} wide{{end}}{{if .Muted}} muted{{end}}{{if .Warn}} warnstate{{end}}">{{end}}
         <span class="lbl"><b>{{.Label}}</b>{{if .LabelRest}} {{.LabelRest}}{{end}}</span>
         <span class="num{{if .NumTxt}} txt{{end}}{{if .NumMono}} mono{{end}}">{{if .Running}}<span class="running-dot" aria-hidden="true"></span>{{end}}{{if .Icon}}{{template "agent-icon" .Icon}}{{end}}{{.Num}}{{if .Check}} <span class="okt" style="color:var(--ok)">&#10003;</span>{{end}}{{if .NumSmall}} <small>{{.NumSmall}}</small>{{end}}</span>
         <span class="sum{{if .SumMono}} mono{{end}}">{{.Sum}}{{if .Go}} <span class="go">&rarr;</span>{{end}}</span>
@@ -30,6 +30,20 @@
     </div>
     <div class="tiles">
 {{- range .Daemon}}
+      {{template "htile" .}}
+{{- end}}
+    </div>
+  </section>
+
+  <!-- CAPTURE -->
+  <section class="card{{if not .CaptureOn}} muted{{end}}" aria-labelledby="h-cap">
+    <div class="card-head">
+      <h2 id="h-cap">Capture</h2>
+      {{if .CaptureOn}}<span class="state-ok"><span class="okdot{{if .CaptureWarn}} warn{{end}}"></span>{{.CaptureState}}</span>{{else}}<span class="state-off">{{.CaptureState}}</span>{{end}}
+      <span class="hint">what sentient records of the kernel's events</span>
+    </div>
+    <div class="tiles">
+{{- range .Capture}}
       {{template "htile" .}}
 {{- end}}
     </div>

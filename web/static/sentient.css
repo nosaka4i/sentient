@@ -262,6 +262,7 @@ section.card {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 1px; background: var(--border);
 }
+.tile.warnstate { box-shadow: inset 3px 0 0 var(--med-line); background: var(--med-tint); }
 .tile {
   background: var(--surface); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; min-width: 0;
 }

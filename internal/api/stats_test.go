@@ -114,6 +114,8 @@ func TestHealthOverSocket(t *testing.T) {
 		Agents:    []health.Agent{{Agent: "claude", Version: "2.0", Logs: "~/.claude/projects"}},
 		Live:      []health.LiveSession{{SessionID: "s", Agent: "claude", Repo: "r", LastActivity: time.Date(2026, 10, 17, 11, 0, 0, 0, time.UTC)}},
 		Sudo:      health.Sudo{Checked: true, Passwordless: []string{"ubuntu"}},
+		Capture: health.Capture{Enabled: true, Level: "essential", PolicyKnown: true, PolicyLevel: "complete",
+			PolicyFile: "/etc/tetragon/tetragon.tp.d/sentient.yaml", PolicyInstalled: time.Date(2026, 11, 2, 0, 59, 0, 0, time.UTC)},
 	}
 	srv.SetHealth(func(ctx context.Context) (*health.Report, error) { cp := *want; return &cp, nil })
 	got, err := c.Health(ctx)
@@ -122,7 +124,7 @@ func TestHealthOverSocket(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got.Daemon, want.Daemon) || !reflect.DeepEqual(got.Storage, want.Storage) ||
 		!reflect.DeepEqual(got.Ingest, want.Ingest) || !reflect.DeepEqual(got.Agents, want.Agents) ||
-		!reflect.DeepEqual(got.Live, want.Live) || !reflect.DeepEqual(got.Sudo, want.Sudo) ||
+		!reflect.DeepEqual(got.Live, want.Live) || !reflect.DeepEqual(got.Sudo, want.Sudo) || !reflect.DeepEqual(got.Capture, want.Capture) ||
 		!got.CheckedAt.Equal(want.CheckedAt) || !got.HistoryBegins.IsZero() ||
 		got.Integrity.Records != 5 || !got.Integrity.OK || got.Integrity.Interval != time.Hour || !got.Integrity.CheckedAt.IsZero() {
 		t.Errorf("round trip:\n got %+v\nwant %+v", got, want)

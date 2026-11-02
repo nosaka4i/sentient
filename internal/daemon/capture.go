@@ -8,6 +8,7 @@ import (
 
 	"github.com/nosaka4i/sentient/internal/collector/tetragon/policy"
 	"github.com/nosaka4i/sentient/internal/dbtime"
+	"github.com/nosaka4i/sentient/internal/health"
 	"github.com/nosaka4i/sentient/internal/store"
 )
 
@@ -68,4 +69,32 @@ func startCapture(ctx context.Context, st *store.Store, cfg Config, env policy.E
 			"hint", "sen policy --verbosity "+string(c.level)+", install it, restart Tetragon")
 	}
 	return c, nil
+}
+
+// captureReport is the Capture section of the health report: the level
+// sentientd runs at and what the installed policy says it was made for. The
+// policy file is read each time, so a reinstalled policy shows at once.
+func captureReport(cfg Config, read func(string) ([]byte, error), mtime func(string) time.Time) health.Capture {
+	file := cfg.PolicyFile
+	if file == "" {
+		file = policy.DefaultPolicyFile
+	}
+	c := health.Capture{Enabled: cfg.Tetragon != "", Level: string(cfg.Verbosity), PolicyFile: file}
+	if !c.Enabled {
+		return c
+	}
+	if text, err := read(file); err == nil {
+		if level, _, ok := policy.ParseHeader(string(text)); ok {
+			c.PolicyKnown, c.PolicyLevel = true, string(level)
+			c.PolicyInstalled = mtime(file)
+		}
+	}
+	return c
+}
+
+func fileModTime(p string) time.Time {
+	if fi, err := os.Stat(p); err == nil {
+		return fi.ModTime()
+	}
+	return time.Time{}
 }

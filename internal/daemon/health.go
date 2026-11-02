@@ -35,6 +35,7 @@ type monitor struct {
 	started time.Time
 	now     func() time.Time
 	log     *slog.Logger
+	cfg     Config
 
 	cpu   *cpuSampler
 	integ *integrity
@@ -45,7 +46,7 @@ func newMonitor(st *store.Store, cfg Config, log *slog.Logger) *monitor {
 	now := time.Now
 	return &monitor{
 		st: st, dataDir: cfg.DataDir, socket: cfg.Socket, homes: cfg.Homes,
-		started: now(), now: now, log: log,
+		started: now(), now: now, log: log, cfg: cfg,
 		cpu:   newCPUSampler(now),
 		integ: &integrity{st: st, now: now, interval: cfg.IntegrityInterval, log: log},
 		sudo:  &sudoChecker{now: now, run: runSudoList, root: os.Geteuid() == 0, users: agentAccounts(cfg.Homes)},
@@ -99,6 +100,7 @@ func (m *monitor) report(ctx context.Context) (*health.Report, error) {
 	m.integ.incremental(ctx)
 	r.Integrity = m.integ.state()
 	r.Sudo = m.sudo.check(ctx)
+	r.Capture = captureReport(m.cfg, os.ReadFile, fileModTime)
 	return r, nil
 }
 

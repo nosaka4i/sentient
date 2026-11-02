@@ -5,7 +5,22 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/nosaka4i/sentient/internal/collector/tetragon/policy"
 )
+
+// A machine with no Go, no caches and no extra files, so the tests never run
+// the real go command (which writes its cache under the test's HOME).
+func init() {
+	noiseEnv = func() policy.Env {
+		return policy.Env{
+			Getenv:   func(string) string { return "" },
+			GoEnv:    func() map[string]string { return nil },
+			IsDir:    func(string) bool { return false },
+			ReadFile: func(string) ([]byte, error) { return nil, os.ErrNotExist },
+		}
+	}
+}
 
 // agentHome is a home directory with Claude installed the way its installer
 // does: a versioned binary and a launcher link.
@@ -37,6 +52,21 @@ func TestPolicyNamesTheInstalledAgentForTheUsersHome(t *testing.T) {
 	if !strings.HasPrefix(out, "# sentient:") || !strings.Contains(out, `"`+home+`/.local/share/claude/versions/2.1.307"`) ||
 		!strings.Contains(out, `"`+home+`/.local/bin/claude"`) {
 		t.Errorf("policy = %.300s", out)
+	}
+}
+
+func TestPolicyVerbosityFlag(t *testing.T) {
+	home := agentHome(t, "2.1.307")
+	out, err := run(t, "policy", "--home", home)
+	if err != nil || !strings.Contains(out, "# Verbosity: essential.") || !strings.Contains(out, `operator: "NotPrefix"`) {
+		t.Errorf("default is not essential: %v\n%.300s", err, out)
+	}
+	out, err = run(t, "policy", "--home", home, "--verbosity", "complete")
+	if err != nil || !strings.Contains(out, "# Verbosity: complete.") || strings.Contains(out, "NotPrefix") {
+		t.Errorf("complete: %v\n%.300s", err, out)
+	}
+	if _, err = run(t, "policy", "--home", home, "--verbosity", "detailed"); err == nil || !strings.Contains(err.Error(), "unknown verbosity") {
+		t.Errorf("unknown level: err = %v", err)
 	}
 }
 
