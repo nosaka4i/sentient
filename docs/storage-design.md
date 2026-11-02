@@ -92,7 +92,7 @@ The collector subscribes first and the import runs behind it; the in-memory queu
 - **One log table for all agents or per agent.** Leaning one with an `agent` column.
 - **Triggers vs retention.** Triggers block deletes, so stage 2 expiry drops whole segment files rather than rows.
 - **Segment size and rollover trigger**, and who verifies a chain across segments (daemon hourly, or `sen verify`).
-- **Capture verbosity:** its own questions (names, Tetragon operator behaviour, raw-export caps, free-space threshold) are in [capture-verbosity.md](capture-verbosity.md).
+- **Capture verbosity:** its own questions (names, Tetragon operator behaviour, free-space threshold) are in [capture-verbosity.md](capture-verbosity.md).
 - **Migration.** Reshape the existing `sentient.db` in place (migration 7), or start fresh and re-import (the transcripts are still on disk).
 - **Backup.** A consistent snapshot of one file (SQLite `VACUUM INTO`).
 

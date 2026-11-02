@@ -1,6 +1,6 @@
 # Capture verbosity
 
-**Status:** built: `sen policy --verbosity` (verified on Tetragon 1.7.1), `sentientd --verbosity` with the ingest filter, and the `capture_levels` table (`internal/collector/filter.go`, `internal/daemon/capture.go`, `internal/store/capture.go`). The Health page's Capture card (level, policy match, disk) and its warnings are built too: a policy that differs from sentientd, and the disk at 70% used (warning) and 90% used (critical). Proposed, not yet built: stopping recording at 95% used, the raw-export tile, `extended` per-command summaries (until then `extended` drops and counts in memory, like `essential`), and the `complete` raw export. Backlog `bbee4b1` (the setting), `27f6732` (the policy generator). Levels: `essential` (default), `extended` and `complete`, named like the lean and complete data-collection presets of endpoint products.
+**Status:** built: `sen policy --verbosity` (verified on Tetragon 1.7.1), `sentientd --verbosity` with the ingest filter, and the `capture_levels` table (`internal/collector/filter.go`, `internal/daemon/capture.go`, `internal/store/capture.go`). The Health page's Capture card (level, policy match, disk) and its warnings are built too: a policy that differs from sentientd, and the disk at 70% used (warning) and 90% used (critical). Proposed, not yet built: stopping recording at 95% used, `extended` per-command summaries (until then `extended` drops and counts in memory, like `essential`). The `complete` raw export was dropped: sentient is not the raw collector. Backlog `bbee4b1` (the setting), `27f6732` (the policy generator). Levels: `essential` (default), `extended` and `complete`, named like the lean and complete data-collection presets of endpoint products.
 
 How much of what the kernel reports sentient records, as one setting with a default that leaves out the noise. Part of the storage work: see [storage-design.md](storage-design.md) "Containing the size" for the other levers (compression, large records by reference, retention, the archive tier). What the collector and the merge do with the events that are recorded is in [tetragon-integration.md](tetragon-integration.md).
 
@@ -15,7 +15,7 @@ One setting, three values. The default records the evidence and leaves out the n
 |---|---|---|
 | **essential** (default) | every `exec` and `exit`, `net_connect`, file create, unlink, rename and chmod, `kill`, and `file_open` except the noise locations below | the Tetragon policy, so the kernel does not report the noise at all |
 | **extended** | essential, and the noise is counted per command instead of dropped: "`go test` opened 41,000 files: 38,000 in the build cache, 2,100 in the repo" (one summary row per command and location group) | `sentientd` counts events it does not store |
-| **complete** | every event Tetragon reports, and the rotating raw export | nobody |
+| **complete** | every event the policy reports, all stored in the database | nobody |
 
 ## The noise locations
 
@@ -27,7 +27,7 @@ Never recorded at essential. The Go build cache, module cache and toolchain; the
 - `sentientd --verbosity <level>` applies the same filter at ingest as a safety net, so a policy that is more verbose than configured cannot grow the database. At `extended` it is the only filter, and it writes the per-command summaries.
 - The level is recorded with the data: a `capture_levels` table (time, level, source) gets a row when `sentientd` starts and whenever the level changes, immutable like `monitor_gaps`. The pages and the audit read it, so "never recorded at that level" is not mistaken for "the kernel missed it".
 - Health shows the policy's level and `sentientd`'s and warns when they differ, shows free space and warns at 70% used (below 30% free, with sentient's own size and growth in the message), is critical at 90% used, and stops recording at 95% used (5% free) and says so plainly; the thresholds are configurable. Recording must never fail silently.
-- At `complete`, the Tetragon export file is on with rotation capped by days and by size. It is the lossless layer for forensics and for replaying the merge and the collector in tests.
+- Sentient does not keep Tetragon's raw events (see "Why this way, not that"). What it stores per event is the compact record `normalize.go` builds.
 
 ## Changing the level
 
@@ -48,10 +48,8 @@ To go from `complete` to `essential`: install the new policy, restart Tetragon, 
 **Space comes back only through a separate command, never as a side effect of the setting.** The setting changes what is recorded from then on; removing what is already stored is `sudo sentientd prune`, in the way of `docker prune`:
 - **Root only, through the daemon.** The evidence is meant to resist the monitored agent, so the command is not reachable over the user socket that `sen` and the web page use. An agent running as the user could otherwise erase the record of what it did. (An agent account with passwordless sudo can run it, which is the warning Health already shows.)
 - **Dry run by default.** It lists what it would remove and the space it frees, and changes nothing until `--force` or an interactive confirmation.
-- **Targets:** noise events that the current level would not record, older than a date; everything older than a date (retention); and the raw export files.
+- **Targets:** noise events that the current level would not record, older than a date; and everything older than a date (retention).
 - **It is itself recorded.** Every prune appends a permanent row: when, the filter, how many rows and bytes, and the hash span removed. The chain carries across the removed span, so verification still passes and the removal is visible. The archive tier ([storage-design.md](storage-design.md) "Stage 2") is the other way space leaves the hot database, by whole sealed segments.
-
-The raw export is not evidence: it stops when the level drops below `complete`, its files age out by their day and size caps, and `prune` or the user may delete them.
 
 ## Estimated size
 
@@ -64,7 +62,7 @@ Estimates (this dataset, 842,987 events over five recorded days; estimates from 
 | essential and 32-byte hashes (drop `prev_hash`) | 298,566 | about 96 MB | about 375 MB |
 | extended | 298,566 and about 5,000 summary rows | about 131 MB | about 415 MB |
 
-The transcripts then dominate and grow with agent use, not with build noise. With a 15 GB budget and 330 MB a day (this machine's worst day, complete), that is about 45 days; at essential about 125 days; on an average day of these five, 200 days at complete and 600 at essential. The raw export adds about 1 KB per event, up to 1 GB a day on a worst day, so it needs its cap. The existing evidence does not shrink when the level is lowered (it is append-only): only new data is smaller, until the archive tier.
+The transcripts then dominate and grow with agent use, not with build noise. With a 15 GB budget and 330 MB a day (this machine's worst day, complete), that is about 45 days; at essential about 125 days; on an average day of these five, 200 days at complete and 600 at essential. The existing evidence does not shrink when the level is lowered (it is append-only): only new data is smaller, until the archive tier.
 
 ## Why this way, not that
 
@@ -72,6 +70,7 @@ The transcripts then dominate and grow with agent use, not with build noise. Wit
 - **A block list, not an allow list.** An allow list ("only the repo and home") silently misses a sensitive path nobody listed.
 - **Filter before the write, not after.** The evidence tables are append-only, so noise stored once is stored until the archive tier. At essential the policy keeps it out of the stream; at extended `sentientd` counts it and drops it.
 - **Exec, network, writes and signals are never filtered.** A payload hidden in a build or a test has to run something, connect somewhere or change files, and all of those stay recorded at every level. Only `file_open` of known noise locations is dropped.
+- **No raw export of Tetragon's events.** Sentient is not the raw collector. It watches the agent's process tree, keeps what shows what the agent did, and ties it to the agent's own log. A company that wants every Tetragon event already has its own pipeline for that (the export file, Loki, Fluent Bit), and enabling it is a Tetragon setting that sentient does not touch. A second copy in sentient would be unprotected by the hash chain, would hold more than the agent's process tree if other policies are loaded, and would cost about 1 KB per event (up to 1 GB on a worst day). Anything sentient needs from an event goes into the record it already stores; the extra fields Tetragon sends (ancestry, capabilities, namespaces) are not read anywhere. A replay corpus for tests is an explicit developer tool, not an always-on mode (backlog `647e1c0`).
 - **One setting, not a flag per event type.** Three named levels are easier to reason about, document and verify than a matrix; a finer knob can come later if a real case needs it.
 
 
@@ -81,7 +80,7 @@ The transcripts then dominate and grow with agent use, not with build noise. Wit
 - **Testing a policy:** a policy loaded at runtime (`tetra tracingpolicy add`) is validated, but Tetragon does not follow the children of processes that already existed when it was loaded, so the running agent's commands record no file opens. A runtime load proves the file is accepted; whether children's opens survive the exclusions can only be seen with the policy installed in the policy directory and Tetragon restarted (the agent, already running, is then marked at startup), or with a fresh agent process.
 - **Tetragon's behaviour (verified 2026-10-30, 1.7.1):** the essential policy loads, and with a fresh agent a `go test` run showed `link` opening 25 files where unfiltered runs showed about 42,000 (40,016 in the build cache), with the repo opens still recorded. Also verified: `/proc/<pid>/environ` and `status` stay recorded, and `stat` and `statm` are dropped.
 - **`extended` grouping (decided):** by named category (Go build cache, Go toolchain, system libraries, ...), the label each noise location carries; not by directory prefix.
-- **Default caps for the raw export** (days and size), and whether 70% used / 90% used / 95% used are the right default thresholds (a percentage is early on a very large disk, hence the size and growth in the message).
+- **Disk thresholds:** whether 70% used / 90% used / 95% used are the right default thresholds (a percentage is early on a very large disk, hence the size and growth in the message).
 - **A level change at runtime:** whether it needs a restart.
 - **`sentientd prune`:** how the removal carries the hash chain across the removed span (a record holding the removed rows' chain end and count), whether it can drop single noise rows or only whole sealed segments, and how a root-only command reaches the daemon (a separate admin socket, or run offline against the database file). Decided with the archive tier.
 - **Evidence recorded at `complete`** after a switch to `essential`: how the pages show it (the `capture_levels` rows say where the change was).
@@ -89,7 +88,7 @@ The transcripts then dominate and grow with agent use, not with build noise. Wit
 
 ## Related and deferred
 
-- [storage-design.md](storage-design.md): size containment, retention and the archive tier; the raw export file question.
+- [storage-design.md](storage-design.md): size containment, retention and the archive tier.
 - [tetragon-integration.md](tetragon-integration.md): the collector, the merge, and which events each feature reads (file reads confirm the agent's Read calls, so repo opens must stay recorded).
 - [mocks/cli/audit.md](mocks/cli/audit.md): `sen audit` reads `capture_levels` to tell "not recorded at this level" from "missed".
 - Backlog: `bbee4b1` (verbosity levels), `27f6732` (`sen policy --verbosity`), `71372a4` (`sen audit`), `647e1c0` (corpus tooling), `65d950c` (file effects of a command).
