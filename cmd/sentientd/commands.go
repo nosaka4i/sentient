@@ -12,6 +12,7 @@ import (
 
 	"github.com/nosaka4i/sentient/internal/api"
 	"github.com/nosaka4i/sentient/internal/collector/tetragon"
+	"github.com/nosaka4i/sentient/internal/collector/tetragon/policy"
 	"github.com/nosaka4i/sentient/internal/daemon"
 	"github.com/nosaka4i/sentient/internal/version"
 )
@@ -42,6 +43,8 @@ func newRootCmd() *cobra.Command {
 	f.DurationVar(&cfg.PollInterval, "poll-interval", 2*time.Second, "how often transcripts are checked for new records")
 	f.StringVar(&cfg.Tetragon, "tetragon", "", "read kernel events from Tetragon's gRPC address (bare --tetragon: "+tetragon.DefaultAddr+"); off by default")
 	f.Lookup("tetragon").NoOptDefVal = tetragon.DefaultAddr
+	f.StringVar((*string)(&cfg.Verbosity), "verbosity", "essential", "how much the kernel reports is stored: essential (leaves out build caches, toolchains and system libraries), extended or complete; match it to the policy from sen policy --verbosity")
+	f.StringVar(&cfg.PolicyFile, "policy-file", policy.DefaultPolicyFile, "the installed Tetragon policy whose level is compared with --verbosity")
 	f.DurationVar(&cfg.IntegrityInterval, "integrity-interval", time.Hour, "how often the full hash-chain check runs")
 	cmd.SetContext(context.Background())
 	return cmd

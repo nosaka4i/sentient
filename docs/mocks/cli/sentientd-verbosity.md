@@ -1,6 +1,6 @@
 # sentientd --verbosity
 
-**Status:** mock, not yet built. Design: [capture-verbosity.md](../../capture-verbosity.md). Health page: `.mocks/health-02.html`.
+**Status:** built (`sentientd --verbosity`, `--policy-file`; the disk-full lines are not built yet). Design: [capture-verbosity.md](../../capture-verbosity.md). Health page: `.mocks/health-02.html`.
 
 ## The flag
 

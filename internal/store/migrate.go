@@ -262,6 +262,21 @@ ALTER TABLE actions ADD COLUMN kernel_event_id INTEGER REFERENCES kernel_events(
 CREATE UNIQUE INDEX actions_kernel_event ON actions(kernel_event_id) WHERE kernel_event_id IS NOT NULL;
 CREATE INDEX call_links_shell ON call_links(shell_exec_id);
 `,
+	// 12: the capture level in force, one row each time sentientd starts or the
+	// level changes (docs/capture-verbosity.md). Append-only, so "never recorded
+	// at that level" can be told from "the kernel missed it".
+	`
+CREATE TABLE capture_levels (
+	id     INTEGER PRIMARY KEY,
+	ts     TEXT NOT NULL,
+	level  TEXT NOT NULL,                             -- essential | extended | complete
+	source TEXT NOT NULL                              -- flag | before-setting
+);
+CREATE TRIGGER capture_levels_no_update BEFORE UPDATE ON capture_levels
+	BEGIN SELECT RAISE(ABORT, 'capture_levels is append-only'); END;
+CREATE TRIGGER capture_levels_no_delete BEFORE DELETE ON capture_levels
+	BEGIN SELECT RAISE(ABORT, 'capture_levels is append-only'); END;
+`,
 }
 
 // SchemaVersion is the version the code expects.

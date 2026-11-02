@@ -136,6 +136,9 @@ func DetectNoise(homes []string, env Env) []NoisePath {
 		}
 		add(filepath.Join(nvm, "versions"), "Node toolchains", true)
 		add(filepath.Join(h, ".cache/pip"), "pip cache", true)
+		// sentientd runs as another user than the one who builds, so go env is not enough
+		add(filepath.Join(h, ".cache/go-build"), "Go build cache", true)
+		add(filepath.Join(h, "go/pkg/mod"), "Go module cache", true)
 
 		if b, err := env.ReadFile(filepath.Join(h, ExtrasFile)); err == nil {
 			sc := bufio.NewScanner(strings.NewReader(string(b)))
@@ -221,4 +224,45 @@ func RenderWith(o Options) (string, error) {
 		return "", err
 	}
 	return b.String(), nil
+}
+
+// Match reports which noise location a file open belongs to, with the same
+// rule the policy applies: a plain string prefix, and /proc/<pid>/stat and
+// statm. The category of /proc polling is "agent polling itself".
+func Match(noise []NoisePath, path string) (NoisePath, bool) {
+	if strings.HasPrefix(path, procPrefix) && (strings.HasSuffix(path, "/stat") || strings.HasSuffix(path, "/statm")) {
+		return NoisePath{procPrefix, "agent polling itself"}, true
+	}
+	for _, n := range noise {
+		if strings.HasPrefix(path, n.Path) {
+			return n, true
+		}
+	}
+	return NoisePath{}, false
+}
+
+// ParseHeader reads the level and the noise locations back out of a policy
+// that Render wrote (the "# Verbosity:" comment). ok is false when the text has
+// no such header, e.g. a policy written before levels existed.
+func ParseHeader(text string) (level Verbosity, noise []NoisePath, ok bool) {
+	for _, line := range strings.Split(text, "\n") {
+		if rest, found := strings.CutPrefix(line, "# Verbosity: "); found {
+			word, _, _ := strings.Cut(rest, ".")
+			v, err := ParseVerbosity(word)
+			if err != nil {
+				return "", nil, false
+			}
+			level, ok = v, true
+			continue
+		}
+		rest, found := strings.CutPrefix(line, "#   /")
+		if !ok || !found || strings.Contains(rest, "<pid>") {
+			continue
+		}
+		path, cat, _ := strings.Cut("/"+rest, " ")
+		cat = strings.TrimSpace(cat)
+		cat = strings.TrimSuffix(strings.TrimPrefix(cat, "("), ")")
+		noise = append(noise, NoisePath{path, cat})
+	}
+	return level, noise, ok
 }

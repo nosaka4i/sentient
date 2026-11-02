@@ -1,6 +1,6 @@
 # Capture verbosity
 
-**Status:** policy generator built and verified on Tetragon 1.7.1 (`sen policy --verbosity`); the `sentientd` setting, `capture_levels`, Health checks, `extended` summaries and `complete` export are proposed, not yet built. Backlog `bbee4b1` (the setting), `27f6732` (the policy generator). Levels: `essential` (default), `extended` and `complete`, named like the lean and complete data-collection presets of endpoint products.
+**Status:** built: `sen policy --verbosity` (verified on Tetragon 1.7.1), `sentientd --verbosity` with the ingest filter, and the `capture_levels` table (`internal/collector/filter.go`, `internal/daemon/capture.go`, `internal/store/capture.go`). Proposed, not yet built: the Health Capture card and checks, `extended` per-command summaries (until then `extended` drops and counts in memory, like `essential`), and the `complete` raw export. Backlog `bbee4b1` (the setting), `27f6732` (the policy generator). Levels: `essential` (default), `extended` and `complete`, named like the lean and complete data-collection presets of endpoint products.
 
 How much of what the kernel reports sentient records, as one setting with a default that leaves out the noise. Part of the storage work: see [storage-design.md](storage-design.md) "Containing the size" for the other levers (compression, large records by reference, retention, the archive tier). What the collector and the merge do with the events that are recorded is in [tetragon-integration.md](tetragon-integration.md).
 

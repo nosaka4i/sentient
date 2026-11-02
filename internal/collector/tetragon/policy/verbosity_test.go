@@ -216,3 +216,60 @@ func TestSystemEnvIsUsable(t *testing.T) {
 		t.Errorf("DetectNoise = %v", got)
 	}
 }
+
+func TestMatchAppliesThePoliciesRule(t *testing.T) {
+	noise := []NoisePath{{"/h/.cache/go-build", "Go build cache"}, {"/etc/ld.so", "the dynamic linker's cache"}}
+	for path, want := range map[string]string{
+		"/h/.cache/go-build/ab/cd": "Go build cache",
+		"/etc/ld.so.cache":         "the dynamic linker's cache", // a plain string prefix, as Tetragon's Prefix
+		"/proc/42/stat":            "agent polling itself",
+		"/proc/42/statm":           "agent polling itself",
+	} {
+		n, ok := Match(noise, path)
+		if !ok || n.Category != want {
+			t.Errorf("Match(%s) = %v, %v; want %q", path, n, ok, want)
+		}
+	}
+	for _, path := range []string{"/proc/42/environ", "/proc/42/mem", "/h/work/repo/x.go", "/h/.cache/other", "/proc/stat"} {
+		if n, ok := Match(noise, path); ok && path != "/proc/stat" {
+			t.Errorf("Match(%s) = %v; it is evidence", path, n)
+		}
+	}
+}
+
+func TestParseHeaderReadsBackWhatRenderWrote(t *testing.T) {
+	noise := []NoisePath{{"/h/.cache/go-build", "Go build cache"}, {"/etc/ld.so", "the dynamic linker's cache"}}
+	p, err := RenderWith(Options{Binaries: testBins, Verbosity: Essential, Noise: noise})
+	if err != nil {
+		t.Fatal(err)
+	}
+	level, got, ok := ParseHeader(p)
+	if !ok || level != Essential {
+		t.Fatalf("level %q, ok %v", level, ok)
+	}
+	if len(got) != 2 || got[0] != noise[0] || got[1] != noise[1] {
+		t.Errorf("noise = %+v, want %+v", got, noise)
+	}
+	for _, v := range []Verbosity{Extended, Complete} {
+		p, _ := RenderWith(Options{Binaries: testBins, Verbosity: v, Noise: noise})
+		if level, got, ok := ParseHeader(p); !ok || level != v || len(got) != 0 {
+			t.Errorf("%s: %q %v %v", v, level, got, ok)
+		}
+	}
+	if _, _, ok := ParseHeader("apiVersion: cilium.io/v1alpha1\n"); ok {
+		t.Error("a policy without the header parsed")
+	}
+	if _, _, ok := ParseHeader("# Verbosity: loud.\n"); ok {
+		t.Error("an unknown level parsed")
+	}
+}
+
+func TestDetectNoiseKnowsTheHomesGoDirectories(t *testing.T) {
+	env := fakeEnv([]string{"/h/.cache/go-build", "/h/go/pkg/mod"}, nil, nil, nil)
+	got := paths(DetectNoise([]string{"/h"}, env))
+	for _, want := range []string{"/h/.cache/go-build", "/h/go/pkg/mod"} {
+		if !slices.Contains(got, want) {
+			t.Errorf("noise lacks %s: %v", want, got)
+		}
+	}
+}

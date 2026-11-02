@@ -69,6 +69,11 @@ type Config struct {
 	// Tetragon is the gRPC address of a running Tetragon. Empty leaves the
 	// kernel collector off, which is the log-only mode.
 	Tetragon string
+	// Verbosity is the capture level (docs/capture-verbosity.md); empty is
+	// essential. PolicyFile is the installed Tetragon policy it is compared
+	// with (default policy.DefaultPolicyFile).
+	Verbosity  policy.Verbosity
+	PolicyFile string
 	// IntegrityInterval is how often the full hash-chain check runs
 	// (default hourly).
 	IntegrityInterval time.Duration
@@ -135,6 +140,12 @@ func Run(ctx context.Context, cfg Config) error {
 		cfg.IntegrityInterval = time.Hour
 	}
 
+	level, err := policy.ParseVerbosity(string(cfg.Verbosity))
+	if err != nil {
+		return err
+	}
+	cfg.Verbosity = level
+
 	st, err := store.Open(ctx, cfg.DataDir)
 	if err != nil {
 		return err
@@ -176,11 +187,16 @@ func Run(ctx context.Context, cfg Config) error {
 		log.Info("kernel collector on", "collector", coll.Name(), "addr", cfg.Tetragon)
 		// Events are queued and written in batches, so a busy store (the
 		// first import of a big transcript) slows the queue, not Tetragon.
-		sink := collector.NewBufferedSink(st, coll.Name(), kernelQueue)
+		buffered := collector.NewBufferedSink(st, coll.Name(), kernelQueue)
+		capt, err := startCapture(ctx, st, cfg, policy.SystemEnv(), time.Now(), log)
+		if err != nil {
+			return err
+		}
+		sink := &collector.FilterSink{Sink: buffered, Level: capt.level, Noise: capt.noise}
 		att := &attribute.Attributor{St: st, Log: log, IsAgent: func(b string) bool { return policy.IsAgent(agents, b) }}
 		mrg := &merge.Merger{St: st, Log: log}
 		wg.Add(4)
-		go func() { defer wg.Done(); errc <- sink.Run(ctx) }()
+		go func() { defer wg.Done(); errc <- buffered.Run(ctx) }()
 		go func() { defer wg.Done(); errc <- coll.Run(ctx, sink) }()
 		go func() { defer wg.Done(); errc <- att.Run(ctx, attributeInterval) }()
 		go func() { defer wg.Done(); errc <- mrg.Run(ctx, attributeInterval) }()

@@ -31,3 +31,18 @@ func TestRunReportsStartupError(t *testing.T) {
 		t.Fatal("want error for unwritable data dir")
 	}
 }
+
+func TestVerbosityFlag(t *testing.T) {
+	cmd := newRootCmd()
+	f := cmd.Flags().Lookup("verbosity")
+	if f == nil || f.DefValue != "essential" {
+		t.Fatalf("verbosity flag = %v", f)
+	}
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"--verbosity", "detailed", "--data-dir", t.TempDir(), "--socket", t.TempDir() + "/s.sock", "--home", "/nonexistent"})
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "unknown verbosity") {
+		t.Errorf("err = %v", err)
+	}
+}

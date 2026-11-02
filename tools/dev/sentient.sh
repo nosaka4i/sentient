@@ -8,7 +8,7 @@
 #   ./sentient.sh build       # throttled `make build` (bin/sen, bin/sentientd)
 #   ./sentient.sh install     # throttled `make install` (sen, sentientd into $GOBIN / $GOPATH/bin)
 #   ./sentient.sh sentientd   # the monitor daemon, unprivileged dev mode
-#   ./sentient.sh kernel      # the daemon as root with --tetragon, scratch data in .claudetmp/dev/kdata, logs/sentientd-kernel.log
+#   ./sentient.sh kernel      # the daemon as root with --tetragon (SENTIENT_VERBOSITY=essential|extended|complete), scratch data in .claudetmp/dev/kdata, logs/sentientd-kernel.log
 #   ./sentient.sh serve       # the web UI on 127.0.0.1:7357
 #
 # Dev data, socket and logs stay under the repo (.claudetmp/dev/, logs/),
@@ -74,7 +74,9 @@ case "$SERVICE" in
     cd "$REPO_ROOT"
     KDATA="${SENTIENT_KERNEL_DIR:-$DEV_DIR/kdata}"
     mkdir -p "$KDATA"
-    sudo bin/sentientd --tetragon --home "$HOME" --data-dir "$KDATA" --socket "$KDATA/s.sock" --socket-group "$(id -gn)" 2>&1 | tee -a "$LOG_DIR/sentientd-kernel.log"
+    # The capture level is a flag, not saved anywhere: SENTIENT_VERBOSITY=complete
+    # changes it (install a policy from `sen policy --verbosity` at the same level).
+    sudo bin/sentientd --tetragon --verbosity "${SENTIENT_VERBOSITY:-essential}" --home "$HOME" --data-dir "$KDATA" --socket "$KDATA/s.sock" --socket-group "$(id -gn)" 2>&1 | tee -a "$LOG_DIR/sentientd-kernel.log"
     ;;
 
   serve)

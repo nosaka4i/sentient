@@ -299,6 +299,7 @@ file_changes   (action_id FK, path, commit,                 -- commit in the sha
 alerts         (id PK autoincrement, action_id FK, ts, severity, rule,
                 status, reviewed_at)                        -- open | reviewed; id = CLI `#`
 monitor_gaps   (id PK, started_at, ended_at, reason)
+capture_levels (id PK, ts, level essential|extended|complete, source flag|before-setting)  -- append-only; a row at each sentientd start with the kernel collector on
 schema_version (version)
 ```
 
