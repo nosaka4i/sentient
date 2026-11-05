@@ -70,6 +70,7 @@ func healthToProto(r *health.Report) *pb.HealthResponse {
 			Enabled: r.Capture.Enabled, Level: r.Capture.Level, PolicyKnown: r.Capture.PolicyKnown,
 			PolicyLevel: r.Capture.PolicyLevel, PolicyFile: r.Capture.PolicyFile, PolicyInstalled: ts(r.Capture.PolicyInstalled),
 		},
+		CatchingUp: r.CatchingUp,
 	}
 	for _, g := range r.Ingest {
 		resp.Ingest = append(resp.Ingest, &pb.HealthResponse_IngestAgent{
@@ -118,6 +119,7 @@ func healthFromProto(p *pb.HealthResponse) *health.Report {
 			PolicyKnown: p.GetCapture().GetPolicyKnown(), PolicyLevel: p.GetCapture().GetPolicyLevel(),
 			PolicyFile: p.GetCapture().GetPolicyFile(), PolicyInstalled: fromTS(p.GetCapture().GetPolicyInstalled()),
 		},
+		CatchingUp: p.GetCatchingUp(),
 	}
 	for _, g := range p.GetIngest() {
 		r.Ingest = append(r.Ingest, health.IngestAgent{

@@ -97,6 +97,9 @@ func (s *Server) Health(ctx context.Context, _ *sentientpb.HealthRequest) (*sent
 	}
 	r, err := s.health(ctx)
 	if err != nil {
+		if ctx.Err() != nil { // the caller gave up; not a failure on our side
+			return nil, status.FromContextError(ctx.Err()).Err()
+		}
 		return nil, status.Errorf(codes.Internal, "health: %v", err)
 	}
 	r.API = s.stats.Snapshot()

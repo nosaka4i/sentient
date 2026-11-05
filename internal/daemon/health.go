@@ -24,6 +24,10 @@ import (
 	"github.com/nosaka4i/sentient/internal/version"
 )
 
+// dbReportWait is how long a health report waits for the database before it
+// answers "catching up" without the database-backed parts.
+const dbReportWait = 3 * time.Second
+
 // monitor builds sentientd's health report.
 type monitor struct {
 	st      *store.Store
@@ -34,7 +38,8 @@ type monitor struct {
 	now     func() time.Time
 	log     *slog.Logger
 	cfg     Config
-	disk    *diskGuard // nil in tests that do not pause
+	disk    *diskGuard    // nil in tests that do not pause
+	dbWait  time.Duration // how long the report waits for the database
 
 	cpu   *cpuSampler
 	integ *integrity
@@ -45,7 +50,7 @@ func newMonitor(st *store.Store, cfg Config, log *slog.Logger) *monitor {
 	now := time.Now
 	return &monitor{
 		st: st, dataDir: cfg.DataDir, socket: cfg.Socket, homes: cfg.Homes,
-		started: now(), now: now, log: log, cfg: cfg,
+		started: now(), now: now, log: log, cfg: cfg, dbWait: dbReportWait,
 		cpu:   newCPUSampler(now),
 		integ: &integrity{st: st, now: now, interval: cfg.IntegrityInterval, log: log},
 		sudo:  &sudoChecker{now: now, run: runSudoList, root: os.Geteuid() == 0, users: agentAccounts(cfg.Homes)},
@@ -71,11 +76,6 @@ func (m *monitor) run(ctx context.Context) {
 func (m *monitor) report(ctx context.Context) (*health.Report, error) {
 	now := m.now()
 	r := &health.Report{CheckedAt: now}
-	var err error
-	if r.HistoryBegins, err = query.HistoryBegins(ctx, m.st.DB); err != nil {
-		return nil, err
-	}
-
 	u := "unknown"
 	if cu, err := user.Current(); err == nil {
 		u = cu.Username
@@ -92,20 +92,45 @@ func (m *monitor) report(ctx context.Context) (*health.Report, error) {
 		r.Storage.PausedSince = m.disk.PausedSince()
 	}
 
-	if r.Ingest, err = query.IngestStats(ctx, m.st.DB); err != nil {
-		return nil, err
-	}
-	if r.Agents, err = query.Agents(ctx, m.st.DB); err != nil {
-		return nil, err
-	}
-	if r.Live, err = query.LiveSessions(ctx, m.st.DB, now.Add(-query.RunningWindow)); err != nil {
-		return nil, err
-	}
-	m.integ.incremental(ctx)
-	r.Integrity = m.integ.state()
 	r.Sudo = m.sudo.check(ctx)
 	r.Capture = captureReport(m.cfg, os.ReadFile, fileModTime)
+
+	// The database-backed parts get a short deadline: right after a start the
+	// catch-up writers hold the database for a minute or more, and the page
+	// should say so at once instead of hanging.
+	dctx, cancel := context.WithTimeout(ctx, m.dbWait)
+	defer cancel()
+	if err := m.fromDB(dctx, r, now); err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err() // the caller gave up: not our error
+		}
+		if dctx.Err() == nil {
+			return nil, err
+		}
+		r.CatchingUp = true
+		r.HistoryBegins, r.Ingest, r.Live = time.Time{}, nil, nil
+		r.Agents = append([]health.Agent(nil), query.Adapters...)
+	}
+	r.Integrity = m.integ.state()
 	return r, nil
+}
+
+// fromDB fills the parts of the report that read the database.
+func (m *monitor) fromDB(ctx context.Context, r *health.Report, now time.Time) (err error) {
+	if r.HistoryBegins, err = query.HistoryBegins(ctx, m.st.DB); err != nil {
+		return err
+	}
+	if r.Ingest, err = query.IngestStats(ctx, m.st.DB); err != nil {
+		return err
+	}
+	if r.Agents, err = query.Agents(ctx, m.st.DB); err != nil {
+		return err
+	}
+	if r.Live, err = query.LiveSessions(ctx, m.st.DB, now.Add(-query.RunningWindow)); err != nil {
+		return err
+	}
+	m.integ.incremental(ctx)
+	return nil
 }
 
 // storage reports the database's size and the free space beside it.

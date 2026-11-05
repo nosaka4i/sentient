@@ -2998,6 +2998,9 @@ type HealthResponse struct {
 	Live          []*HealthResponse_LiveSession `protobuf:"bytes,9,rep,name=live,proto3" json:"live,omitempty"`
 	Sudo          *HealthResponse_Sudo          `protobuf:"bytes,10,opt,name=sudo,proto3" json:"sudo,omitempty"`
 	Capture       *HealthResponse_Capture       `protobuf:"bytes,11,opt,name=capture,proto3" json:"capture,omitempty"`
+	// True while sentientd's database was too busy to answer within the wait
+	// (startup catch-up): the database-backed parts above are then empty.
+	CatchingUp    bool `protobuf:"varint,12,opt,name=catching_up,json=catchingUp,proto3" json:"catching_up,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3107,6 +3110,13 @@ func (x *HealthResponse) GetCapture() *HealthResponse_Capture {
 		return x.Capture
 	}
 	return nil
+}
+
+func (x *HealthResponse) GetCatchingUp() bool {
+	if x != nil {
+		return x.CatchingUp
+	}
+	return false
 }
 
 type StatusRequest struct {
@@ -4544,7 +4554,7 @@ const file_sentient_proto_rawDesc = "" +
 	"\n" +
 	"NamedCount\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05count\x18\x02 \x01(\x03R\x05count\"\xaf\x15\n" +
+	"\x05count\x18\x02 \x01(\x03R\x05count\"\xd0\x15\n" +
 	"\x0eHealthResponse\x129\n" +
 	"\n" +
 	"checked_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\tcheckedAt\x12A\n" +
@@ -4558,7 +4568,9 @@ const file_sentient_proto_rawDesc = "" +
 	"\x04live\x18\t \x03(\v2'.sentient.v1.HealthResponse.LiveSessionR\x04live\x124\n" +
 	"\x04sudo\x18\n" +
 	" \x01(\v2 .sentient.v1.HealthResponse.SudoR\x04sudo\x12=\n" +
-	"\acapture\x18\v \x01(\v2#.sentient.v1.HealthResponse.CaptureR\acapture\x1a\x90\x02\n" +
+	"\acapture\x18\v \x01(\v2#.sentient.v1.HealthResponse.CaptureR\acapture\x12\x1f\n" +
+	"\vcatching_up\x18\f \x01(\bR\n" +
+	"catchingUp\x1a\x90\x02\n" +
 	"\x06Daemon\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x124\n" +
 	"\astarted\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\astarted\x12\x1f\n" +

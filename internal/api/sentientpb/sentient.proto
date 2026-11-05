@@ -461,6 +461,10 @@ message HealthResponse {
     google.protobuf.Timestamp policy_installed = 6; // unset if unknown
   }
   Capture capture = 11;
+
+  // True while sentientd's database was too busy to answer within the wait
+  // (startup catch-up): the database-backed parts above are then empty.
+  bool catching_up = 12;
 }
 
 message StatusRequest {

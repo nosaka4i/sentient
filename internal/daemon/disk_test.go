@@ -224,6 +224,41 @@ func TestHealthReportCarriesThePause(t *testing.T) {
 	}
 }
 
+func TestHealthAnswersAtOnceWhenTheDatabaseIsBusy(t *testing.T) {
+	_, st, _, _ := guardAt(t, 80)
+	m := newMonitor(st, Config{DataDir: t.TempDir(), DiskHigh: 80, DiskLow: 75}, quiet)
+	m.dbWait = time.Nanosecond // the database cannot answer in time
+
+	r, err := m.report(context.Background())
+	if err != nil {
+		t.Fatalf("a busy database is not an error: %v", err)
+	}
+	if !r.CatchingUp || len(r.Ingest) != 0 || len(r.Live) != 0 || !r.HistoryBegins.IsZero() {
+		t.Errorf("catching up = %v, ingest %v, live %v", r.CatchingUp, r.Ingest, r.Live)
+	}
+	if len(r.Agents) == 0 || r.Agents[0].Agent != "claude" || r.Daemon.Version == "" || r.Storage.HighPct != 80 {
+		t.Errorf("the parts that need no database are still there: %+v %+v", r.Agents, r.Daemon)
+	}
+	found := false
+	for _, w := range r.Warnings() {
+		found = found || w.What == "sentientd is processing logs since the last startup"
+	}
+	if !found {
+		t.Error("no startup notice")
+	}
+
+	m.dbWait = time.Minute // normal
+	if r, err = m.report(context.Background()); err != nil || r.CatchingUp {
+		t.Errorf("answered normally: catching up %v, err %v", r.CatchingUp, err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // the caller gave up: that is the caller's doing, not a report
+	if _, err = m.report(ctx); !errors.Is(err, context.Canceled) {
+		t.Errorf("cancelled caller: err = %v", err)
+	}
+}
+
 func TestUsedPercentIsWhatDfPrints(t *testing.T) {
 	for _, c := range []struct {
 		used, avail int64

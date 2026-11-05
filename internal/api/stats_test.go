@@ -110,11 +110,12 @@ func TestHealthOverSocket(t *testing.T) {
 			CPUWindow: time.Minute, RSSBytes: 10, Socket: sock, User: "u", Root: true},
 		Storage: health.Storage{DataDir: "d", DBPath: "d/x.db", DBBytes: 1, FreeBytes: 2, SizeBytes: 3,
 			HighPct: 80, LowPct: 70, Paused: true, PausedSince: time.Date(2026, 11, 2, 14, 2, 0, 0, time.UTC), UsedPct: 81},
-		Ingest:    []health.IngestAgent{{Agent: "claude", Files: 2, Unknown: 1}},
-		Integrity: health.Integrity{Records: 5, OK: true, Interval: time.Hour, BadRecordID: 0},
-		Agents:    []health.Agent{{Agent: "claude", Version: "2.0", Logs: "~/.claude/projects"}},
-		Live:      []health.LiveSession{{SessionID: "s", Agent: "claude", Repo: "r", LastActivity: time.Date(2026, 10, 17, 11, 0, 0, 0, time.UTC)}},
-		Sudo:      health.Sudo{Checked: true, Passwordless: []string{"ubuntu"}},
+		Ingest:     []health.IngestAgent{{Agent: "claude", Files: 2, Unknown: 1}},
+		Integrity:  health.Integrity{Records: 5, OK: true, Interval: time.Hour, BadRecordID: 0},
+		Agents:     []health.Agent{{Agent: "claude", Version: "2.0", Logs: "~/.claude/projects"}},
+		Live:       []health.LiveSession{{SessionID: "s", Agent: "claude", Repo: "r", LastActivity: time.Date(2026, 10, 17, 11, 0, 0, 0, time.UTC)}},
+		Sudo:       health.Sudo{Checked: true, Passwordless: []string{"ubuntu"}},
+		CatchingUp: true,
 		Capture: health.Capture{Enabled: true, Level: "essential", PolicyKnown: true, PolicyLevel: "complete",
 			PolicyFile: "/etc/tetragon/tetragon.tp.d/sentient.yaml", PolicyInstalled: time.Date(2026, 11, 2, 0, 59, 0, 0, time.UTC)},
 	}
@@ -126,7 +127,7 @@ func TestHealthOverSocket(t *testing.T) {
 	if !reflect.DeepEqual(got.Daemon, want.Daemon) || !reflect.DeepEqual(got.Storage, want.Storage) ||
 		!reflect.DeepEqual(got.Ingest, want.Ingest) || !reflect.DeepEqual(got.Agents, want.Agents) ||
 		!reflect.DeepEqual(got.Live, want.Live) || !reflect.DeepEqual(got.Sudo, want.Sudo) || !reflect.DeepEqual(got.Capture, want.Capture) ||
-		!got.CheckedAt.Equal(want.CheckedAt) || !got.HistoryBegins.IsZero() ||
+		!got.CheckedAt.Equal(want.CheckedAt) || !got.HistoryBegins.IsZero() || got.CatchingUp != want.CatchingUp ||
 		got.Integrity.Records != 5 || !got.Integrity.OK || got.Integrity.Interval != time.Hour || !got.Integrity.CheckedAt.IsZero() {
 		t.Errorf("round trip:\n got %+v\nwant %+v", got, want)
 	}
@@ -137,6 +138,21 @@ func TestHealthOverSocket(t *testing.T) {
 	}
 	if !strings.Contains(joinNames(got.API.ErrorsByCode), "Unimplemented") {
 		t.Errorf("errors by code = %+v", got.API.ErrorsByCode)
+	}
+}
+
+func TestHealthCancelledByTheCallerIsNotInternal(t *testing.T) {
+	st, err := store.Open(context.Background(), filepath.Join(shortDir(t), "data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	srv := NewServer(st.DB)
+	srv.SetHealth(func(ctx context.Context) (*health.Report, error) { return nil, ctx.Err() })
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := srv.Health(ctx, nil); status.Code(err) != codes.Canceled {
+		t.Errorf("code = %v, want Canceled", status.Code(err))
 	}
 }
 

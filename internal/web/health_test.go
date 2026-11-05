@@ -222,7 +222,7 @@ func TestHealthCaptureCardMismatch(t *testing.T) {
 	for _, want := range []string{
 		`The Tetragon policy records at complete, sentientd is set to essential`,
 		`class="tile warnstate"`, `does not match sentientd · restart sentientd with --verbosity complete, or sen policy --verbosity essential`,
-			`Either restart sentientd with --verbosity complete to match the policy`,
+		`Either restart sentientd with --verbosity complete to match the policy`,
 		`<span class="okdot warn"></span>on · essential`,
 	} {
 		if !strings.Contains(body, want) {

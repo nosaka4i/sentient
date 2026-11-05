@@ -24,6 +24,10 @@ type Report struct {
 	Live      []LiveSession
 	Sudo      Sudo
 	Capture   Capture
+
+	// CatchingUp is set while the database was too busy to answer in time
+	// (sentientd starting up): HistoryBegins, Ingest and Live are then empty.
+	CatchingUp bool
 }
 
 // Daemon is sentientd's own process.
@@ -133,6 +137,13 @@ type Sudo struct {
 // Warnings lists the problems worth showing at the top of the page.
 func (r *Report) Warnings() []Warning {
 	var w []Warning
+	if r.CatchingUp {
+		w = append(w, Warning{
+			What: "sentientd is processing logs since the last startup",
+			Why: "Until it has caught up, the log counts and live sessions below may be incomplete. " +
+				"This clears by itself, usually within a minute or two.",
+		})
+	}
 	if r.Integrity.CheckedAt.After(time.Time{}) && !r.Integrity.OK {
 		w = append(w, Warning{Critical: true, Headline: "Integrity check failed",
 			What: "Hash chain broken",
