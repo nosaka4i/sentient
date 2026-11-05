@@ -85,7 +85,20 @@ type stepView struct {
 	Group    bool
 	Runs     []runView
 	RunsMore int
+	// Pause: a band around the actions logged while nobody was recording the
+	// kernel. Children holds them as the trace draws them; the band says when
+	// the pause was, how many actions are in it and what kind.
+	Pause     bool
+	PauseWhen string // "Oct 7 14:47:05 – 14:47:25 (20s)"; empty when the gap is not known
+	PauseNote string // "2 actions here are in the agent's log but were not compared with the kernel"
+	PauseKind string // "62 commands · 31 file reads · 7 edits · steps 41–140"
+	PauseOpen bool   // short pauses start open; a long one is collapsed
+	PauseAt   string // +m:ss of its first action
+	first     time.Duration
 }
+
+// pauseOpenMax is how many actions a pause band may hold and still start open.
+const pauseOpenMax = 10
 
 type runView struct {
 	T, Path string
@@ -101,6 +114,9 @@ type evidenceView struct {
 	// the rest of the agent log, so it adds up: confirmed + unverified +
 	// not checked (file tools, web) + pending (a running prompt)
 	NotChecked, Pending int64
+	// logged while nobody was recording the kernel (a gap): no record to compare
+	// with, so neither confirmed nor unverified
+	NotCompared int64
 	// Background commands the agent ran while the prompt did, and the agent's
 	// timeline for the prompt's window.
 	Background     int64
@@ -157,7 +173,7 @@ func newPromptPage(d *query.PromptDetail, now time.Time, home string) promptPage
 	p.Evidence = evidenceView{
 		Watched: d.Counts.Watched, AgentLog: d.Counts.AgentLog, KernelLog: d.Counts.KernelLog,
 		Unverified: d.Counts.Unverified, Unreported: d.Counts.Unreported, Background: d.Counts.Background,
-		NotChecked: d.Counts.NotChecked, Pending: d.Counts.Pending,
+		NotChecked: d.Counts.NotChecked, Pending: d.Counts.Pending, NotCompared: d.Counts.NotCompared,
 	}
 	if d.Counts.Background > 0 && d.Counts.AgentID != "" {
 		end := now
@@ -186,6 +202,7 @@ func newPromptPage(d *query.PromptDetail, now time.Time, home string) promptPage
 		p.FilesRemoved += f.Removed
 	}
 	p.Steps, p.StepCount, p.TraceMore = buildTrace(d.Steps)
+	labelPauses(p.Steps, d.Gaps, d.Prompt.Started, now)
 
 	if strings.TrimSpace(d.Reply) != "" {
 		p.Reply = replyParagraphs(d.Reply)
@@ -265,6 +282,26 @@ func buildTrace(steps []query.Step) ([]stepView, int, int) {
 		more = len(steps) - maxTraceSteps
 		steps = steps[:maxTraceSteps]
 	}
+	// a run of steps logged while nobody was recording is one band
+	var out []stepView
+	for i := 0; i < len(steps); {
+		j := i
+		for j < len(steps) && steps[j].NotCompared == steps[i].NotCompared {
+			j++
+		}
+		if steps[i].NotCompared {
+			out = append(out, pauseBand(steps[i:j]))
+		} else {
+			out = append(out, traceRows(steps[i:j])...)
+		}
+		i = j
+	}
+	return out, len(steps), more
+}
+
+// traceRows draws steps one by one, a Bash call that ran several commands as a
+// header with its commands under it.
+func traceRows(steps []query.Step) []stepView {
 	var out []stepView
 	for i := 0; i < len(steps); i++ {
 		s := steps[i]
@@ -280,7 +317,75 @@ func buildTrace(steps []query.Step) ([]stepView, int, int) {
 		g.CallNote = fmt.Sprintf("1 tool call, %d commands", len(g.Children))
 		out = append(out, g)
 	}
-	return out, len(steps), more
+	return out
+}
+
+// pauseBand is one band around steps the agent logged while nobody was
+// recording the kernel. Nothing in it is hidden: the rows are the ones the
+// trace draws anywhere else, and the band says what is inside by kind.
+func pauseBand(steps []query.Step) stepView {
+	b := stepView{Pause: true, PauseOpen: len(steps) <= pauseOpenMax, first: steps[0].Offset,
+		PauseAt: offsetLabel(steps[0].Offset), Children: traceRows(steps)}
+	var commands, reads, edits, other int
+	for _, s := range steps {
+		switch {
+		case s.Resource == "command":
+			commands++
+		case s.Resource == "file" && s.Action == "read":
+			reads++
+		case s.Resource == "file":
+			edits++
+		default:
+			other++
+		}
+	}
+	var kinds []string
+	for _, k := range []struct {
+		n    int
+		word string
+	}{{commands, "command"}, {reads, "file read"}, {edits, "edit"}, {other, "other"}} {
+		if k.n > 0 {
+			kinds = append(kinds, plural(int64(k.n), k.word))
+		}
+	}
+	if last := steps[len(steps)-1].N; last != steps[0].N {
+		kinds = append(kinds, fmt.Sprintf("steps %d–%d", steps[0].N, last))
+	} else {
+		kinds = append(kinds, fmt.Sprintf("step %d", steps[0].N))
+	}
+	if len(steps) == 1 {
+		b.PauseNote = "1 action here is in the agent's log but was not compared with the kernel"
+	} else {
+		b.PauseNote = fmt.Sprintf("%d actions here are in the agent's log but were not compared with the kernel", len(steps))
+	}
+	b.PauseKind = strings.Join(kinds, " · ")
+	return b
+}
+
+// labelPauses says when each band's pause was, from the gap that holds its
+// first action (widened by the same few seconds the accounting allows).
+func labelPauses(rows []stepView, gaps []query.GapInfo, started, now time.Time) {
+	const slack = 5 * time.Second
+	for i := range rows {
+		if !rows[i].Pause {
+			continue
+		}
+		at := started.Add(rows[i].first)
+		for _, g := range gaps {
+			if at.Before(g.From.Add(-slack)) || at.After(g.To.Add(slack)) {
+				continue
+			}
+			end := g.To
+			when := stamp(g.From, now) + " – " + clockOrDate(end, g.From, now)
+			if g.Open {
+				when = stamp(g.From, now) + " – still paused"
+			} else {
+				when += " (" + uptime(end.Sub(g.From)) + ")"
+			}
+			rows[i].PauseWhen = when
+			break
+		}
+	}
 }
 
 func newStepView(s query.Step, top bool) stepView {

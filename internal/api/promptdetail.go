@@ -78,14 +78,17 @@ func promptDetailToProto(d *query.PromptDetail) *sentientpb.PromptDetailResponse
 		ps := &sentientpb.Step{
 			N: s.N, Offset: durationpb.New(s.Offset), Resource: s.Resource, Action: s.Action, Path: s.Path,
 			Failed: s.Failed, Evidence: s.Evidence, CallId: s.CallID, CallCommand: s.CallCommand, Builtin: s.Builtin, ActionId: s.ActionID,
-			Alert: s.Alert, Unreported: s.Unreported, Unverified: s.Unverified,
+			Alert: s.Alert, Unreported: s.Unreported, Unverified: s.Unverified, NotCompared: s.NotCompared,
 		}
 		r.Steps = append(r.Steps, ps)
 	}
 	r.Counts = &sentientpb.EvidenceCounts{
 		Watched: d.Counts.Watched, AgentLog: d.Counts.AgentLog, KernelLog: d.Counts.KernelLog,
 		Unverified: d.Counts.Unverified, Unreported: d.Counts.Unreported, Background: d.Counts.Background,
-		AgentId: d.Counts.AgentID, Confirmed: d.Counts.Confirmed, NotChecked: d.Counts.NotChecked, Pending: d.Counts.Pending,
+		AgentId: d.Counts.AgentID, Confirmed: d.Counts.Confirmed, NotChecked: d.Counts.NotChecked, Pending: d.Counts.Pending, NotCompared: d.Counts.NotCompared,
+	}
+	for _, g := range d.Gaps {
+		r.Gaps = append(r.Gaps, &sentientpb.Gap{From: timestamppb.New(g.From), To: timestamppb.New(g.To), Open: g.Open, Reason: g.Reason})
 	}
 	return r
 }
@@ -128,7 +131,7 @@ func promptDetailFromProto(r *sentientpb.PromptDetailResponse) *query.PromptDeta
 			N: s.GetN(), Offset: s.GetOffset().AsDuration(), Resource: s.GetResource(), Action: s.GetAction(),
 			Path: s.GetPath(), Failed: s.GetFailed(), Evidence: s.GetEvidence(), CallID: s.GetCallId(),
 			CallCommand: s.GetCallCommand(), Builtin: s.GetBuiltin(), ActionID: s.GetActionId(),
-			Alert: s.GetAlert(), Unreported: s.GetUnreported(), Unverified: s.GetUnverified(),
+			Alert: s.GetAlert(), Unreported: s.GetUnreported(), Unverified: s.GetUnverified(), NotCompared: s.GetNotCompared(),
 		}
 		d.Steps = append(d.Steps, qs)
 	}
@@ -136,7 +139,10 @@ func promptDetailFromProto(r *sentientpb.PromptDetailResponse) *query.PromptDeta
 	d.Counts = query.EvidenceCounts{
 		Watched: c.GetWatched(), AgentLog: c.GetAgentLog(), KernelLog: c.GetKernelLog(),
 		Unverified: c.GetUnverified(), Unreported: c.GetUnreported(), Background: c.GetBackground(),
-		AgentID: c.GetAgentId(), Confirmed: c.GetConfirmed(), NotChecked: c.GetNotChecked(), Pending: c.GetPending(),
+		AgentID: c.GetAgentId(), Confirmed: c.GetConfirmed(), NotChecked: c.GetNotChecked(), Pending: c.GetPending(), NotCompared: c.GetNotCompared(),
+	}
+	for _, g := range r.GetGaps() {
+		d.Gaps = append(d.Gaps, query.GapInfo{From: g.GetFrom().AsTime(), To: g.GetTo().AsTime(), Open: g.GetOpen(), Reason: g.GetReason()})
 	}
 	return d
 }

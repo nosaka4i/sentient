@@ -55,8 +55,9 @@
         <span class="sum">
           {{- if and .Evidence.Watched .Evidence.Unverified}}<span class="tag unver" title="logged by the agent, but the kernel has no record of it">{{.Evidence.Unverified}} unverified</span> {{end}}
           {{- if and .Evidence.Watched .Evidence.NotChecked}}<span class="tag" title="logged actions the kernel record cannot be compared with yet, such as web fetches">{{.Evidence.NotChecked}} not checked</span> {{end}}
+          {{- if .Evidence.NotCompared}}<span class="tag pause" title="the agent logged them while recording was paused, so the kernel has no record to compare them with">{{.Evidence.NotCompared}} not compared</span> {{end}}
           {{- if .Evidence.Pending}}<span class="tag" title="commands of a prompt that is still running, not matched yet">{{.Evidence.Pending}} pending</span>{{end}}
-          {{- if not (or .Evidence.Unverified .Evidence.NotChecked .Evidence.Pending)}}&nbsp;{{end}}</span>
+          {{- if not (or .Evidence.Unverified .Evidence.NotChecked .Evidence.NotCompared .Evidence.Pending)}}&nbsp;{{end}}</span>
       </a>
 {{- if .Evidence.Watched}}
       <a class="tile" href="#trace">
@@ -117,6 +118,30 @@
       <ol class="steps">
 {{- range .Steps}}
 {{- if .Group}}{{template "group" .}}
+{{- else if .Pause}}
+        <li class="pausegroup">
+          <details{{if .PauseOpen}} open{{end}}>
+            <summary><span class="t">{{.PauseAt}}</span><span><b>Recording was paused</b>{{if .PauseWhen}} · {{.PauseWhen}}{{end}} · {{.PauseNote}}</span><span class="kinds">{{.PauseKind}}</span></summary>
+            <ol>
+{{- range .Children}}
+{{- if .Call}}
+              <li>
+                <div class="step call">
+                  <span class="n"></span><span class="t">{{.T}}</span>
+                  <span class="k">Bash</span>
+                  <span class="p">{{.Path}} <span class="note">· {{.CallNote}}</span></span>
+                  <span class="d"></span>
+                </div>
+                <ol>
+{{- range .Children}}{{template "step" .}}{{end}}
+                </ol>
+              </li>
+{{- else}}{{template "step" .}}
+{{- end}}
+{{- end}}
+            </ol>
+          </details>
+        </li>
 {{- else if .Call}}
         <li>
           <div class="step call">

@@ -69,6 +69,8 @@ type Attributor struct {
 	Log     *slog.Logger
 	// Now is the clock; time.Now when nil.
 	Now func() time.Time
+	// Paused, if set, says recording is paused: no pass is made until it is false.
+	Paused func() bool
 }
 
 // Run attributes every interval until ctx is cancelled.
@@ -80,6 +82,9 @@ func (a *Attributor) Run(ctx context.Context, interval time.Duration) error {
 		case <-ctx.Done():
 			return nil
 		case <-t.C:
+			if a.Paused != nil && a.Paused() {
+				continue
+			}
 			if _, err := a.Once(ctx); err != nil && ctx.Err() == nil && a.Log != nil {
 				a.Log.Error("attribute processes", "err", err)
 			}

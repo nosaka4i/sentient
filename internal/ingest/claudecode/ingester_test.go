@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -234,6 +235,36 @@ func TestScanErrorsAreReported(t *testing.T) {
 	cancel()
 	if err := in.ScanOnce(ctx); err != nil {
 		t.Fatalf("ScanOnce with no files: %v", err)
+	}
+}
+
+// While paused nothing is read; when it ends, reading carries on from the
+// start, so what the agent logged meanwhile is caught up, not skipped.
+func TestRunReadsNothingWhilePausedAndCatchesUpAfter(t *testing.T) {
+	home := fixtureHome(t)
+	st := openStore(t)
+	var paused atomic.Bool
+	paused.Store(true)
+	in := New(st, Config{Homes: []string{home}, PollInterval: 10 * time.Millisecond, Paused: paused.Load})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error)
+	go func() { done <- in.Run(ctx) }()
+
+	time.Sleep(150 * time.Millisecond) // many polls
+	if n := count(t, st, `SELECT COUNT(*) FROM raw_log_records`); n != 0 {
+		t.Fatalf("%d records ingested while paused", n)
+	}
+	paused.Store(false)
+	deadline := time.Now().Add(5 * time.Second)
+	for count(t, st, `SELECT COUNT(*) FROM raw_log_records`) < 25 {
+		if time.Now().After(deadline) {
+			t.Fatal("did not catch up after the pause")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }
 

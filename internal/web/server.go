@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/nosaka4i/sentient/internal/api"
@@ -55,6 +56,9 @@ type Server struct {
 	log    *slog.Logger
 	pages  map[string]*template.Template
 	static http.Handler
+
+	siteAlert  atomic.Pointer[siteAlert] // the last look at Health, for the banner and the icon's dot
+	refreshing atomic.Bool
 }
 
 // New returns a Server reading from src. socket is only used in messages.
@@ -65,7 +69,13 @@ func New(src Source, socket string, log *slog.Logger) (*Server, error) {
 	home, _ := os.UserHomeDir()
 	s := &Server{src: src, socket: socket, now: time.Now, home: home, log: log, pages: map[string]*template.Template{}}
 	for _, page := range []string{"activity", "agent", "agents", "alert", "alerts", "dashboard", "health", "prompt", "prompts", "session", "sessions", "down"} {
-		t, err := template.ParseFS(assets.FS, "templates/layout.html", "templates/"+page+".html")
+		notice := s.notice
+		if page == "down" {
+			// sentientd cannot be asked: the page says so itself
+			notice = func() *siteAlert { return nil }
+		}
+		t, err := template.New("layout.html").Funcs(template.FuncMap{"notice": notice}).
+			ParseFS(assets.FS, "templates/layout.html", "templates/"+page+".html")
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", page, err)
 		}

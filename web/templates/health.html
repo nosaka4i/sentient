@@ -39,7 +39,7 @@
   <section class="card{{if not .CaptureOn}} muted{{end}}" aria-labelledby="h-cap">
     <div class="card-head">
       <h2 id="h-cap">Capture</h2>
-      {{if .CaptureOn}}<span class="state-ok"><span class="okdot{{if .CaptureWarn}} warn{{end}}"></span>{{.CaptureState}}</span>{{else}}<span class="state-off">{{.CaptureState}}</span>{{end}}
+      {{if .CapturePaused}}<span class="state-paused"><span class="okdot bad"></span>{{.CaptureState}}</span>{{else if .CaptureOn}}<span class="state-ok"><span class="okdot{{if .CaptureWarn}} warn{{end}}"></span>{{.CaptureState}}</span>{{else}}<span class="state-off">{{.CaptureState}}</span>{{end}}
       <span class="hint">what sentient records of the kernel's events</span>
     </div>
     <div class="tiles">

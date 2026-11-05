@@ -45,6 +45,8 @@ func newRootCmd() *cobra.Command {
 	f.Lookup("tetragon").NoOptDefVal = tetragon.DefaultAddr
 	f.StringVar((*string)(&cfg.Verbosity), "verbosity", "essential", "how much the kernel reports is stored: essential (leaves out build caches, toolchains and system libraries), extended or complete; match it to the policy from sen policy --verbosity")
 	f.StringVar(&cfg.PolicyFile, "policy-file", policy.DefaultPolicyFile, "the installed Tetragon policy whose level is compared with --verbosity")
+	f.IntVar(&cfg.DiskHigh, "disk-high-threshold", daemon.DefaultDiskHigh, "pause recording when this percent of the data disk is used (10-99); Health warns 10 points before")
+	f.IntVar(&cfg.DiskLow, "disk-low-threshold", 0, "resume recording when the disk is down to this percent used (default: 5 below the high threshold)")
 	f.DurationVar(&cfg.IntegrityInterval, "integrity-interval", time.Hour, "how often the full hash-chain check runs")
 	cmd.SetContext(context.Background())
 	return cmd

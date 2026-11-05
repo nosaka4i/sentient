@@ -34,6 +34,8 @@ const slack = 5 * time.Second
 type Merger struct {
 	St  *store.Store
 	Log *slog.Logger
+	// Paused, if set, says recording is paused: no pass is made until it is false.
+	Paused func() bool
 }
 
 // Run merges every interval until ctx is cancelled.
@@ -45,6 +47,9 @@ func (m *Merger) Run(ctx context.Context, interval time.Duration) error {
 		case <-ctx.Done():
 			return nil
 		case <-t.C:
+			if m.Paused != nil && m.Paused() {
+				continue
+			}
 			if _, err := m.Once(ctx); err != nil && ctx.Err() == nil && m.Log != nil {
 				m.Log.Error("merge log and kernel", "err", err)
 			}

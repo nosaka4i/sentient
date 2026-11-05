@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,10 +23,11 @@ type healthPage struct {
 	Warnings []health.Warning
 	Checked  since
 
-	Capture      []htile
-	CaptureOn    bool   // the kernel collector is on
-	CaptureWarn  bool   // the policy and sentientd disagree, or the disk is filling
-	CaptureState string // the card's header chip
+	Capture       []htile
+	CaptureOn     bool   // the kernel collector is on
+	CaptureWarn   bool   // the policy and sentientd disagree, or the disk is filling
+	CapturePaused bool   // recording is paused for lack of disk
+	CaptureState  string // the card's header chip
 
 	Daemon    []htile
 	DaemonOn  string // hint: sentientd · user
@@ -69,6 +71,7 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 		s.down(w, err)
 		return
 	}
+	s.setAlert(rep) // the banner on this page is as new as the page
 	s.render(w, http.StatusOK, "health", newHealthPage(rep, s.now()))
 }
 
@@ -83,14 +86,21 @@ func newHealthPage(rep *health.Report, now time.Time) healthPage {
 		p.Since = &since{ISO: iso(rep.HistoryBegins, now), Date: render.Date(rep.HistoryBegins, now), Ago: render.Ago(rep.HistoryBegins, now)}
 	}
 	p.OK = true
+	critical := ""
 	for _, w := range p.Warnings {
 		if w.Critical {
 			p.OK = false
+			if critical == "" {
+				critical = w.Headline
+			}
 		}
 	}
 	switch n := len(p.Warnings); {
 	case !p.OK:
-		p.Headline = "Integrity check failed"
+		p.Headline = critical // the first critical warning says what the page's headline is
+		if p.Headline == "" {
+			p.Headline = "Needs attention"
+		}
 	case n == 1:
 		p.Headline = "Running, with 1 warning" // not "normal": the line under it lists a warning
 	case n > 1:
@@ -99,7 +109,7 @@ func newHealthPage(rep *health.Report, now time.Time) healthPage {
 		p.Headline = "All systems normal"
 	}
 
-	p.Capture, p.CaptureOn, p.CaptureWarn, p.CaptureState = captureCard(rep, now)
+	p.Capture, p.CaptureOn, p.CaptureWarn, p.CapturePaused, p.CaptureState = captureCard(rep, now)
 
 	d := rep.Daemon
 	p.DaemonOn = "sentientd · " + d.User
@@ -319,11 +329,11 @@ var levelNote = map[string]string{
 // captureCard is the Capture card: the level sentientd runs at, the level the
 // installed policy was made for, and the disk. It also returns whether the
 // kernel collector is on, whether anything needs a look, and the header chip.
-func captureCard(rep *health.Report, now time.Time) (tiles []htile, on, warn bool, state string) {
+func captureCard(rep *health.Report, now time.Time) (tiles []htile, on, warn, paused bool, state string) {
 	c := rep.Capture
 	if !c.Enabled {
 		return []htile{{Label: "kernel capture", Num: "off", NumTxt: true, Wide: true, Muted: true,
-			Sum: "sentientd was started without --tetragon, so only the agents' own logs are recorded"}}, false, false, "off"
+			Sum: "sentientd was started without --tetragon, so only the agents' own logs are recorded"}}, false, false, false, "off"
 	}
 	level := htile{Label: "level", Num: c.Level, NumTxt: true, Sum: levelNote[c.Level]}
 	if c.Level == "essential" {
@@ -338,21 +348,40 @@ func captureCard(rep *health.Report, now time.Time) (tiles []htile, on, warn boo
 			installed = " · installed " + render.Date(c.PolicyInstalled, now)
 		}
 		if c.PolicyLevel == c.Level {
-			policy.Check, policy.Sum = true, "matches sentientd"+installed
+			// one tile while they agree: the policy tile would only repeat the level
+			level.Check = true
+			level.Sum += " · policy matches" + installed
+			policy = htile{}
 		} else {
 			policy.Warn, warn = true, true
-			policy.Sum = "does not match sentientd · sen policy --verbosity " + c.Level + installed
+			policy.Sum = "does not match sentientd · restart sentientd with --verbosity " + c.PolicyLevel +
+				", or sen policy --verbosity " + c.Level + ", install it and restart Tetragon" + installed
 		}
 	}
-	disk := htile{Label: "disk", LabelRest: "free", Num: "—", Sum: "unknown"}
+	tiles = []htile{level}
+	if policy.Label != "" {
+		tiles = append(tiles, policy)
+	}
+	disk := htile{Label: "disk", LabelRest: "used", Num: "—", Sum: "unknown"}
 	if s := rep.Storage; s.SizeBytes > 0 {
-		free := s.FreeBytes * 100 / s.SizeBytes
-		disk.Num = humanize.Bytes(uint64(s.FreeBytes))
-		disk.Sum = fmt.Sprintf("of %s · %d%% free", humanize.Bytes(uint64(s.SizeBytes)), free)
-		if 100-free >= 70 {
+		disk.Num, disk.NumSmall = strconv.Itoa(s.UsedPct), "%"
+		disk.Sum = fmt.Sprintf("%s free of %s", humanize.Bytes(uint64(s.FreeBytes)), humanize.Bytes(uint64(s.SizeBytes)))
+		warnAt := 70
+		if s.HighPct > 0 {
+			disk.Sum += fmt.Sprintf(" · pauses at %d%%", s.HighPct)
+			warnAt = s.HighPct - 10
+		}
+		if s.UsedPct >= warnAt {
 			disk.Warn, warn = true, true
 		}
 	}
+	tiles = append(tiles, disk)
 	state = "on · " + c.Level
-	return []htile{level, policy, disk}, true, warn, state
+	if s := rep.Storage; s.Paused {
+		paused = true
+		state = "recording paused"
+		tiles = append(tiles, htile{Label: "paused", LabelRest: "since", NumTxt: true, Warn: true,
+			Num: render.Date(s.PausedSince, now), Sum: uptime(now.Sub(s.PausedSince)) + " · one gap recorded · resumes at " + strconv.Itoa(s.LowPct) + "%"})
+	}
+	return tiles, true, warn, paused, state
 }

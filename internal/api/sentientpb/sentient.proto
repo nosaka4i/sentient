@@ -258,6 +258,7 @@ message Step {
   bool alert = 12; // an alert is about this step
   bool unreported = 13; // the kernel saw it, the agent's log does not have it
   bool unverified = 14; // the agent logged it, the kernel did not see it
+  bool not_compared = 15; // the agent logged it while nobody was recording (a gap)
 }
 
 // EvidenceCounts says how the agent's log and the kernel's relate for a
@@ -272,11 +273,12 @@ message EvidenceCounts {
   // and the agent process that ran them.
   int64 background = 6;
   string agent_id = 7;
-  // agent_log = confirmed + unverified + not_checked + pending
+  // agent_log = confirmed + unverified + not_checked + not_compared + pending
   // kernel_log = confirmed + unreported
   int64 confirmed = 8;
   int64 not_checked = 9; // logged actions that are not commands: not matched to the kernel yet
   int64 pending = 10; // logged commands of a prompt still running
+  int64 not_compared = 11; // logged while nobody was recording (a gap): no kernel record to compare with
 }
 
 message AgentRow {
@@ -345,6 +347,16 @@ message PromptDetailResponse {
   google.protobuf.Timestamp reply_at = 7;
   string repo_root = 8; // empty if the session has no repo
   EvidenceCounts counts = 9;
+  // Stretches in which nobody was recording, touched by the prompt's actions
+  // (only sent when some action was not compared).
+  repeated Gap gaps = 10;
+}
+
+message Gap {
+  google.protobuf.Timestamp from = 1;
+  google.protobuf.Timestamp to = 2;
+  bool open = 3; // still going: to is where the prompt's actions end
+  string reason = 4;
 }
 
 message HealthRequest {}
@@ -391,6 +403,11 @@ message HealthResponse {
     int64 db_bytes = 3;
     int64 free_bytes = 4;
     int64 size_bytes = 5;
+    int32 high_pct = 6; // recording pauses at this share used; 0 = unknown
+    bool paused = 7;
+    google.protobuf.Timestamp paused_since = 8; // unset when not paused
+    int32 used_pct = 9; // as df prints it
+    int32 low_pct = 10; // recording resumes at this share used
   }
   Storage storage = 5;
 

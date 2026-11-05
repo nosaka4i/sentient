@@ -59,6 +59,7 @@ func healthToProto(r *health.Report) *pb.HealthResponse {
 		},
 		Storage: &pb.HealthResponse_Storage{
 			DataDir: s.DataDir, DbPath: s.DBPath, DbBytes: s.DBBytes, FreeBytes: s.FreeBytes, SizeBytes: s.SizeBytes,
+			HighPct: int32(s.HighPct), LowPct: int32(s.LowPct), Paused: s.Paused, PausedSince: ts(s.PausedSince), UsedPct: int32(s.UsedPct),
 		},
 		Integrity: &pb.HealthResponse_Integrity{
 			CheckedAt: ts(in.CheckedAt), FullAt: ts(in.FullAt), Records: in.Records, Ok: in.OK,
@@ -105,6 +106,7 @@ func healthFromProto(p *pb.HealthResponse) *health.Report {
 		Storage: health.Storage{
 			DataDir: s.GetDataDir(), DBPath: s.GetDbPath(), DBBytes: s.GetDbBytes(),
 			FreeBytes: s.GetFreeBytes(), SizeBytes: s.GetSizeBytes(),
+			HighPct: int(s.GetHighPct()), LowPct: int(s.GetLowPct()), Paused: s.GetPaused(), PausedSince: fromTS(s.GetPausedSince()), UsedPct: int(s.GetUsedPct()),
 		},
 		Integrity: health.Integrity{
 			CheckedAt: fromTS(in.GetCheckedAt()), FullAt: fromTS(in.GetFullAt()), Records: in.GetRecords(), OK: in.GetOk(),

@@ -38,6 +38,10 @@ type Config struct {
 	// PollInterval is how often files are checked for new records.
 	PollInterval time.Duration
 	Logger       *slog.Logger
+	// Paused, if set, says recording is paused (the disk is too full): nothing
+	// is read until it is false again, and then reading carries on from where
+	// it stopped, so what the agent logged meanwhile is caught up.
+	Paused func() bool
 }
 
 // Ingester tails transcripts into the store. Only one should run per store.
@@ -80,8 +84,10 @@ func (in *Ingester) Run(ctx context.Context) error {
 	t := time.NewTicker(in.cfg.PollInterval)
 	defer t.Stop()
 	for {
-		if err := in.ScanOnce(ctx); err != nil && ctx.Err() == nil {
-			in.log.Error("scan failed", "err", err)
+		if in.cfg.Paused == nil || !in.cfg.Paused() {
+			if err := in.ScanOnce(ctx); err != nil && ctx.Err() == nil {
+				in.log.Error("scan failed", "err", err)
+			}
 		}
 		select {
 		case <-ctx.Done():

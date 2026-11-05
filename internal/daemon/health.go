@@ -18,8 +18,6 @@ import (
 	"syscall"
 	"time"
 
-	"golang.org/x/sys/unix"
-
 	"github.com/nosaka4i/sentient/internal/health"
 	"github.com/nosaka4i/sentient/internal/query"
 	"github.com/nosaka4i/sentient/internal/store"
@@ -36,6 +34,7 @@ type monitor struct {
 	now     func() time.Time
 	log     *slog.Logger
 	cfg     Config
+	disk    *diskGuard // nil in tests that do not pause
 
 	cpu   *cpuSampler
 	integ *integrity
@@ -87,6 +86,11 @@ func (m *monitor) report(ctx context.Context) (*health.Report, error) {
 		RSSBytes: rssBytes(), Socket: m.socket, User: u, Root: os.Geteuid() == 0,
 	}
 	r.Storage = storage(m.dataDir)
+	r.Storage.HighPct, r.Storage.LowPct = m.cfg.DiskHigh, m.cfg.DiskLow
+	if m.disk != nil {
+		r.Storage.Paused = m.disk.Paused()
+		r.Storage.PausedSince = m.disk.PausedSince()
+	}
 
 	if r.Ingest, err = query.IngestStats(ctx, m.st.DB); err != nil {
 		return nil, err
@@ -112,10 +116,8 @@ func storage(dataDir string) health.Storage {
 			s.DBBytes += fi.Size()
 		}
 	}
-	var fs unix.Statfs_t
-	if err := unix.Statfs(dataDir, &fs); err == nil {
-		s.FreeBytes = int64(fs.Bavail) * int64(fs.Bsize)
-		s.SizeBytes = int64(fs.Blocks) * int64(fs.Bsize)
+	if free, size, used, err := diskUsage(dataDir); err == nil {
+		s.FreeBytes, s.SizeBytes, s.UsedPct = free, size, used
 	}
 	return s
 }

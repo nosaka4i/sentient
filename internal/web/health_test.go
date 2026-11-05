@@ -25,7 +25,7 @@ func healthReport() *health.Report {
 			Clients: []string{"sen serve", "sen status"},
 		},
 		Storage: health.Storage{DataDir: "/opt/sentient/data", DBPath: "/opt/sentient/data/sentient.db",
-			DBBytes: 1_600_000_000, FreeBytes: 118_000_000_000, SizeBytes: 240_000_000_000},
+			DBBytes: 1_600_000_000, FreeBytes: 118_000_000_000, SizeBytes: 240_000_000_000, UsedPct: 51, HighPct: 80, LowPct: 75},
 		Ingest: []health.IngestAgent{
 			{Agent: "claude", LastRecord: now.Add(-400 * time.Millisecond), Files: 38},
 			{Agent: "codex", LastRecord: now.Add(-50 * time.Hour), Files: 11, Unknown: 0},
@@ -117,7 +117,7 @@ func TestHealthPageStates(t *testing.T) {
 	r.Integrity = health.Integrity{CheckedAt: now, FullAt: now, OK: false, BadRecordID: 42, Interval: time.Hour}
 	r.Sudo = health.Sudo{Reason: "unknown (sentientd not running as root)"}
 	r.Ingest[0].Unknown = 3
-	r.Storage.FreeBytes = 1_000_000_000
+	r.Storage.FreeBytes, r.Storage.UsedPct = 1_000_000_000, 99
 	r.Live = nil
 	r.API = health.API{Since: now}
 	r.HistoryBegins = time.Time{}
@@ -126,7 +126,7 @@ func TestHealthPageStates(t *testing.T) {
 	for _, want := range []string{
 		`okdot bad`, `Integrity check failed`,
 		`<strong>3 warnings</strong>`,
-		`Hash chain broken`, `3 agent log records of unknown type`, `Disk almost full`,
+		`Hash chain broken`, `3 agent log records of unknown type`, `Disk filling up`,
 		`Broken at record #42`,
 		`<span class="num txt">unknown</span>`, `unknown (sentientd not running as root)`,
 		`none active in the last 5m`,
@@ -200,15 +200,15 @@ func TestHealthCaptureCardMatching(t *testing.T) {
 	})
 	for _, want := range []string{
 		`<h2 id="h-cap">Capture</h2>`, `on · essential`,
-		`<span class="num txt">essential</span>`, `default · build caches, toolchains and system libraries are not recorded`,
-		`matches sentientd · installed `,
-		`<span class="lbl"><b>disk</b> free</span>`, `of 240 GB · 49% free`,
+		`<span class="num txt">essential <span class="okt"`, `default · build caches, toolchains and system libraries are not recorded`,
+		`policy matches · installed `,
+		`<span class="lbl"><b>disk</b> used</span>`, `<span class="num">51 <small>%</small></span>`, `118 GB free of 240 GB · pauses at 80%`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page lacks %q", want)
 		}
 	}
-	for _, bad := range []string{`warnstate`, `does not match`, `The Tetragon policy records at`} {
+	for _, bad := range []string{`warnstate`, `does not match`, `The Tetragon policy records at`, `<b>policy</b>`} {
 		if strings.Contains(body, bad) {
 			t.Errorf("page has %q although the levels agree", bad)
 		}
@@ -221,7 +221,8 @@ func TestHealthCaptureCardMismatch(t *testing.T) {
 	})
 	for _, want := range []string{
 		`The Tetragon policy records at complete, sentientd is set to essential`,
-		`class="tile warnstate"`, `does not match sentientd · sen policy --verbosity essential`,
+		`class="tile warnstate"`, `does not match sentientd · restart sentientd with --verbosity complete, or sen policy --verbosity essential`,
+			`Either restart sentientd with --verbosity complete to match the policy`,
 		`<span class="okdot warn"></span>on · essential`,
 	} {
 		if !strings.Contains(body, want) {
@@ -253,9 +254,9 @@ func TestHealthCaptureCardOffAndUnknown(t *testing.T) {
 	}
 	body = captureBody(t, func(r *health.Report) {
 		r.Capture = health.Capture{Enabled: true, Level: "essential", PolicyKnown: true, PolicyLevel: "essential"}
-		r.Storage.FreeBytes = 60_000_000_000
+		r.Storage.FreeBytes, r.Storage.UsedPct = 60_000_000_000, 75
 	})
-	if !strings.Contains(body, `class="tile warnstate"`) || !strings.Contains(body, `60 GB`) {
+	if !strings.Contains(body, `class="tile warnstate"`) || !strings.Contains(body, `60 GB free of 240 GB`) {
 		t.Errorf("disk at 75%% used is not shaded")
 	}
 }

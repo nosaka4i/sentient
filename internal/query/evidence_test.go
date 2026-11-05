@@ -91,8 +91,9 @@ var evidenceNow = time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
 // checked or pending, and everything the kernel saw is confirmed or unreported.
 func assertAccounting(t *testing.T, c EvidenceCounts) {
 	t.Helper()
-	if got := c.Confirmed + c.Unverified + c.NotChecked + c.Pending; got != c.AgentLog {
-		t.Errorf("agent log %d != confirmed %d + unverified %d + not checked %d + pending %d = %d", c.AgentLog, c.Confirmed, c.Unverified, c.NotChecked, c.Pending, got)
+	if got := c.Confirmed + c.Unverified + c.NotChecked + c.NotCompared + c.Pending; got != c.AgentLog {
+		t.Errorf("agent log %d != confirmed %d + unverified %d + not checked %d + not compared %d + pending %d = %d",
+			c.AgentLog, c.Confirmed, c.Unverified, c.NotChecked, c.NotCompared, c.Pending, got)
 	}
 	if got := c.Confirmed + c.Unreported; got != c.KernelLog {
 		t.Errorf("kernel log %d != confirmed %d + unreported %d = %d", c.KernelLog, c.Confirmed, c.Unreported, got)
@@ -157,6 +158,123 @@ func TestPromptEvidenceWithoutKernel(t *testing.T) {
 		t.Errorf("counts = %+v", d.Counts)
 	}
 	assertAccounting(t, d.Counts)
+}
+
+func addGap(t *testing.T, st *store.Store, start, end string) {
+	t.Helper()
+	var endAt any
+	if end != "" {
+		endAt = "2026-10-17T" + end + ".000000000Z"
+	}
+	if _, err := st.DB.Exec(`INSERT INTO monitor_gaps (collector, started_at, ended_at, reason) VALUES ('sentientd', ?, ?, 'disk 81% used: recording paused')`,
+		"2026-10-17T"+start+".000000000Z", endAt); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func counted(t *testing.T, st *store.Store, pid int64) *PromptDetail {
+	t.Helper()
+	d, err := GetPromptDetail(context.Background(), st.DB, pid, evidenceNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertAccounting(t, d.Counts)
+	return d
+}
+
+// The kernel has no record of what was logged while nobody was recording: that is
+// "not compared", neither confirmed nor unverified. What the kernel did match stays
+// confirmed, and what falls outside every gap is still a finding.
+func TestActionsInAGapAreNotCompared(t *testing.T) {
+	st, pid := evidenceFixture(t, true)
+	addGap(t, st, "09:00:50", "09:02:10") // covers make (confirmed) and curl (logged only)
+	d := counted(t, st, pid)
+	want := EvidenceCounts{Watched: true, AgentLog: 4, KernelLog: 2, Confirmed: 1, Unverified: 1, NotChecked: 1, NotCompared: 1, Unreported: 1, Background: 3, AgentID: "root"}
+	if d.Counts != want {
+		t.Errorf("counts = %+v, want %+v", d.Counts, want)
+	}
+	byPath := map[string]Step{}
+	for _, s := range d.Steps {
+		byPath[s.Path] = s
+	}
+	if s := byPath["curl x"]; !s.NotCompared || s.Unverified {
+		t.Errorf("curl in the gap: %+v", s)
+	}
+	if s := byPath["make"]; s.NotCompared || s.Unverified || s.Evidence != "both" {
+		t.Errorf("make was matched by the kernel, so it stays confirmed: %+v", s)
+	}
+	if s := byPath["/w/a"]; s.NotCompared || !s.Unverified {
+		t.Errorf("the read at 09:04 is outside the gap: %+v", s)
+	}
+	// the gap itself comes with the detail, for the band's label
+	if len(d.Gaps) != 1 || d.Gaps[0].Reason != "disk 81% used: recording paused" || d.Gaps[0].Open ||
+		d.Gaps[0].To.Sub(d.Gaps[0].From) != 80*time.Second {
+		t.Errorf("gaps = %+v", d.Gaps)
+	}
+}
+
+func TestGapEdgesAreWidenedByFiveSeconds(t *testing.T) {
+	// the file read is logged at 09:04:00
+	for _, c := range []struct {
+		end         string
+		notCompared bool
+		describe    string
+	}{
+		{"09:03:57", true, "3 seconds after the gap"},
+		{"09:03:55", true, "5 seconds after the gap"},
+		{"09:03:54", false, "6 seconds after the gap"},
+	} {
+		st, pid := evidenceFixture(t, true)
+		addGap(t, st, "09:03:00", c.end)
+		d := counted(t, st, pid)
+		var read Step
+		for _, s := range d.Steps {
+			if s.Path == "/w/a" {
+				read = s
+			}
+		}
+		if read.NotCompared != c.notCompared || read.Unverified == c.notCompared {
+			t.Errorf("read %s: %+v", c.describe, read)
+		}
+	}
+	// and before it
+	st, pid := evidenceFixture(t, true)
+	addGap(t, st, "09:04:04", "09:05:00")
+	d := counted(t, st, pid)
+	if d.Counts.NotCompared != 1 {
+		t.Errorf("4 seconds before the gap: %+v", d.Counts)
+	}
+}
+
+func TestAnOpenGapLastsThroughThePrompt(t *testing.T) {
+	st, pid := evidenceFixture(t, true)
+	addGap(t, st, "09:01:30", "") // still open: Tetragon is down
+	d := counted(t, st, pid)
+	if d.Counts.NotCompared != 2 || d.Counts.Unverified != 0 { // curl and the read
+		t.Errorf("counts = %+v", d.Counts)
+	}
+	if len(d.Gaps) != 1 || !d.Gaps[0].Open {
+		t.Errorf("an open gap should come through as open: %+v", d.Gaps)
+	}
+}
+
+func TestAGapOutsideThePromptChangesNothing(t *testing.T) {
+	st, pid := evidenceFixture(t, true)
+	addGap(t, st, "07:00:00", "08:00:00")
+	addGap(t, st, "10:00:00", "10:30:00")
+	d := counted(t, st, pid)
+	if d.Counts.NotCompared != 0 || d.Counts.Unverified != 2 || len(d.Gaps) != 0 {
+		t.Errorf("counts = %+v, gaps %+v", d.Counts, d.Gaps)
+	}
+}
+
+func TestNothingRecordingStaysNotCheckedEvenInAGap(t *testing.T) {
+	st, pid := evidenceFixture(t, false)
+	addGap(t, st, "09:00:00", "09:10:00")
+	d := counted(t, st, pid)
+	if d.Counts.Watched || d.Counts.NotCompared != 0 || d.Counts.Unverified != 0 {
+		t.Errorf("counts = %+v", d.Counts)
+	}
 }
 
 func TestPromptEvidenceRunningHasNoUnverified(t *testing.T) {

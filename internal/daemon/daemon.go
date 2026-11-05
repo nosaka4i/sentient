@@ -74,6 +74,10 @@ type Config struct {
 	// with (default policy.DefaultPolicyFile).
 	Verbosity  policy.Verbosity
 	PolicyFile string
+	// DiskHigh is the share of the data directory's filesystem that may be used
+	// before recording pauses (default DefaultDiskHigh); it resumes at DiskLow
+	// (default 5 points below DiskHigh). Like kubelet's image GC thresholds.
+	DiskHigh, DiskLow int
 	// IntegrityInterval is how often the full hash-chain check runs
 	// (default hourly).
 	IntegrityInterval time.Duration
@@ -145,6 +149,9 @@ func Run(ctx context.Context, cfg Config) error {
 		return err
 	}
 	cfg.Verbosity = level
+	if cfg.DiskHigh, cfg.DiskLow, err = thresholds(cfg.DiskHigh, cfg.DiskLow); err != nil {
+		return err
+	}
 
 	st, err := store.Open(ctx, cfg.DataDir)
 	if err != nil {
@@ -168,16 +175,34 @@ func Run(ctx context.Context, cfg Config) error {
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	ing := claudecode.New(st, claudecode.Config{Homes: cfg.Homes, PollInterval: cfg.PollInterval, Logger: log})
+	// Gaps the last run left open end now: nothing watched while it was down.
+	if err := closeStaleGaps(ctx, st, time.Now(), log); err != nil {
+		return err
+	}
+
+	// Recording pauses when the disk is too full; the first look is made before
+	// anything is recorded, so a start above the threshold starts paused.
+	guard := newDiskGuard(st, cfg.DataDir, cfg.DiskHigh, cfg.DiskLow, log)
+	guard.check(ctx)
+	ing := claudecode.New(st, claudecode.Config{Homes: cfg.Homes, PollInterval: cfg.PollInterval, Logger: log, Paused: guard.Paused})
+
+	var capt *capture
+	if cfg.Tetragon != "" {
+		if capt, err = startCapture(ctx, st, cfg, policy.SystemEnv(), time.Now(), log); err != nil {
+			return err
+		}
+	}
 
 	mon := newMonitor(st, cfg, log)
+	mon.disk = guard
 	srv := api.NewServer(st.DB)
 	srv.SetHealth(mon.report)
 	srv.SetLogger(log)
 
 	var wg sync.WaitGroup
 	errc := make(chan error, 6)
-	wg.Add(3)
+	wg.Add(4)
+	go func() { defer wg.Done(); guard.run(ctx) }()
 	go func() { defer wg.Done(); errc <- ing.Run(ctx) }()
 	go func() { defer wg.Done(); errc <- api.Serve(ctx, lis, srv) }()
 	go func() { defer wg.Done(); mon.run(ctx) }()
@@ -188,13 +213,11 @@ func Run(ctx context.Context, cfg Config) error {
 		// Events are queued and written in batches, so a busy store (the
 		// first import of a big transcript) slows the queue, not Tetragon.
 		buffered := collector.NewBufferedSink(st, coll.Name(), kernelQueue)
-		capt, err := startCapture(ctx, st, cfg, policy.SystemEnv(), time.Now(), log)
-		if err != nil {
-			return err
-		}
-		sink := &collector.FilterSink{Sink: buffered, Level: capt.level, Noise: capt.noise}
-		att := &attribute.Attributor{St: st, Log: log, IsAgent: func(b string) bool { return policy.IsAgent(agents, b) }}
-		mrg := &merge.Merger{St: st, Log: log}
+		// The gate is outermost: while paused nothing reaches the filter or the queue.
+		sink := &collector.GateSink{Paused: guard.Paused,
+			Sink: &collector.FilterSink{Sink: buffered, Level: capt.level, Noise: capt.noise}}
+		att := &attribute.Attributor{St: st, Log: log, Paused: guard.Paused, IsAgent: func(b string) bool { return policy.IsAgent(agents, b) }}
+		mrg := &merge.Merger{St: st, Log: log, Paused: guard.Paused}
 		wg.Add(4)
 		go func() { defer wg.Done(); errc <- buffered.Run(ctx) }()
 		go func() { defer wg.Done(); errc <- coll.Run(ctx, sink) }()

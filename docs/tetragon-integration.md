@@ -177,8 +177,13 @@ log only and should be empty, so it is a finding (a command that was not found
 or not approved, or a shape the matching misses). A web search, a subagent start
 and a shell builtin (`echo`, `cd`, `printf`, `test`, `pwd` ... bash runs them
 itself, no process) are not machine actions the kernel can see and are left out
-of the agent log count. The sums are checked in tests: agent log = confirmed +
-unverified + not checked + pending, kernel log = confirmed + unreported.
+of the agent log count. *Not compared* is a logged command whose time falls in a
+gap (`monitor_gaps`: recording paused for lack of disk, sentientd or Tetragon down),
+widened by 5 seconds: nobody was recording, so the kernel has no record to compare
+with, and it is neither confirmed nor unverified. An action that did get a kernel
+match stays confirmed wherever it falls. See [disk-thresholds.md](disk-thresholds.md).
+The sums are checked in tests: agent log = confirmed + unverified + not checked +
+not compared + pending, kernel log = confirmed + unreported.
 
 **Shapes of a Bash call the matching has to know** (each seen in real data):
 - a command with a heredoc, or with a `<` in its text, keeps its own stdin, so

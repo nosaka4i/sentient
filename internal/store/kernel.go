@@ -145,6 +145,18 @@ func (t *Tx) OpenGap(ctx context.Context, g Gap) (int64, error) {
 	return res.LastInsertId()
 }
 
+// CloseOpenGaps ends every gap still open, at the given time, and returns how
+// many there were. Nothing is watching while sentientd is down, so a gap left
+// open by the last run (a crash, a stop during a pause) ends when this run
+// starts; leaving it open would make it last until now, forever.
+func (t *Tx) CloseOpenGaps(ctx context.Context, endedAt string) (int64, error) {
+	res, err := t.tx.ExecContext(ctx, `UPDATE monitor_gaps SET ended_at = ? WHERE ended_at IS NULL`, endedAt)
+	if err != nil {
+		return 0, fmt.Errorf("close open gaps: %w", err)
+	}
+	return res.RowsAffected()
+}
+
 // CloseGap ends a gap. Closing an unknown or already closed gap changes
 // nothing and reports false.
 func (t *Tx) CloseGap(ctx context.Context, id int64, endedAt string) (bool, error) {

@@ -197,6 +197,115 @@ func TestBuildTraceCapsLongPrompts(t *testing.T) {
 	}
 }
 
+// pausedDetail is the sample prompt with two actions logged while recording was
+// paused (steps 3 and 4: a Bash call of two commands) and one more after it.
+func pausedDetail() *query.PromptDetail {
+	d := sampleDetail()
+	started := d.Prompt.Started
+	d.Steps = []query.Step{
+		{N: 1, Resource: "prompt", Action: "request", Path: "make the build", Evidence: "log"},
+		{N: 2, Offset: time.Minute, Resource: "file", Action: "read", Path: "/w/nosaka/a.go", Evidence: "both"},
+		{N: 3, Offset: 65 * time.Second, Resource: "command", Action: "execute", Path: "plutil -p x", Evidence: "log", NotCompared: true, CallID: "c1", CallCommand: "plutil -p x && cat x"},
+		{N: 4, Offset: 66 * time.Second, Resource: "command", Action: "execute", Path: "cat x", Evidence: "log", NotCompared: true, CallID: "c1"},
+		{N: 5, Offset: 80 * time.Second, Resource: "file", Action: "update", Path: "/w/nosaka/x", Evidence: "log", NotCompared: true},
+		{N: 6, Offset: 3 * time.Minute, Resource: "command", Action: "execute", Path: "make", Evidence: "both"},
+		{N: 7, Offset: 4 * time.Minute, Resource: "command", Action: "execute", Path: "pwd", Evidence: "log", Unverified: true},
+	}
+	d.Counts = query.EvidenceCounts{Watched: true, AgentLog: 6, KernelLog: 2, Confirmed: 2, Unverified: 1, NotCompared: 3}
+	d.Gaps = []query.GapInfo{{From: started.Add(62 * time.Second), To: started.Add(82 * time.Second), Reason: "disk 81% used: recording paused"}}
+	return d
+}
+
+func TestPausedActionsAreOneBand(t *testing.T) {
+	s := newTestServer(t, &fakeSource{detail: pausedDetail()})
+	_, body := get(t, s, "/prompt/7", "localhost:7357")
+	for _, want := range []string{
+		`<li class="pausegroup">`, `<details open>`, // 3 actions: short, so open
+		`<b>Recording was paused</b>`, ` &middot; `,
+		`3 actions here are in the agent&#39;s log but were not compared with the kernel`,
+		`2 commands · 1 edit · steps 3–5`,
+		`<span class="tag pause"`, `3 not compared</span>`, // the agent log tile
+		`(20s)`, // the gap's own length
+	} {
+		if !strings.Contains(strings.ReplaceAll(body, "·", "&middot;"), strings.ReplaceAll(want, "·", "&middot;")) && !strings.Contains(body, want) {
+			t.Errorf("page lacks %q", want)
+		}
+	}
+	// one band: no tag on the rows inside it, and the Bash call stays a call header inside
+	if n := strings.Count(body, `class="pausegroup"`); n != 1 {
+		t.Errorf("%d bands, want 1", n)
+	}
+	if !strings.Contains(body, "plutil -p x &amp;&amp; cat x") || !strings.Contains(body, "1 tool call, 2 commands") {
+		t.Error("the Bash call inside the band lost its header")
+	}
+	// the one logged-only command outside the gap is still unverified
+	if !strings.Contains(body, "not seen by the kernel") {
+		t.Error("the unverified command outside the gap lost its note")
+	}
+}
+
+func TestPauseBandCollapsesWhenLongAndNamesItsKinds(t *testing.T) {
+	steps := []query.Step{{N: 1, Resource: "prompt", Action: "request", Evidence: "log"}}
+	for i := 0; i < 11; i++ {
+		steps = append(steps, query.Step{N: int64(2 + i), Offset: time.Duration(i) * time.Second, Resource: "command", Action: "execute", Path: "c", Evidence: "log", NotCompared: true})
+	}
+	steps = append(steps,
+		query.Step{N: 13, Resource: "file", Action: "read", Path: "/a", Evidence: "log", NotCompared: true},
+		query.Step{N: 14, Resource: "web", Action: "fetch", Path: "u", Evidence: "log", NotCompared: true})
+	rows, n, _ := buildTrace(steps)
+	if len(rows) != 2 || !rows[1].Pause || n != 14 {
+		t.Fatalf("rows = %d, steps %d", len(rows), n)
+	}
+	b := rows[1]
+	if b.PauseOpen || len(b.Children) != 13 || b.PauseKind != "11 commands · 1 file read · 1 other · steps 2–14" {
+		t.Errorf("band = open %v, children %d, kinds %q", b.PauseOpen, len(b.Children), b.PauseKind)
+	}
+	if !strings.Contains(b.PauseNote, "13 actions here") {
+		t.Errorf("note = %q", b.PauseNote)
+	}
+	// a band of one action
+	one, _, _ := buildTrace([]query.Step{{N: 1, Resource: "prompt", Evidence: "log"}, {N: 2, Resource: "command", Path: "c", Evidence: "log", NotCompared: true}})
+	if !one[1].PauseOpen || !strings.HasPrefix(one[1].PauseNote, "1 action here is in the agent's log") || !strings.HasSuffix(one[1].PauseKind, "step 2") {
+		t.Errorf("single band = %+v", one[1])
+	}
+	// two separate pauses are two bands
+	two, _, _ := buildTrace([]query.Step{
+		{N: 1, Resource: "command", Path: "a", Evidence: "log", NotCompared: true},
+		{N: 2, Resource: "command", Path: "b", Evidence: "log"},
+		{N: 3, Resource: "command", Path: "c", Evidence: "log", NotCompared: true}})
+	if len(two) != 3 || !two[0].Pause || two[1].Pause || !two[2].Pause {
+		t.Errorf("rows = %+v", two)
+	}
+}
+
+func TestLabelPausesNamesTheWindow(t *testing.T) {
+	started := now.Add(-30 * time.Minute)
+	gaps := []query.GapInfo{{From: started.Add(62 * time.Second), To: started.Add(82 * time.Second)}}
+	rows, _, _ := buildTrace([]query.Step{{N: 1, Offset: 65 * time.Second, Resource: "command", Path: "c", Evidence: "log", NotCompared: true}})
+	labelPauses(rows, gaps, started, now)
+	if !strings.Contains(rows[0].PauseWhen, "(20s)") || !strings.Contains(rows[0].PauseWhen, " – ") {
+		t.Errorf("when = %q", rows[0].PauseWhen)
+	}
+	// still going
+	rows, _, _ = buildTrace([]query.Step{{N: 1, Offset: 65 * time.Second, Resource: "command", Path: "c", Evidence: "log", NotCompared: true}})
+	labelPauses(rows, []query.GapInfo{{From: started.Add(62 * time.Second), To: started.Add(90 * time.Second), Open: true}}, started, now)
+	if !strings.HasSuffix(rows[0].PauseWhen, "still paused") {
+		t.Errorf("open gap: %q", rows[0].PauseWhen)
+	}
+	// no gap holds it: the band still says what it is, without a window
+	rows, _, _ = buildTrace([]query.Step{{N: 1, Offset: 10 * time.Minute, Resource: "command", Path: "c", Evidence: "log", NotCompared: true}})
+	labelPauses(rows, gaps, started, now)
+	if rows[0].PauseWhen != "" {
+		t.Errorf("when = %q, want none", rows[0].PauseWhen)
+	}
+	// rows that are not bands are left alone
+	plain, _, _ := buildTrace([]query.Step{{N: 1, Resource: "command", Path: "c", Evidence: "log"}})
+	labelPauses(plain, gaps, started, now)
+	if plain[0].PauseWhen != "" {
+		t.Error("a plain row got a window")
+	}
+}
+
 func TestOffsetLabelAndReply(t *testing.T) {
 	if got := offsetLabel(75 * time.Second); got != "+1:15" {
 		t.Errorf("offsetLabel = %q", got)

@@ -33,6 +33,9 @@ type PromptDetail struct {
 	// show repo-relative paths.
 	RepoRoot string
 	Counts   EvidenceCounts
+	// Gaps are the stretches in which nobody was recording that the prompt's
+	// actions touch; the actions inside one are marked NotCompared.
+	Gaps []GapInfo
 }
 
 // EvidenceCounts says how the two logs relate for one prompt. Shell builtins
@@ -42,7 +45,7 @@ type EvidenceCounts struct {
 	// AgentLog means anything.
 	//
 	// The numbers are meant to add up, and tests check that they do:
-	//   AgentLog  = Confirmed + Unverified + NotChecked + Pending
+	//   AgentLog  = Confirmed + Unverified + NotChecked + NotCompared + Pending
 	//   KernelLog = Confirmed + Unreported
 	Watched    bool
 	AgentLog   int64 // actions the agent logged (shell builtins left out)
@@ -51,7 +54,11 @@ type EvidenceCounts struct {
 	Unverified int64 // logged commands the kernel did not see
 	NotChecked int64 // logged actions that are not commands (file tools, web): the kernel cannot be matched to them yet
 	Pending    int64 // logged commands of a prompt still running, not matched yet
-	Unreported int64 // seen by the kernel, in nobody's log, not a known background command
+	// NotCompared: logged commands the kernel has no record of because nobody was
+	// recording then (a gap: recording paused for lack of disk, sentientd or
+	// Tetragon down). They are neither confirmed nor unverified.
+	NotCompared int64
+	Unreported  int64 // seen by the kernel, in nobody's log, not a known background command
 	// Background is how many background commands the agent ran while the
 	// prompt did; they are not part of the prompt (see AgentID).
 	Background int64
@@ -92,6 +99,7 @@ type Step struct {
 	Alert               bool  // an alert is about this step
 	Unreported          bool  // the kernel saw it, the agent's log does not have it
 	Unverified          bool  // the agent logged it, the kernel did not see it
+	NotCompared         bool  // the agent logged it while nobody was recording: no kernel record to compare with
 }
 
 // maxDiffLines caps a file's diff; the rest is summarized.
@@ -173,6 +181,22 @@ FROM prompts p JOIN sessions s ON s.id = p.session_id WHERE p.id = ?`, id).
 	}
 	if d.Steps, d.Files, d.Counts, err = promptSteps(ctx, db, p, repoRoot, d.Counts); err != nil {
 		return nil, err
+	}
+	if d.Counts.NotCompared > 0 {
+		// the gaps the bands are drawn for, from the prompt's start to its last action
+		last := p.Started
+		for _, s := range d.Steps {
+			if t := p.Started.Add(s.Offset); t.After(last) {
+				last = t
+			}
+		}
+		spans, err := gapsAround(ctx, db, p.Started, last)
+		if err != nil {
+			return nil, err
+		}
+		for _, g := range spans {
+			d.Gaps = append(d.Gaps, g.info())
+		}
 	}
 	if d.Counts.Watched {
 		if d.Counts.Background, d.Counts.AgentID, err = backgroundDuring(ctx, db, session, p, now); err != nil {
@@ -317,6 +341,13 @@ FROM actions a WHERE a.prompt_id = ? ORDER BY a.ts, a.id`, p.ID)
 		return nil, nil, counts, err
 	}
 
+	var gaps []gapSpan
+	if len(acts) > 0 {
+		if gaps, err = gapsAround(ctx, db, acts[0].ts, acts[len(acts)-1].ts); err != nil {
+			return nil, nil, counts, err
+		}
+	}
+
 	_, line := PromptLine(p.Text)
 	steps := []Step{{N: 1, Resource: "prompt", Action: "request", Path: Ellipsis(line, 120), Evidence: "log"}}
 	next := int64(2) // the number of the next numbered step
@@ -362,6 +393,10 @@ FROM actions a WHERE a.prompt_id = ? ORDER BY a.ts, a.id`, p.ID)
 				case !kernelMatchable(a.resource, a.action), !counts.Watched:
 					// no way to compare it with the kernel (yet), or nothing was recording
 					counts.NotChecked++
+				case inGap(gaps, a.ts):
+					// the kernel has no record because nobody was recording: not a finding
+					s.NotCompared = true
+					counts.NotCompared++
 				case p.Running:
 					counts.Pending++ // may yet be matched
 				default:

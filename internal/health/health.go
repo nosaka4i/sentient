@@ -65,6 +65,17 @@ type Storage struct {
 	DBBytes   int64 // database file plus WAL and shared-memory files
 	FreeBytes int64 // available to sentientd on the data dir's filesystem
 	SizeBytes int64 // that filesystem's size
+
+	// HighPct is the share of that filesystem that may be used before recording
+	// pauses (0 = unknown) and LowPct the share at which it resumes. Paused
+	// says it is paused now, since PausedSince.
+	HighPct     int
+	LowPct      int
+	Paused      bool
+	PausedSince time.Time
+	// UsedPct is the share of the filesystem in use as df prints it (used over
+	// used plus available, rounded up). Reserved blocks count as neither.
+	UsedPct int
 }
 
 // IngestAgent is one agent log adapter's progress.
@@ -123,7 +134,7 @@ type Sudo struct {
 func (r *Report) Warnings() []Warning {
 	var w []Warning
 	if r.Integrity.CheckedAt.After(time.Time{}) && !r.Integrity.OK {
-		w = append(w, Warning{Critical: true,
+		w = append(w, Warning{Critical: true, Headline: "Integrity check failed",
 			What: "Hash chain broken",
 			Why:  "A stored agent log record was changed or removed after it was written.",
 		})
@@ -149,24 +160,31 @@ func (r *Report) Warnings() []Warning {
 	if c := r.Capture; c.Enabled && c.PolicyKnown && c.PolicyLevel != c.Level {
 		w = append(w, Warning{
 			What: "The Tetragon policy records at " + c.PolicyLevel + ", sentientd is set to " + c.Level,
-			Why: "Rerun sen policy --verbosity " + c.Level + ", install it and restart Tetragon. Until then sentientd keeps only what " + c.Level +
+			Why: "Either restart sentientd with --verbosity " + c.PolicyLevel + " to match the policy, or rerun sen policy --verbosity " + c.Level + ", install it and restart Tetragon. Until then sentientd keeps only what " + c.Level +
 				" allows, so the database stays the size you asked for, but Tetragon still does the extra work.",
 		})
 	}
 	if s := r.Storage; s.SizeBytes > 0 {
-		used := 100 - s.FreeBytes*100/s.SizeBytes
+		used := strconv.Itoa(s.UsedPct)
 		ours := "sentient's database is " + humanize.Bytes(uint64(s.DBBytes)) + ". "
+		warnAt := 70 // 10 points before recording pauses
+		if s.HighPct > 0 {
+			warnAt = s.HighPct - 10
+		}
 		switch {
-		case used >= 90:
-			w = append(w, Warning{Critical: true,
-				What: "Disk almost full",
-				Why:  ours + strconv.FormatInt(used, 10) + "% of the filesystem holding sentient's data is used. Free space; recording does not stop by itself yet.",
+		case s.Paused:
+			w = append(w, Warning{Critical: true, Headline: "Recording paused",
+				What: "Recording paused: the disk is " + used + "% used",
+				Why: "sentientd stops recording at " + strconv.Itoa(s.HighPct) + "% used so the evidence is never lost to a full disk and the machine stays usable. " +
+					"Kernel events are not kept while it is paused (the pause is recorded as a gap); agent logs are picked up again afterwards. " +
+					"Free space, and recording resumes at " + strconv.Itoa(s.LowPct) + "% used. " + ours + "Nothing is deleted automatically.",
 			})
-		case used >= 70:
-			w = append(w, Warning{
-				What: "Disk filling up",
-				Why:  ours + strconv.FormatInt(used, 10) + "% of the filesystem holding sentient's data is used.",
-			})
+		case s.UsedPct >= warnAt:
+			why := ours + used + "% of the filesystem holding sentient's data is used."
+			if s.HighPct > 0 {
+				why += " At " + strconv.Itoa(s.HighPct) + "% sentientd pauses recording."
+			}
+			w = append(w, Warning{What: "Disk filling up", Why: why})
 		}
 	}
 	return w
@@ -175,6 +193,7 @@ func (r *Report) Warnings() []Warning {
 // Warning is one problem.
 type Warning struct {
 	Critical bool
+	Headline string // the page's headline when this is the first critical warning
 	What     string
 	Account  string // set for sudo warnings
 	Why      string
