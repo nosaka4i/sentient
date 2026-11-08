@@ -55,7 +55,11 @@ func TestStatusWhenTheStreamEnds(t *testing.T) {
 	c := newCollector(addr)
 	c.Status = st
 	stop := runCollector(t, c, newRecorder())
-	until(t, "a reconnect after the stream ended", func() bool { return st.Snapshot(time.Now()).Reconnects >= 1 })
+	// the reconnect is counted when the second stream opens; its event is read a moment later
+	until(t, "a reconnect and the event after it", func() bool {
+		s := st.Snapshot(time.Now())
+		return s.Reconnects >= 1 && s.Events >= 2
+	})
 	if err := stop(); err != nil {
 		t.Fatal(err)
 	}
