@@ -24,8 +24,15 @@ type BufferedSink struct {
 	ch     chan op
 
 	dropped   atomic.Int64
+	lost      atomic.Int64 // dropped since sentientd started; unlike dropped, never reset
 	firstDrop atomic.Int64 // unix nanoseconds of the first drop since the last gap
 }
+
+// Queue is how many operations wait to be written, and how many fit.
+func (b *BufferedSink) Queue() (waiting, size int) { return len(b.ch), cap(b.ch) }
+
+// Lost is how many operations have been dropped since sentientd started.
+func (b *BufferedSink) Lost() int64 { return b.lost.Load() }
 
 type opKind int
 
@@ -57,6 +64,7 @@ func (b *BufferedSink) enqueue(o op) {
 	select {
 	case b.ch <- o:
 	default:
+		b.lost.Add(1)
 		if b.dropped.Add(1) == 1 {
 			b.firstDrop.Store(time.Now().UnixNano())
 		}

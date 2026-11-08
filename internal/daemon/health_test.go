@@ -11,8 +11,45 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nosaka4i/sentient/internal/collector"
 	"github.com/nosaka4i/sentient/internal/store"
 )
+
+func TestHealthReportCarriesTheCollector(t *testing.T) {
+	ctx := context.Background()
+	_, st, _, _ := guardAt(t, 80)
+	m := newMonitor(st, Config{DataDir: t.TempDir(), DiskHigh: 80, DiskLow: 75}, quiet)
+
+	r, err := m.report(ctx)
+	if err != nil || r.Collector.On {
+		t.Fatalf("agent logs only: on = %v, err %v", r.Collector.On, err)
+	}
+
+	now := time.Now()
+	m.status = collector.NewStatus("Tetragon", "eBPF on Linux", "socket", "unix:///t.sock", now)
+	m.status.SetState(collector.Connected, now, "")
+	m.status.SetVersion("1.7.1")
+	m.status.CountEvent(now)
+	m.queue = collector.NewBufferedSink(st, "tetragon", 8)
+	if r, err = m.report(ctx); err != nil {
+		t.Fatal(err)
+	}
+	c := r.Collector
+	if !c.On || c.System != "Tetragon" || c.Platform != "eBPF on Linux" || c.DetailLabel != "socket" || c.Detail != "unix:///t.sock" ||
+		c.Version != "1.7.1" || c.State != "connected" || c.PerMinute != 1 || c.LastEvent.IsZero() ||
+		c.QueueSize != 8 || c.QueueWaiting != 0 || c.Lost != 0 || c.Stored != 0 || c.Gaps != 0 || c.Latest.Set {
+		t.Errorf("collector = %+v", c)
+	}
+
+	// a database too busy to answer keeps the live state and leaves out what it holds
+	m.dbWait = time.Nanosecond
+	if r, err = m.report(ctx); err != nil || !r.CatchingUp {
+		t.Fatalf("catching up = %v, err %v", r.CatchingUp, err)
+	}
+	if c = r.Collector; !c.On || c.State != "connected" || c.Version != "1.7.1" || c.Stored != 0 || c.Processes != 0 || c.Latest.Set {
+		t.Errorf("while catching up: %+v", c)
+	}
+}
 
 var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
 

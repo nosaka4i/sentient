@@ -116,6 +116,11 @@ func TestHealthOverSocket(t *testing.T) {
 		Live:       []health.LiveSession{{SessionID: "s", Agent: "claude", Repo: "r", LastActivity: time.Date(2026, 10, 17, 11, 0, 0, 0, time.UTC)}},
 		Sudo:       health.Sudo{Checked: true, Passwordless: []string{"ubuntu"}},
 		CatchingUp: true,
+		Collector: health.Collector{On: true, System: "Tetragon", Platform: "eBPF on Linux", DetailLabel: "socket", Detail: "unix:///t.sock",
+			Version: "1.7.1", State: "connected", Since: time.Date(2026, 10, 17, 4, 5, 0, 0, time.UTC), LastError: "x", Reconnects: 2,
+			LastEvent: time.Date(2026, 10, 17, 11, 59, 58, 0, time.UTC), PerMinute: 480, QueueWaiting: 3, QueueSize: 10000, Lost: 4,
+			Stored: 27716, FirstEvent: time.Date(2026, 10, 15, 4, 45, 0, 0, time.UTC), Processes: 1204, AgentProcesses: 312, Gaps: 2,
+			Latest: health.GapNote{Set: true, From: time.Date(2026, 10, 17, 9, 0, 0, 0, time.UTC), Open: true, Reason: "tetragon unreachable"}},
 		Capture: health.Capture{Enabled: true, Level: "essential", PolicyKnown: true, PolicyLevel: "complete",
 			PolicyFile: "/etc/tetragon/tetragon.tp.d/sentient.yaml", PolicyInstalled: time.Date(2026, 11, 2, 0, 59, 0, 0, time.UTC)},
 	}
@@ -127,7 +132,7 @@ func TestHealthOverSocket(t *testing.T) {
 	if !reflect.DeepEqual(got.Daemon, want.Daemon) || !reflect.DeepEqual(got.Storage, want.Storage) ||
 		!reflect.DeepEqual(got.Ingest, want.Ingest) || !reflect.DeepEqual(got.Agents, want.Agents) ||
 		!reflect.DeepEqual(got.Live, want.Live) || !reflect.DeepEqual(got.Sudo, want.Sudo) || !reflect.DeepEqual(got.Capture, want.Capture) ||
-		!got.CheckedAt.Equal(want.CheckedAt) || !got.HistoryBegins.IsZero() || got.CatchingUp != want.CatchingUp ||
+		!got.CheckedAt.Equal(want.CheckedAt) || !got.HistoryBegins.IsZero() || got.CatchingUp != want.CatchingUp || !reflect.DeepEqual(got.Collector, want.Collector) ||
 		got.Integrity.Records != 5 || !got.Integrity.OK || got.Integrity.Interval != time.Hour || !got.Integrity.CheckedAt.IsZero() {
 		t.Errorf("round trip:\n got %+v\nwant %+v", got, want)
 	}

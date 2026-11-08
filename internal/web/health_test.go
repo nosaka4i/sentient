@@ -61,8 +61,8 @@ func TestHealthPage(t *testing.T) {
 		`<span class="num">31 MB</span>`,
 		`<span class="num txt mono">/run/sentient/sentientd.sock</span>`,
 		`<span class="num txt">ubuntu</span>`, // sudo tile
-		`<section class="card muted" aria-labelledby="h-coll">`,
-		`<span class="state-off">not set up yet</span>`,
+		`<section class="card muted" aria-labelledby="h-cap">`,
+		`<span class="state-off">agent logs only</span>`,
 		`gRPC on /run/sentient/sentientd.sock`,
 		`<span class="num">18,204</span>`, `2.1 / sec now`,
 		`<span class="num">4 <small>ms</small></span>`, `p50 · p95 22 ms · p99 61 ms`,
@@ -199,10 +199,11 @@ func TestHealthCaptureCardMatching(t *testing.T) {
 			PolicyFile: "/etc/tetragon/tetragon.tp.d/sentient.yaml", PolicyInstalled: now.Add(-48 * time.Hour)}
 	})
 	for _, want := range []string{
-		`<h2 id="h-cap">Capture</h2>`, `on · essential`,
+		`<h2 id="h-cap">Kernel capture</h2>`, `<span class="state-ok"><span class="okdot"></span>recording</span>`,
+		`<span class="lbl"><b>level</b> / policy</span>`,
 		`<span class="num txt">essential <span class="okt"`, `default · build caches, toolchains and system libraries are not recorded`,
 		`policy matches · installed `,
-		`<span class="lbl"><b>disk</b> used</span>`, `<span class="num">51 <small>%</small></span>`, `118 GB free of 240 GB · pauses at 80%`,
+		`<span class="lbl"><b>disk</b> used</span>`, `<span class="num">51 <small>%</small></span>`, `whole disk: 118 GB free of 240 GB · recording pauses at 80%`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page lacks %q", want)
@@ -223,7 +224,7 @@ func TestHealthCaptureCardMismatch(t *testing.T) {
 		`The Tetragon policy records at complete, sentientd is set to essential`,
 		`class="tile warnstate"`, `does not match sentientd · restart sentientd with --verbosity complete, or sen policy --verbosity essential`,
 		`Either restart sentientd with --verbosity complete to match the policy`,
-		`<span class="okdot warn"></span>on · essential`,
+		`<span class="okdot warn"></span>recording`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page lacks %q", want)
@@ -233,8 +234,9 @@ func TestHealthCaptureCardMismatch(t *testing.T) {
 
 func TestHealthCaptureCardOffAndUnknown(t *testing.T) {
 	body := captureBody(t, func(r *health.Report) { r.Capture = health.Capture{Level: "essential"} })
-	if !strings.Contains(body, `<section class="card muted" aria-labelledby="h-cap">`) || !strings.Contains(body, `sentientd was started without --tetragon`) ||
-		!strings.Contains(body, `<span class="state-off">off</span>`) {
+	if !strings.Contains(body, `<section class="card muted" aria-labelledby="h-cap">`) || !strings.Contains(body, `Nothing independent confirms them`) ||
+		!strings.Contains(body, `Start sentientd with --tetragon to add kernel evidence`) ||
+		!strings.Contains(body, `<span class="state-off">agent logs only</span>`) {
 		t.Errorf("capture off:\n%s", body)
 	}
 	body = captureBody(t, func(r *health.Report) {

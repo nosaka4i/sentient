@@ -35,33 +35,17 @@
     </div>
   </section>
 
-  <!-- CAPTURE -->
+  <!-- KERNEL CAPTURE: the collector (any platform's), what it stored, the level and policy, the disk -->
   <section class="card{{if not .CaptureOn}} muted{{end}}" aria-labelledby="h-cap">
     <div class="card-head">
-      <h2 id="h-cap">Capture</h2>
-      {{if .CapturePaused}}<span class="state-paused"><span class="okdot bad"></span>{{.CaptureState}}</span>{{else if .CaptureOn}}<span class="state-ok"><span class="okdot{{if .CaptureWarn}} warn{{end}}"></span>{{.CaptureState}}</span>{{else}}<span class="state-off">{{.CaptureState}}</span>{{end}}
-      <span class="hint">what sentient records of the kernel's events</span>
+      <h2 id="h-cap">Kernel capture</h2>
+      {{if or .CapturePaused .CaptureLost}}<span class="state-paused"><span class="okdot bad"></span>{{.CaptureState}}</span>{{else if .CaptureOn}}<span class="state-ok"><span class="okdot{{if .CaptureWarn}} warn{{end}}"></span>{{.CaptureState}}</span>{{else}}<span class="state-off">{{.CaptureState}}</span>{{end}}
+      <span class="hint">{{if .CaptureOn}}what the kernel reports about the agent{{else}}no kernel collector started{{end}}</span>
     </div>
     <div class="tiles">
 {{- range .Capture}}
       {{template "htile" .}}
 {{- end}}
-    </div>
-  </section>
-
-  <!-- COLLECTOR -->
-  <section class="card muted" aria-labelledby="h-coll">
-    <div class="card-head">
-      <h2 id="h-coll">Collector</h2>
-      <span class="state-off">not set up yet</span>
-      <span class="hint">Tetragon (eBPF) kernel events</span>
-    </div>
-    <div class="tiles">
-      <div class="tile wide muted">
-        <span class="lbl"><b>tetragon</b></span>
-        <span class="num txt">not set up yet</span>
-        <span class="sum">kernel capture is the next build step; until then sentient records the agents' own logs only</span>
-      </div>
     </div>
   </section>
 

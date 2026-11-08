@@ -71,6 +71,7 @@ func healthToProto(r *health.Report) *pb.HealthResponse {
 			PolicyLevel: r.Capture.PolicyLevel, PolicyFile: r.Capture.PolicyFile, PolicyInstalled: ts(r.Capture.PolicyInstalled),
 		},
 		CatchingUp: r.CatchingUp,
+		Collector:  collectorToProto(r.Collector),
 	}
 	for _, g := range r.Ingest {
 		resp.Ingest = append(resp.Ingest, &pb.HealthResponse_IngestAgent{
@@ -86,6 +87,32 @@ func healthToProto(r *health.Report) *pb.HealthResponse {
 		})
 	}
 	return resp
+}
+
+func collectorToProto(c health.Collector) *pb.HealthResponse_Collector {
+	return &pb.HealthResponse_Collector{
+		On: c.On, System: c.System, Platform: c.Platform, DetailLabel: c.DetailLabel, Detail: c.Detail, Version: c.Version,
+		State: c.State, Since: ts(c.Since), LastError: c.LastError, Reconnects: c.Reconnects,
+		LastEvent: ts(c.LastEvent), PerMinute: c.PerMinute,
+		QueueWaiting: int32(c.QueueWaiting), QueueSize: int32(c.QueueSize), Lost: c.Lost,
+		Stored: c.Stored, FirstEvent: ts(c.FirstEvent), Processes: c.Processes, AgentProcesses: c.AgentProcesses, Gaps: c.Gaps,
+		Latest: &pb.HealthResponse_Collector_Gap{
+			Set: c.Latest.Set, From: ts(c.Latest.From), To: ts(c.Latest.To), Open: c.Latest.Open, Reason: c.Latest.Reason,
+		},
+	}
+}
+
+func collectorFromProto(c *pb.HealthResponse_Collector) health.Collector {
+	l := c.GetLatest()
+	return health.Collector{
+		On: c.GetOn(), System: c.GetSystem(), Platform: c.GetPlatform(), DetailLabel: c.GetDetailLabel(), Detail: c.GetDetail(),
+		Version: c.GetVersion(), State: c.GetState(), Since: fromTS(c.GetSince()), LastError: c.GetLastError(),
+		Reconnects: c.GetReconnects(), LastEvent: fromTS(c.GetLastEvent()), PerMinute: c.GetPerMinute(),
+		QueueWaiting: int(c.GetQueueWaiting()), QueueSize: int(c.GetQueueSize()), Lost: c.GetLost(),
+		Stored: c.GetStored(), FirstEvent: fromTS(c.GetFirstEvent()), Processes: c.GetProcesses(),
+		AgentProcesses: c.GetAgentProcesses(), Gaps: c.GetGaps(),
+		Latest: health.GapNote{Set: l.GetSet(), From: fromTS(l.GetFrom()), To: fromTS(l.GetTo()), Open: l.GetOpen(), Reason: l.GetReason()},
+	}
 }
 
 func healthFromProto(p *pb.HealthResponse) *health.Report {
@@ -120,6 +147,7 @@ func healthFromProto(p *pb.HealthResponse) *health.Report {
 			PolicyFile: p.GetCapture().GetPolicyFile(), PolicyInstalled: fromTS(p.GetCapture().GetPolicyInstalled()),
 		},
 		CatchingUp: p.GetCatchingUp(),
+		Collector:  collectorFromProto(p.GetCollector()),
 	}
 	for _, g := range p.GetIngest() {
 		r.Ingest = append(r.Ingest, health.IngestAgent{

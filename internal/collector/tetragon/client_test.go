@@ -22,6 +22,14 @@ type fakeTetragon struct {
 	calls   atomic.Int32
 	gotReq  atomic.Pointer[tetragon.GetEventsRequest]
 	release chan struct{} // closed to end held streams
+	version string        // what GetVersion answers; empty leaves it Unimplemented
+}
+
+func (f *fakeTetragon) GetVersion(ctx context.Context, req *tetragon.GetVersionRequest) (*tetragon.GetVersionResponse, error) {
+	if f.version == "" {
+		return f.UnimplementedFineGuidanceSensorsServer.GetVersion(ctx, req)
+	}
+	return &tetragon.GetVersionResponse{Version: f.version}, nil
 }
 
 func (f *fakeTetragon) GetEvents(req *tetragon.GetEventsRequest, s grpc.ServerStreamingServer[tetragon.GetEventsResponse]) error {

@@ -2,7 +2,10 @@ package tetragon
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
+	"strings"
 	"time"
 
 	"github.com/cilium/tetragon/api/v1/tetragon"
@@ -26,10 +29,19 @@ type Collector struct {
 	Retry    time.Duration // wait between attempts; 2s when zero
 	ConnWait time.Duration // how long to wait for a connection per attempt; 3s when zero
 	Now      func() time.Time
+	Status   *collector.Status // updated as the connection changes; nil to not track
 }
 
 // Name implements collector.Collector.
 func (c *Collector) Name() string { return Name }
+
+// NewStatus returns the status a Collector for addr reports to.
+func NewStatus(addr string, now time.Time) *collector.Status {
+	if addr == "" {
+		addr = DefaultAddr
+	}
+	return collector.NewStatus("Tetragon", "eBPF on Linux", "socket", addr, now)
+}
 
 func (c *Collector) addr() string {
 	if c.Addr == "" {
@@ -84,6 +96,7 @@ func (c *Collector) Run(ctx context.Context, sink collector.Sink) error {
 			if ctx.Err() != nil {
 				break
 			}
+			c.Status.SetState(collector.Reconnecting, time.Now(), "connect to "+c.addr()+": "+dialError(c.addr()))
 			if err := openGap("tetragon unreachable at " + c.addr()); err != nil {
 				return err
 			}
@@ -96,6 +109,8 @@ func (c *Collector) Run(ctx context.Context, sink collector.Sink) error {
 			}
 			gap = 0
 		}
+		c.Status.SetState(collector.Connected, time.Now(), "")
+		c.Status.SetVersion(c.version(ctx, client))
 		err := c.stream(ctx, client, norm)
 		if ctx.Err() != nil {
 			break
@@ -103,6 +118,7 @@ func (c *Collector) Run(ctx context.Context, sink collector.Sink) error {
 		if sinkErr, ok := err.(sinkError); ok {
 			return sinkErr.error
 		}
+		c.Status.SetState(collector.Reconnecting, time.Now(), fmt.Sprintf("stream ended: %v", err))
 		if err := openGap(fmt.Sprintf("tetragon stream ended: %v", err)); err != nil {
 			return err
 		}
@@ -128,10 +144,43 @@ func (c *Collector) stream(ctx context.Context, client tetragon.FineGuidanceSens
 		if err != nil {
 			return err
 		}
+		c.Status.CountEvent(time.Now())
 		if err := norm.Handle(ctx, r); err != nil {
 			return sinkError{err}
 		}
 	}
+}
+
+// version asks Tetragon for its version; empty when it does not say.
+func (c *Collector) version(ctx context.Context, client tetragon.FineGuidanceSensorsClient) string {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	r, err := client.GetVersion(ctx, &tetragon.GetVersionRequest{})
+	if err != nil {
+		return ""
+	}
+	return r.GetVersion()
+}
+
+// dialError says why addr cannot be reached ("permission denied", "no such
+// file or directory", ...), by trying a plain connection.
+func dialError(addr string) string {
+	network, target := "tcp", addr
+	if p, ok := strings.CutPrefix(addr, "unix://"); ok {
+		network, target = "unix", p
+	} else if p, ok := strings.CutPrefix(addr, "unix:"); ok {
+		network, target = "unix", p
+	}
+	conn, err := net.DialTimeout(network, target, time.Second)
+	if err != nil {
+		var op *net.OpError
+		if errors.As(err, &op) && op.Err != nil {
+			return op.Err.Error()
+		}
+		return err.Error()
+	}
+	conn.Close()
+	return "not answering"
 }
 
 // waitReady connects and waits up to d for the connection to be ready.

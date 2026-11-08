@@ -59,7 +59,7 @@ Rules:
 ## Where the user sees it
 
 - **At the warning (70%):** the Health icon in the top bar gets a cyan dot; the Health page has a "Disk filling up" notice. No banner.
-- **At the pause (80%):** a banner under the top bar on every page ("Recording is paused: the disk is 81% used. Nothing is recorded until it is below 75%." with a link to Health), a red dot on the Health icon, the headline "Recording paused" and a critical notice on Health, and the Capture card's chip reads "recording paused". The banner is not dismissable while the pause lasts and goes away by itself.
+- **At the pause (80%):** a banner under the top bar on every page ("Recording is paused: the disk is 81% used. Nothing is recorded until it is below 75%." with a link to Health), a red dot on the Health icon, the headline "Recording paused" and a critical notice on Health, and the Kernel capture card's chip reads "recording paused". The banner is not dismissable while the pause lasts and goes away by itself.
 - **In the log:** `recording paused: disk 81% used` at ERROR with the threshold, the resume point, the free space and a hint; `recording resumed` with how long it lasted.
 - **In the CLI,** once `sen status` is wired to real data (backlog `a4e3e68`): one line above its output while paused.
 

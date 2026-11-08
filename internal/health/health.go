@@ -25,9 +25,55 @@ type Report struct {
 	Sudo      Sudo
 	Capture   Capture
 
+	// Collector is the kernel collector's live state and what it has stored;
+	// Collector.On is false when sentientd runs on agent logs only.
+	Collector Collector
+
 	// CatchingUp is set while the database was too busy to answer in time
 	// (sentientd starting up): HistoryBegins, Ingest and Live are then empty.
 	CatchingUp bool
+}
+
+// CollectorGrace is how long a collector may be unreachable before Health
+// warns, so a routine restart of the source does not flash red.
+const CollectorGrace = 30 * time.Second
+
+// Collector is the state of the kernel collector, whichever platform's it is.
+type Collector struct {
+	On bool // a collector was started; false means agent logs only
+
+	System      string // "Tetragon", "eslogger"
+	Platform    string // "eBPF on Linux"
+	DetailLabel string // "socket", "process"
+	Detail      string // where it reads from
+	Version     string // the source's own version, if it said
+
+	State      string // connecting | connected | reconnecting
+	Since      time.Time
+	LastError  string
+	Reconnects int64
+	LastEvent  time.Time // this run
+	PerMinute  float64
+
+	QueueWaiting, QueueSize int   // sentient's own write queue
+	Lost                    int64 // dropped by that queue since start
+
+	// From the database.
+	Stored         int64     // kernel events stored
+	FirstEvent     time.Time // the oldest of them
+	Processes      int64     // processes tracked, all time
+	AgentProcesses int64     // of those, attributed to an agent session
+	Gaps           int64     // gaps in kernel coverage, all time
+	Latest         GapNote   // the most recent gap
+}
+
+// GapNote is one gap in kernel coverage.
+type GapNote struct {
+	Set    bool // false when there has been no gap
+	From   time.Time
+	To     time.Time // zero while open
+	Open   bool
+	Reason string
 }
 
 // Daemon is sentientd's own process.
@@ -142,6 +188,17 @@ func (r *Report) Warnings() []Warning {
 			What: "sentientd is processing logs since the last startup",
 			Why: "Until it has caught up, the log counts and live sessions below may be incomplete. " +
 				"This clears by itself, usually within a minute or two.",
+		})
+	}
+	if c := r.Collector; c.On && c.State == "reconnecting" && r.CheckedAt.Sub(c.Since) >= CollectorGrace {
+		why := "sentientd cannot reach " + c.System + ", so the kernel is not recording what the agent does. " +
+			"Actions in this time are shown as logged by the agent and marked not compared."
+		if c.LastError != "" {
+			why += " Last error: " + c.LastError + "."
+		}
+		w = append(w, Warning{Critical: true, Headline: "Kernel capture lost",
+			What: c.System + " is not reachable",
+			Why:  why + " sentientd keeps retrying and records this time as a gap.",
 		})
 	}
 	if r.Integrity.CheckedAt.After(time.Time{}) && !r.Integrity.OK {

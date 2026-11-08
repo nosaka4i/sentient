@@ -465,6 +465,40 @@ message HealthResponse {
   // True while sentientd's database was too busy to answer within the wait
   // (startup catch-up): the database-backed parts above are then empty.
   bool catching_up = 12;
+
+  // The kernel collector, whichever platform's it is. on is false when
+  // sentientd runs on agent logs only; everything else is then empty.
+  message Collector {
+    bool on = 1;
+    string system = 2;       // "Tetragon", "eslogger"
+    string platform = 3;     // "eBPF on Linux"
+    string detail_label = 4; // "socket", "process"
+    string detail = 5;
+    string version = 6;
+    string state = 7; // connecting | connected | reconnecting
+    google.protobuf.Timestamp since = 8;
+    string last_error = 9;
+    int64 reconnects = 10;
+    google.protobuf.Timestamp last_event = 11;
+    double per_minute = 12;
+    int32 queue_waiting = 13;
+    int32 queue_size = 14;
+    int64 lost = 15;
+    int64 stored = 16;
+    google.protobuf.Timestamp first_event = 17;
+    int64 processes = 18;
+    int64 agent_processes = 19;
+    int64 gaps = 20;
+    message Gap {
+      bool set = 1;
+      google.protobuf.Timestamp from = 2;
+      google.protobuf.Timestamp to = 3;
+      bool open = 4;
+      string reason = 5;
+    }
+    Gap latest = 21;
+  }
+  Collector collector = 13;
 }
 
 message StatusRequest {

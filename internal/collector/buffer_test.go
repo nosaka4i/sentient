@@ -93,6 +93,9 @@ func TestBufferedSinkRecordsAGapWhenTheQueueOverflows(t *testing.T) {
 	if b.Dropped() != 17 {
 		t.Fatalf("dropped = %d, want 17", b.Dropped())
 	}
+	if n, size := b.Queue(); n != 10 || size != 10 {
+		t.Errorf("queue = %d of %d, want a full 10", n, size)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	if err := b.Run(ctx); err != nil {
@@ -108,6 +111,9 @@ func TestBufferedSinkRecordsAGapWhenTheQueueOverflows(t *testing.T) {
 	}
 	if b.Dropped() != 0 {
 		t.Errorf("drops not reset: %d", b.Dropped())
+	}
+	if b.Lost() != 17 {
+		t.Errorf("lost = %d, the running total is kept after the gap is recorded", b.Lost())
 	}
 }
 

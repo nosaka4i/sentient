@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -27,6 +26,7 @@ type healthPage struct {
 	CaptureOn     bool   // the kernel collector is on
 	CaptureWarn   bool   // the policy and sentientd disagree, or the disk is filling
 	CapturePaused bool   // recording is paused for lack of disk
+	CaptureLost   bool   // the collector has been unreachable past the grace period
 	CaptureState  string // the card's header chip
 
 	Daemon    []htile
@@ -109,7 +109,8 @@ func newHealthPage(rep *health.Report, now time.Time) healthPage {
 		p.Headline = "All systems normal"
 	}
 
-	p.Capture, p.CaptureOn, p.CaptureWarn, p.CapturePaused, p.CaptureState = captureCard(rep, now)
+	cv := captureCard(rep, now)
+	p.Capture, p.CaptureOn, p.CaptureWarn, p.CapturePaused, p.CaptureLost, p.CaptureState = cv.Tiles, cv.On, cv.Warn, cv.Paused, cv.Lost, cv.State
 
 	d := rep.Daemon
 	p.DaemonOn = "sentientd · " + d.User
@@ -317,71 +318,4 @@ func shortPath(p string) string {
 		parts = parts[len(parts)-2:]
 	}
 	return strings.Join(parts, "/")
-}
-
-// levelNote is what each capture level means, for the card's first tile.
-var levelNote = map[string]string{
-	"essential": "build caches, toolchains and system libraries are not recorded",
-	"extended":  "build noise is not stored (per-command counts are not built yet)",
-	"complete":  "everything the policy reports is stored",
-}
-
-// captureCard is the Capture card: the level sentientd runs at, the level the
-// installed policy was made for, and the disk. It also returns whether the
-// kernel collector is on, whether anything needs a look, and the header chip.
-func captureCard(rep *health.Report, now time.Time) (tiles []htile, on, warn, paused bool, state string) {
-	c := rep.Capture
-	if !c.Enabled {
-		return []htile{{Label: "kernel capture", Num: "off", NumTxt: true, Wide: true, Muted: true,
-			Sum: "sentientd was started without --tetragon, so only the agents' own logs are recorded"}}, false, false, false, "off"
-	}
-	level := htile{Label: "level", Num: c.Level, NumTxt: true, Sum: levelNote[c.Level]}
-	if c.Level == "essential" {
-		level.Sum = "default · " + level.Sum
-	}
-	policy := htile{Label: "policy", LabelRest: "/ installed", Num: "unknown", NumTxt: true,
-		Sum: "no verbosity header in " + shortPath(c.PolicyFile) + ", or sentientd cannot read it · rerun sen policy and install it"}
-	if c.PolicyKnown {
-		policy.Num = c.PolicyLevel
-		installed := ""
-		if !c.PolicyInstalled.IsZero() {
-			installed = " · installed " + render.Date(c.PolicyInstalled, now)
-		}
-		if c.PolicyLevel == c.Level {
-			// one tile while they agree: the policy tile would only repeat the level
-			level.Check = true
-			level.Sum += " · policy matches" + installed
-			policy = htile{}
-		} else {
-			policy.Warn, warn = true, true
-			policy.Sum = "does not match sentientd · restart sentientd with --verbosity " + c.PolicyLevel +
-				", or sen policy --verbosity " + c.Level + ", install it and restart Tetragon" + installed
-		}
-	}
-	tiles = []htile{level}
-	if policy.Label != "" {
-		tiles = append(tiles, policy)
-	}
-	disk := htile{Label: "disk", LabelRest: "used", Num: "—", Sum: "unknown"}
-	if s := rep.Storage; s.SizeBytes > 0 {
-		disk.Num, disk.NumSmall = strconv.Itoa(s.UsedPct), "%"
-		disk.Sum = fmt.Sprintf("%s free of %s", humanize.Bytes(uint64(s.FreeBytes)), humanize.Bytes(uint64(s.SizeBytes)))
-		warnAt := 70
-		if s.HighPct > 0 {
-			disk.Sum += fmt.Sprintf(" · pauses at %d%%", s.HighPct)
-			warnAt = s.HighPct - 10
-		}
-		if s.UsedPct >= warnAt {
-			disk.Warn, warn = true, true
-		}
-	}
-	tiles = append(tiles, disk)
-	state = "on · " + c.Level
-	if s := rep.Storage; s.Paused {
-		paused = true
-		state = "recording paused"
-		tiles = append(tiles, htile{Label: "paused", LabelRest: "since", NumTxt: true, Warn: true,
-			Num: render.Date(s.PausedSince, now), Sum: uptime(now.Sub(s.PausedSince)) + " · one gap recorded · resumes at " + strconv.Itoa(s.LowPct) + "%"})
-	}
-	return tiles, true, warn, paused, state
 }

@@ -193,8 +193,20 @@ func Run(ctx context.Context, cfg Config) error {
 		}
 	}
 
+	// What the Health page shows of the collector: its state, and the queue that
+	// writes its events. Both are made here so the monitor can see them.
+	var kstatus *collector.Status
+	var buffered *collector.BufferedSink
+	if cfg.Tetragon != "" {
+		kstatus = tetragon.NewStatus(cfg.Tetragon, time.Now())
+		// Events are queued and written in batches, so a busy store (the
+		// first import of a big transcript) slows the queue, not Tetragon.
+		buffered = collector.NewBufferedSink(st, tetragon.Name, kernelQueue)
+	}
+
 	mon := newMonitor(st, cfg, log)
 	mon.disk = guard
+	mon.status, mon.queue = kstatus, buffered
 	srv := api.NewServer(st.DB)
 	srv.SetHealth(mon.report)
 	srv.SetLogger(log)
@@ -208,11 +220,8 @@ func Run(ctx context.Context, cfg Config) error {
 	go func() { defer wg.Done(); mon.run(ctx) }()
 	if cfg.Tetragon != "" {
 		agents := policy.AgentPrefixes(cfg.Homes)
-		var coll collector.Collector = &tetragon.Collector{Addr: cfg.Tetragon, Agents: agents}
+		var coll collector.Collector = &tetragon.Collector{Addr: cfg.Tetragon, Agents: agents, Status: kstatus}
 		log.Info("kernel collector on", "collector", coll.Name(), "addr", cfg.Tetragon)
-		// Events are queued and written in batches, so a busy store (the
-		// first import of a big transcript) slows the queue, not Tetragon.
-		buffered := collector.NewBufferedSink(st, coll.Name(), kernelQueue)
 		// The gate is outermost: while paused nothing reaches the filter or the queue.
 		sink := &collector.GateSink{Paused: guard.Paused,
 			Sink: &collector.FilterSink{Sink: buffered, Level: capt.level, Noise: capt.noise}}

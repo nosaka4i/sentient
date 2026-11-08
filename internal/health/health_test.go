@@ -67,6 +67,36 @@ func TestCaptureWarnings(t *testing.T) {
 	}
 }
 
+func TestLostCollectorWarnsOnlyAfterTheGracePeriod(t *testing.T) {
+	now := time.Date(2026, 11, 5, 14, 12, 0, 0, time.UTC)
+	lost := func(since time.Duration, on bool, state string) *Report {
+		return &Report{CheckedAt: now, Collector: Collector{On: on, System: "Tetragon", State: state,
+			Since: now.Add(-since), LastError: "connect to unix:///t.sock: permission denied"}}
+	}
+	for name, r := range map[string]*Report{
+		"a routine restart":      lost(10*time.Second, true, "reconnecting"),
+		"connected":              lost(time.Hour, true, "connected"),
+		"connecting at start":    lost(time.Hour, true, "connecting"),
+		"agent logs only":        lost(time.Hour, false, "reconnecting"),
+		"just under the grace":   lost(CollectorGrace-time.Second, true, "reconnecting"),
+		"no collector, no state": {CheckedAt: now},
+	} {
+		if w := r.Warnings(); len(w) != 0 {
+			t.Errorf("%s: warnings = %+v", name, w)
+		}
+	}
+	w := lost(CollectorGrace, true, "reconnecting").Warnings()
+	if len(w) != 1 || !w[0].Critical || w[0].Headline != "Kernel capture lost" || w[0].What != "Tetragon is not reachable" ||
+		!strings.Contains(w[0].Why, "permission denied") || !strings.Contains(w[0].Why, "marked not compared") {
+		t.Fatalf("warnings = %+v", w)
+	}
+	r := lost(4*time.Minute, true, "reconnecting")
+	r.Collector.LastError = ""
+	if w := r.Warnings(); len(w) != 1 || strings.Contains(w[0].Why, "Last error") {
+		t.Errorf("no error text known: %+v", w)
+	}
+}
+
 func TestDiskWarningsFollowTheUsedShare(t *testing.T) {
 	at := func(used int, high int, paused bool) []Warning {
 		return (&Report{Storage: Storage{SizeBytes: 100_000_000_000, UsedPct: used, HighPct: high, LowPct: max(high-5, 0), Paused: paused, DBBytes: 700_000_000}}).Warnings()

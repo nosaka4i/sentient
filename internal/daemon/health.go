@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nosaka4i/sentient/internal/collector"
 	"github.com/nosaka4i/sentient/internal/health"
 	"github.com/nosaka4i/sentient/internal/query"
 	"github.com/nosaka4i/sentient/internal/store"
@@ -38,8 +39,10 @@ type monitor struct {
 	now     func() time.Time
 	log     *slog.Logger
 	cfg     Config
-	disk    *diskGuard    // nil in tests that do not pause
-	dbWait  time.Duration // how long the report waits for the database
+	disk    *diskGuard              // nil in tests that do not pause
+	dbWait  time.Duration           // how long the report waits for the database
+	status  *collector.Status       // the kernel collector's state; nil without one
+	queue   *collector.BufferedSink // its write queue
 
 	cpu   *cpuSampler
 	integ *integrity
@@ -94,6 +97,7 @@ func (m *monitor) report(ctx context.Context) (*health.Report, error) {
 
 	r.Sudo = m.sudo.check(ctx)
 	r.Capture = captureReport(m.cfg, os.ReadFile, fileModTime)
+	r.Collector = m.collectorReport(now)
 
 	// The database-backed parts get a short deadline: right after a start the
 	// catch-up writers hold the database for a minute or more, and the page
@@ -109,10 +113,31 @@ func (m *monitor) report(ctx context.Context) (*health.Report, error) {
 		}
 		r.CatchingUp = true
 		r.HistoryBegins, r.Ingest, r.Live = time.Time{}, nil, nil
+		r.Collector = m.collectorReport(now) // the live state only; what the database holds is not known yet
 		r.Agents = append([]health.Agent(nil), query.Adapters...)
 	}
 	r.Integrity = m.integ.state()
 	return r, nil
+}
+
+// collectorReport is the kernel collector's live state; empty (not On) when
+// sentientd runs on agent logs only. What the database holds of its work is
+// added by fromDB.
+func (m *monitor) collectorReport(now time.Time) health.Collector {
+	if m.status == nil {
+		return health.Collector{}
+	}
+	s := m.status.Snapshot(now)
+	c := health.Collector{
+		On: true, System: s.System, Platform: s.Platform, DetailLabel: s.DetailLabel, Detail: s.Detail, Version: s.Version,
+		State: string(s.State), Since: s.Since, LastError: s.LastError, Reconnects: s.Reconnects,
+		LastEvent: s.LastEvent, PerMinute: s.PerMinute,
+	}
+	if m.queue != nil {
+		c.QueueWaiting, c.QueueSize = m.queue.Queue()
+		c.Lost = m.queue.Lost()
+	}
+	return c
 }
 
 // fromDB fills the parts of the report that read the database.
@@ -128,6 +153,11 @@ func (m *monitor) fromDB(ctx context.Context, r *health.Report, now time.Time) (
 	}
 	if r.Live, err = query.LiveSessions(ctx, m.st.DB, now.Add(-query.RunningWindow)); err != nil {
 		return err
+	}
+	if r.Collector.On {
+		if err := query.CollectorStats(ctx, m.st.DB, &r.Collector); err != nil {
+			return err
+		}
 	}
 	m.integ.incremental(ctx)
 	return nil
