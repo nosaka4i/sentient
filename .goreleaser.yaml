@@ -1,0 +1,56 @@
+# Release builds, run by .github/workflows/release.yml when a v* tag is pushed.
+# Pure Go (no CGO), so every target cross-compiles from one Linux runner.
+# Try it locally: goreleaser release --snapshot --clean
+version: 2
+
+project_name: sentient
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: sen
+    main: ./cmd/sen
+    binary: sen
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: darwin
+        goarch: amd64
+    ldflags:
+      - -s -w -X github.com/nosaka4i/sentient/internal/version.Version={{ .Version }}
+
+  - id: sentientd
+    main: ./cmd/sentientd
+    binary: sentientd
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: darwin
+        goarch: amd64
+    ldflags:
+      - -s -w -X github.com/nosaka4i/sentient/internal/version.Version={{ .Version }}
+
+archives:
+  - id: sentient
+    formats: [tar.gz]
+    # sentient_0.0.3_linux_amd64.tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+      - src: deploy/sentientd.service
+        strip_parent: true
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  disable: true
+
+release:
+  # The notes are written by hand on the release page.
+  draft: false

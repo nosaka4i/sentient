@@ -7,7 +7,7 @@ See [docs/brief.md](docs/brief.md) for the product brief and
 Two binaries: `sentientd` (the monitor; root, started by systemd) and `sen`
 (the CLI; runs as you and asks `sentientd` over a Unix socket).
 
-## Install (v0.0.2)
+## Install (v0.0.3)
 
 Manual steps for now; a package or `sen install` can come later.
 
@@ -15,7 +15,37 @@ Manual steps for now; a package or `sen install` can come later.
    Install Tetragon the standard way (its release install) and enable its
    systemd service, so it starts at boot before any agent.
 
-2. **Build** (Go 1.26):
+2. **Get the binaries**, either by downloading a release or by building.
+
+   **Download** (Linux amd64 or arm64, macOS on Apple silicon). Pick the
+   archive for your machine from the
+   [releases page](https://github.com/nosaka4i/sentient/releases), check it
+   against `checksums.txt`, and unpack it into a `bin/` and `deploy/` folder
+   (the later steps use those paths):
+
+   ```sh
+   v=0.0.3; os=linux; arch=amd64        # os: linux or darwin; arch: amd64 or arm64
+   base=https://github.com/nosaka4i/sentient/releases/download/v$v
+   curl -fsSLO $base/sentient_${v}_${os}_${arch}.tar.gz
+   curl -fsSLO $base/checksums.txt
+   sha256sum --ignore-missing -c checksums.txt     # on a Mac: shasum -a 256 -c --ignore-missing checksums.txt
+   mkdir -p bin deploy && tar -xzf sentient_${v}_${os}_${arch}.tar.gz sen sentientd && mv sen sentientd bin/
+   tar -xzf sentient_${v}_${os}_${arch}.tar.gz sentientd.service && mv sentientd.service deploy/
+   ```
+
+   Then carry on from step 3 (Linux). The binaries are not signed. Fetching
+   with `curl` as above does not trigger macOS's quarantine; if you download
+   in a browser instead, clear it with
+   `xattr -d com.apple.quarantine sen sentientd`.
+
+   **On a Mac** there is no kernel collector yet, so sentientd runs in agent
+   logs only mode: a view of what the agent says it did, with nothing
+   independent confirming it. Skip the Tetragon and systemd steps. Run
+   `./sentientd` in one terminal and `./sen serve` in another, then open
+   `http://127.0.0.1:7357`. Both use the same default socket under
+   `~/Library/Application Support/sentient/`.
+
+   **Or build** (Go 1.26):
 
    ```sh
    make build            # bin/sen, bin/sentientd; VERSION=x.y.z make build to stamp a version
