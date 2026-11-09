@@ -110,6 +110,26 @@ go build -o .claudetmp/bin/ ./cmd/...
 SENTIENT_SOCKET=.claudetmp/dev/sentientd.sock .claudetmp/bin/sen status
 ```
 
+`tools/dev/sentient.sh` does the same with the paths filled in (symlink it
+as `sentient` on your PATH). One foreground process per terminal; logs go to
+`logs/` in the repo. Data, socket and logs stay under the repo, so nothing
+touches `/opt/sentient`.
+
+```sh
+sentient build       # make build (bin/sen, bin/sentientd)
+sentient install     # make install (into $GOBIN)
+sentient sentientd   # the daemon, unprivileged, agent logs only (no kernel capture)
+sentient kernel      # the daemon as root with --tetragon (SENTIENT_VERBOSITY=essential|extended|complete)
+sentient serve       # the web UI on 127.0.0.1:7357 (SENTIENT_ADDR to change)
+```
+
+On a Mac use `sentientd` and `serve`; `kernel` needs Tetragon, which is
+Linux-only. `serve` passes the same `--socket` as `sentientd`. Running
+`bin/sen serve` by hand uses the default socket instead
+(`~/Library/Application Support/sentient/sentientd.sock` on a Mac), where
+nothing listens, and the page says it cannot reach the monitor. Pass the
+same `--socket` to both.
+
 - `make test` / `make cover` — unit tests (keep each package ≥70% covered).
 - `make proto` — regenerate `internal/api/sentientpb` from `sentient.proto`
   (generated code is committed; `make tools` installs buf and the protoc

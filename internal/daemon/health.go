@@ -54,9 +54,10 @@ func newMonitor(st *store.Store, cfg Config, log *slog.Logger) *monitor {
 	return &monitor{
 		st: st, dataDir: cfg.DataDir, socket: cfg.Socket, homes: cfg.Homes,
 		started: now(), now: now, log: log, cfg: cfg, dbWait: dbReportWait,
-		cpu:   newCPUSampler(now),
-		integ: &integrity{st: st, now: now, interval: cfg.IntegrityInterval, log: log},
-		sudo:  &sudoChecker{now: now, run: runSudoList, root: os.Geteuid() == 0, users: agentAccounts(cfg.Homes)},
+		cpu: newCPUSampler(now),
+		integ: &integrity{st: st, now: now, interval: cfg.IntegrityInterval, log: log,
+			pace: store.VerifyPace{Slice: cfg.IntegritySlice, Pause: cfg.IntegrityPause}, startDelay: cfg.IntegrityStartDelay},
+		sudo: &sudoChecker{now: now, run: runSudoList, root: os.Geteuid() == 0, users: agentAccounts(cfg.Homes)},
 	}
 }
 
@@ -283,6 +284,16 @@ type integrity struct {
 
 	checking sync.Mutex // one check at a time
 
+	// How hard the full check works (docs/integrity-check.md): it reads slices of
+	// records and pauses between them, and the first one waits after the start.
+	pace       store.VerifyPace
+	startDelay time.Duration
+
+	// The kernel chain's counterparts of point, records and bad; guarded by mu.
+	kpoint   store.ChainPoint
+	krecords int64
+	kbad     int64
+
 	mu        sync.Mutex
 	point     store.ChainPoint
 	checkedAt time.Time
@@ -292,6 +303,13 @@ type integrity struct {
 }
 
 func (i *integrity) loop(ctx context.Context) {
+	if i.startDelay > 0 {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(i.startDelay):
+		}
+	}
 	for {
 		i.full(ctx)
 		select {
@@ -305,20 +323,51 @@ func (i *integrity) loop(ctx context.Context) {
 func (i *integrity) full(ctx context.Context) {
 	i.checking.Lock()
 	defer i.checking.Unlock()
-	res, err := i.st.VerifyChainFrom(ctx, store.ChainPoint{})
+	i.log.Info("checking that the stored agent log records are unchanged (hash chain)")
+	began := time.Now()
+	res, err := i.st.VerifyChainPaced(ctx, store.ChainPoint{}, i.pace)
 	if err != nil {
 		if ctx.Err() == nil {
 			i.log.Error("integrity check failed to run", "err", err)
 		}
 		return
 	}
+	if res.BadID == 0 {
+		i.log.Info("agent log records verified: none changed or removed", "records", res.Checked, "took", time.Since(began).Round(time.Millisecond))
+	}
+	// The kernel events, when there are any (agent logs only mode has none).
+	var kres store.ChainResult
+	last, err := i.st.LastKernelEventID(ctx)
+	if err != nil {
+		if ctx.Err() == nil {
+			i.log.Error("integrity check failed to run", "err", err)
+		}
+		return
+	}
+	if last > 0 {
+		i.log.Info("checking that the stored kernel events are unchanged (hash chain)")
+		kbegan := time.Now()
+		if kres, err = i.st.VerifyKernelChainPaced(ctx, store.ChainPoint{}, i.pace); err != nil {
+			if ctx.Err() == nil {
+				i.log.Error("integrity check failed to run", "err", err)
+			}
+			return
+		}
+		if kres.BadID == 0 {
+			i.log.Info("kernel events verified: none changed or removed", "events", kres.Checked, "took", time.Since(kbegan).Round(time.Millisecond))
+		}
+	}
 	now := i.now()
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.point, i.records, i.bad = res.Last, res.Checked, res.BadID
+	i.kpoint, i.krecords, i.kbad = kres.Last, kres.Checked, kres.BadID
 	i.checkedAt, i.fullAt = now, now
 	if res.BadID != 0 {
 		i.log.Error("HASH CHAIN BROKEN: a raw log record was changed or removed", "record_id", res.BadID)
+	}
+	if kres.BadID != 0 {
+		i.log.Error("HASH CHAIN BROKEN: a kernel event was changed or removed", "event_id", kres.BadID)
 	}
 }
 
@@ -332,8 +381,8 @@ func (i *integrity) incremental(ctx context.Context) {
 	}
 	defer i.checking.Unlock()
 	i.mu.Lock()
-	skip := i.fullAt.IsZero() || i.bad != 0 || i.now().Sub(i.checkedAt) < incrementalEvery
-	from := i.point
+	skip := i.fullAt.IsZero() || i.bad != 0 || i.kbad != 0 || i.now().Sub(i.checkedAt) < incrementalEvery
+	from, kfrom := i.point, i.kpoint
 	i.mu.Unlock()
 	if skip {
 		return
@@ -342,10 +391,16 @@ func (i *integrity) incremental(ctx context.Context) {
 	if err != nil {
 		return
 	}
+	kres, err := i.st.VerifyKernelChainFrom(ctx, kfrom)
+	if err != nil {
+		return
+	}
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.point, i.bad = res.Last, res.BadID
+	i.kpoint, i.kbad = kres.Last, kres.BadID
 	i.records += res.Checked
+	i.krecords += kres.Checked
 	i.checkedAt = i.now()
 }
 
@@ -354,7 +409,7 @@ func (i *integrity) state() health.Integrity {
 	defer i.mu.Unlock()
 	return health.Integrity{
 		CheckedAt: i.checkedAt, FullAt: i.fullAt, Records: i.records,
-		OK: i.bad == 0, BadRecordID: i.bad, Interval: i.interval,
+		OK: i.bad == 0 && i.kbad == 0, BadRecordID: i.bad, KernelRecords: i.krecords, BadKernelEventID: i.kbad, Interval: i.interval,
 	}
 }
 

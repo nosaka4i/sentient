@@ -103,28 +103,60 @@ VALUES (NULLIF(?, ''), ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?)`,
 // VerifyKernelChainFrom checks the kernel events after `from`, like
 // VerifyChainFrom does for raw log records.
 func (s *Store) VerifyKernelChainFrom(ctx context.Context, from ChainPoint) (ChainResult, error) {
+	return s.VerifyKernelChainPaced(ctx, from, VerifyPace{})
+}
+
+// VerifyKernelChainPaced is VerifyKernelChainFrom in slices at the given pace
+// (see VerifyPace).
+func (s *Store) VerifyKernelChainPaced(ctx context.Context, from ChainPoint, pace VerifyPace) (ChainResult, error) {
 	res := ChainResult{Last: from}
+	for {
+		n, err := s.verifyKernelSlice(ctx, &res, pace.slice())
+		if err != nil || res.BadID != 0 || n < pace.slice() {
+			return res, err
+		}
+		if !pace.wait(ctx) {
+			return res, ctx.Err()
+		}
+	}
+}
+
+// verifyKernelSlice checks the next limit kernel events after res.Last, updating
+// res, and returns how many it read.
+func (s *Store) verifyKernelSlice(ctx context.Context, res *ChainResult, limit int) (int, error) {
 	rows, err := s.DB.QueryContext(ctx, `
 SELECT id, COALESCE(exec_id, ''), ts, type, COALESCE(path, ''), COALESCE(path2, ''), payload, prev_hash, hash
-FROM kernel_events WHERE id > ? ORDER BY id`, from.ID)
+FROM kernel_events WHERE id > ? ORDER BY id LIMIT ?`, res.Last.ID, limit)
 	if err != nil {
-		return res, err
+		return 0, err
 	}
 	defer rows.Close()
+	n := 0
 	for rows.Next() {
 		var id int64
 		var exec, ts, typ, path, path2, payload, ph, h string
 		if err := rows.Scan(&id, &exec, &ts, &typ, &path, &path2, &payload, &ph, &h); err != nil {
-			return res, err
+			return n, err
 		}
+		n++
 		res.Checked++
 		if ph != res.Last.Hash || ChainHash(res.Last.Hash, ts, kernelSource(exec, typ, path, path2), payload) != h {
 			res.BadID = id
-			return res, nil
+			return n, nil
 		}
 		res.Last = ChainPoint{ID: id, Hash: h}
 	}
-	return res, rows.Err()
+	return n, rows.Err()
+}
+
+// LastKernelEventID is the id of the newest kernel event (0 when there are
+// none), which is instant to read.
+func (s *Store) LastKernelEventID(ctx context.Context) (int64, error) {
+	var id int64
+	if err := s.DB.QueryRowContext(ctx, `SELECT COALESCE(MAX(id), 0) FROM kernel_events`).Scan(&id); err != nil {
+		return 0, fmt.Errorf("last kernel event: %w", err)
+	}
+	return id, nil
 }
 
 // Gap is a stretch of time a collector wasn't watching.

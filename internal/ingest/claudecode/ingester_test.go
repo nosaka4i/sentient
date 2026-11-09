@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -381,6 +382,74 @@ func TestABulkImportIsReportedInTheLog(t *testing.T) {
 	buf.Reset()
 	if err := in.ScanOnce(context.Background()); err != nil || buf.Len() != 0 {
 		t.Errorf("idle scan logged %q, %v", buf.String(), err)
+	}
+}
+
+// logBuf is a log destination that Run's goroutine and the test can both use.
+type logBuf struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (l *logBuf) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *logBuf) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
+}
+
+// runUntilLogged runs the ingester until the log says want, then stops it.
+func runUntilLogged(t *testing.T, in *Ingester, buf *logBuf, want string) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- in.Run(ctx) }()
+	deadline := time.Now().Add(10 * time.Second)
+	for !strings.Contains(buf.String(), want) {
+		if time.Now().After(deadline) {
+			cancel()
+			t.Fatalf("log never said %q:\n%s", want, buf.String())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	cancel()
+	<-done
+}
+
+func TestTheFirstScanSaysWhatItIsDoing(t *testing.T) {
+	buf := &logBuf{}
+	st := openStore(t)
+	home := fixtureHome(t)
+	in := New(st, Config{Homes: []string{home}, PollInterval: 5 * time.Millisecond, Logger: slog.New(slog.NewTextHandler(buf, nil))})
+	runUntilLogged(t, in, buf, "imported new agent log records")
+	out := buf.String()
+	if !strings.Contains(out, "checking the agent's log files for records not yet imported") || !strings.Contains(out, "records=25") || !strings.Contains(out, "files=2") {
+		t.Errorf("first start:\n%s", out)
+	}
+	if strings.Index(out, "checking the agent's") > strings.Index(out, "imported new agent log records") {
+		t.Errorf("the line that says what it is doing comes after the result:\n%s", out)
+	}
+	if n := strings.Count(out, "checking the agent's"); n != 1 {
+		t.Errorf("%d announcements, want one (later scans are silent):\n%s", n, out)
+	}
+
+	// a second start with nothing new says so
+	buf2 := &logBuf{}
+	in2 := New(st, Config{Homes: []string{home}, PollInterval: 5 * time.Millisecond, Logger: slog.New(slog.NewTextHandler(buf2, nil))})
+	runUntilLogged(t, in2, buf2, "nothing new to import")
+
+	// a large import has its own summary, and no second one
+	buf3 := &logBuf{}
+	in3 := New(openStore(t), Config{Homes: []string{home}, PollInterval: 5 * time.Millisecond, Logger: slog.New(slog.NewTextHandler(buf3, nil))})
+	in3.bulkBytes = 1
+	runUntilLogged(t, in3, buf3, "imported agent transcripts")
+	if strings.Contains(buf3.String(), "imported new agent log records") {
+		t.Errorf("a bulk import was summarized twice:\n%s", buf3.String())
 	}
 }
 

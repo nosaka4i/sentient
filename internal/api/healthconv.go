@@ -64,6 +64,7 @@ func healthToProto(r *health.Report) *pb.HealthResponse {
 		Integrity: &pb.HealthResponse_Integrity{
 			CheckedAt: ts(in.CheckedAt), FullAt: ts(in.FullAt), Records: in.Records, Ok: in.OK,
 			BadRecordId: in.BadRecordID, Interval: durationpb.New(in.Interval), GapTracking: in.GapTracking,
+			KernelRecords: in.KernelRecords, BadKernelEventId: in.BadKernelEventID,
 		},
 		Sudo: &pb.HealthResponse_Sudo{Checked: r.Sudo.Checked, Reason: r.Sudo.Reason, Passwordless: r.Sudo.Passwordless},
 		Capture: &pb.HealthResponse_Capture{
@@ -139,6 +140,7 @@ func healthFromProto(p *pb.HealthResponse) *health.Report {
 		Integrity: health.Integrity{
 			CheckedAt: fromTS(in.GetCheckedAt()), FullAt: fromTS(in.GetFullAt()), Records: in.GetRecords(), OK: in.GetOk(),
 			BadRecordID: in.GetBadRecordId(), Interval: in.GetInterval().AsDuration(), GapTracking: in.GetGapTracking(),
+			KernelRecords: in.GetKernelRecords(), BadKernelEventID: in.GetBadKernelEventId(),
 		},
 		Sudo: health.Sudo{Checked: p.GetSudo().GetChecked(), Reason: p.GetSudo().GetReason(), Passwordless: p.GetSudo().GetPasswordless()},
 		Capture: health.Capture{

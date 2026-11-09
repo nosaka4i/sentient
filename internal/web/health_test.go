@@ -74,7 +74,7 @@ func TestHealthPage(t *testing.T) {
 		`<span class="num">118 GB</span>`, `of 240 GB`,
 		`<span class="v">0.4s</span>`, `<span class="v">38 <small>jsonl</small></span>`,
 		`<span class="v">2d 2h</span>`, // codex lag
-		`Verified <span class="okt"`, `2,481,906 records checked`,
+		`Verified <span class="okt"`, `2,481,906 agent log records checked`,
 		`no gap tracking yet`,
 		`Agents <span class="count">(2)</span>`,
 		`<b>claude code</b>`, `<use href="#i-claude"/></svg>2.1.302`,
@@ -109,6 +109,31 @@ func TestHealthHeadlineFollowsTheWarnings(t *testing.T) {
 	_, body = get(t, newTestServer(t, &fakeSource{health: two}), "/health", "127.0.0.1:7357")
 	if !strings.Contains(body, `okdot warn`) || !strings.Contains(body, `Running, with 2 warnings`) || strings.Contains(body, `All systems normal`) {
 		t.Errorf("two warnings: wrong headline")
+	}
+}
+
+func TestTheHashChainTileCoversTheKernelEventsToo(t *testing.T) {
+	r := healthReport()
+	r.Integrity = health.Integrity{CheckedAt: now, FullAt: now, OK: true, Records: 2000, KernelRecords: 913452, Interval: time.Hour}
+	_, body := get(t, newTestServer(t, &fakeSource{health: r}), "/health", "127.0.0.1:7357")
+	wantAll(t, body, `2,000 agent log records and 913,452 kernel events checked`, `Verified`)
+
+	for name, in := range map[string]health.Integrity{
+		"kernel":  {CheckedAt: now, FullAt: now, BadKernelEventID: 77, Interval: time.Hour},
+		"both":    {CheckedAt: now, FullAt: now, BadRecordID: 5, BadKernelEventID: 77, Interval: time.Hour},
+		"records": {CheckedAt: now, FullAt: now, BadRecordID: 5, Interval: time.Hour},
+	} {
+		r.Integrity = in
+		_, body = get(t, newTestServer(t, &fakeSource{health: r}), "/health", "127.0.0.1:7357")
+		switch name {
+		case "kernel":
+			wantAll(t, body, `Broken at kernel event #77`, `A stored kernel event was changed or removed after it was written.`)
+			wantNone(t, body, `Broken at record`, `agent log record was changed`)
+		case "both":
+			wantAll(t, body, `Broken at log record #5 and kernel event #77`, `A stored agent log record and a stored kernel event were changed or removed`)
+		case "records":
+			wantAll(t, body, `Broken at record #5`, `A stored agent log record was changed or removed after it was written.`)
+		}
 	}
 }
 

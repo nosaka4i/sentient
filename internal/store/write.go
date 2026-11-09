@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 )
 
 // Tx is a write transaction. The ingester does one per batch of records.
@@ -274,34 +275,101 @@ type ChainResult struct {
 // already verified. Starting from the zero point checks everything;
 // resuming from the last result checks only what was appended since,
 // which is cheap.
+//
+// It reads in slices and gives the database connection back between them: the
+// store has one connection, so a single query held open over every record would
+// make every other request (the Health page, the ingest, the API) wait for the
+// whole check. VerifyChainPaced also pauses between slices.
 func (s *Store) VerifyChainFrom(ctx context.Context, from ChainPoint) (ChainResult, error) {
+	return s.VerifyChainPaced(ctx, from, VerifyPace{})
+}
+
+// VerifyPace is how hard a chain check works: it reads Slice records, lets go of
+// the database connection, waits Pause, and carries on. A longer pause or a
+// smaller slice takes longer and gets in the way less.
+type VerifyPace struct {
+	Slice int           // records per slice (default DefaultVerifySlice)
+	Pause time.Duration // wait between slices (default none)
+	// Between, if set, is called after each full slice, with the connection free
+	// (tests use it).
+	Between func()
+}
+
+// DefaultVerifySlice is the records one slice reads: about 80 ms of work on the
+// first database this was timed on.
+const DefaultVerifySlice = 2000
+
+func (p VerifyPace) slice() int {
+	if p.Slice <= 0 {
+		return DefaultVerifySlice
+	}
+	return p.Slice
+}
+
+// wait pauses between slices; false means ctx ended during the wait.
+func (p VerifyPace) wait(ctx context.Context) bool {
+	if p.Between != nil {
+		p.Between()
+	}
+	if p.Pause <= 0 {
+		return ctx.Err() == nil
+	}
+	t := time.NewTimer(p.Pause)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-t.C:
+		return true
+	}
+}
+
+// VerifyChainPaced is VerifyChainFrom at the given pace. If ctx ends mid-check it
+// returns the context's error.
+func (s *Store) VerifyChainPaced(ctx context.Context, from ChainPoint, pace VerifyPace) (ChainResult, error) {
 	res := ChainResult{Last: from}
+	for {
+		n, err := s.verifySlice(ctx, &res, pace.slice())
+		if err != nil || res.BadID != 0 || n < pace.slice() {
+			return res, err
+		}
+		if !pace.wait(ctx) {
+			return res, ctx.Err()
+		}
+	}
+}
+
+// verifySlice checks the next limit records after res.Last, updating res, and
+// returns how many it read.
+func (s *Store) verifySlice(ctx context.Context, res *ChainResult, limit int) (int, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-SELECT id, COALESCE(ts, ''), source_file, record, prev_hash, hash FROM raw_log_records WHERE id > ? ORDER BY id`, from.ID)
+SELECT id, COALESCE(ts, ''), source_file, record, prev_hash, hash FROM raw_log_records WHERE id > ? ORDER BY id LIMIT ?`, res.Last.ID, limit)
 	if err != nil {
-		return res, err
+		return 0, err
 	}
 	defer rows.Close()
+	n := 0
 	for rows.Next() {
 		var id int64
 		var ts, src, ph, h string
 		var stored any
 		if err := rows.Scan(&id, &ts, &src, &stored, &ph, &h); err != nil {
-			return res, err
+			return n, err
 		}
+		n++
 		res.Checked++
 		rec, err := DecodeRecord(stored)
 		if err != nil {
 			res.BadID = id
-			return res, nil
+			return n, nil
 		}
 		if ph != res.Last.Hash || ChainHash(res.Last.Hash, ts, src, rec) != h {
 			res.BadID = id
-			return res, nil
+			return n, nil
 		}
 		res.Last = ChainPoint{ID: id, Hash: h}
 	}
-	return res, rows.Err()
+	return n, rows.Err()
 }
 
 func boolInt(b bool) int {

@@ -1,9 +1,12 @@
 package attribute
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -267,6 +270,72 @@ func TestRunStopsWithContext(t *testing.T) {
 	cancel()
 	if err := <-done; err != nil {
 		t.Fatal(err)
+	}
+}
+
+// logBuf is a log destination that Run's goroutine and the test can both use.
+type logBuf struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (l *logBuf) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *logBuf) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
+}
+
+func TestTheFirstPassSaysWhatItIsDoingAndLaterOnesAreSilent(t *testing.T) {
+	f := newFixture(t)
+	buf := &logBuf{}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	a := f.att()
+	a.Log = slog.New(slog.NewTextHandler(buf, nil))
+	go func() { done <- a.Run(ctx, 5*time.Millisecond) }()
+	deadline := time.Now().Add(10 * time.Second)
+	for !strings.Contains(buf.String(), "tied kernel processes to the agent's sessions") {
+		if time.Now().After(deadline) {
+			t.Fatalf("no summary:\n%s", buf.String())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	time.Sleep(60 * time.Millisecond) // several more passes
+	cancel()
+	<-done
+	out := buf.String()
+	if strings.Count(out, "tying kernel processes to the agent's sessions and prompts") != 1 || strings.Count(out, "tied kernel processes") != 1 ||
+		!strings.Contains(out, "newly_tied=0") || !strings.Contains(out, "took=") {
+		t.Errorf("log:\n%s", out)
+	}
+}
+
+func TestAFailedFirstPassIsAnErrorNotASummary(t *testing.T) {
+	f := newFixture(t)
+	f.st.DB.Close()
+	buf := &logBuf{}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	a := f.att()
+	a.Log = slog.New(slog.NewTextHandler(buf, nil))
+	go func() { done <- a.Run(ctx, 5*time.Millisecond) }()
+	deadline := time.Now().Add(10 * time.Second)
+	for !strings.Contains(buf.String(), "attribute processes") {
+		if time.Now().After(deadline) {
+			t.Fatalf("no error logged:\n%s", buf.String())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	cancel()
+	<-done
+	if strings.Contains(buf.String(), "tied kernel processes") {
+		t.Errorf("a failed pass was summarized:\n%s", buf.String())
 	}
 }
 

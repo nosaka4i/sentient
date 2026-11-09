@@ -54,6 +54,8 @@ type Ingester struct {
 	repoRoots map[string]string // cwd -> repo root ("" = not in a repo)
 	unknown   map[string]int    // record type -> count since start
 
+	last scanSummary // the latest scan, guarded by mu
+
 	bulkBytes     int64         // unread bytes that make a scan worth reporting
 	progressEvery time.Duration // how often a reported scan logs progress
 }
@@ -83,17 +85,42 @@ func New(st *store.Store, cfg Config) *Ingester {
 func (in *Ingester) Run(ctx context.Context) error {
 	t := time.NewTicker(in.cfg.PollInterval)
 	defer t.Stop()
+	first := true
 	for {
 		if in.cfg.Paused == nil || !in.cfg.Paused() {
-			if err := in.ScanOnce(ctx); err != nil && ctx.Err() == nil {
+			// Say what the first scan after a start is doing; later scans are silent.
+			if first {
+				in.log.Info("checking the agent's log files for records not yet imported")
+			}
+			err := in.ScanOnce(ctx)
+			if err != nil && ctx.Err() == nil {
 				in.log.Error("scan failed", "err", err)
 			}
+			if first && err == nil {
+				in.reportFirstScan()
+			}
+			first = false
 		}
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-t.C:
 		}
+	}
+}
+
+// reportFirstScan says what the first scan found. A large one has logged its own
+// summary already.
+func (in *Ingester) reportFirstScan() {
+	in.mu.Lock()
+	s := in.last
+	in.mu.Unlock()
+	switch {
+	case s.bulk:
+	case s.records == 0:
+		in.log.Info("agent log files checked: nothing new to import")
+	default:
+		in.log.Info("imported new agent log records", "records", s.records, "files", s.files)
 	}
 }
 
@@ -184,7 +211,17 @@ func (in *Ingester) ScanOnce(ctx context.Context) error {
 		in.log.Info("imported agent transcripts", "records", records, "read_mb", read>>20,
 			"took", time.Since(start).Round(time.Second), "errors", len(errs))
 	}
+	in.mu.Lock()
+	in.last = scanSummary{records: records, files: pendingFiles, bulk: bulk}
+	in.mu.Unlock()
 	return errors.Join(errs...)
+}
+
+// scanSummary is what the latest scan found, for the line the first scan logs.
+type scanSummary struct {
+	records int64
+	files   int
+	bulk    bool // a large scan, which logs its own start, progress and end
 }
 
 // sessionFromPath derives the session id from a transcript path:

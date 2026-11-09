@@ -3922,16 +3922,18 @@ func (x *HealthResponse_IngestAgent) GetUnknown() int64 {
 }
 
 type HealthResponse_Integrity struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CheckedAt     *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=checked_at,json=checkedAt,proto3" json:"checked_at,omitempty"` // unset = not checked yet
-	FullAt        *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=full_at,json=fullAt,proto3" json:"full_at,omitempty"`
-	Records       int64                  `protobuf:"varint,3,opt,name=records,proto3" json:"records,omitempty"`
-	Ok            bool                   `protobuf:"varint,4,opt,name=ok,proto3" json:"ok,omitempty"`
-	BadRecordId   int64                  `protobuf:"varint,5,opt,name=bad_record_id,json=badRecordId,proto3" json:"bad_record_id,omitempty"`
-	Interval      *durationpb.Duration   `protobuf:"bytes,6,opt,name=interval,proto3" json:"interval,omitempty"`
-	GapTracking   bool                   `protobuf:"varint,7,opt,name=gap_tracking,json=gapTracking,proto3" json:"gap_tracking,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	CheckedAt        *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=checked_at,json=checkedAt,proto3" json:"checked_at,omitempty"` // unset = not checked yet
+	FullAt           *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=full_at,json=fullAt,proto3" json:"full_at,omitempty"`
+	Records          int64                  `protobuf:"varint,3,opt,name=records,proto3" json:"records,omitempty"`
+	Ok               bool                   `protobuf:"varint,4,opt,name=ok,proto3" json:"ok,omitempty"`
+	BadRecordId      int64                  `protobuf:"varint,5,opt,name=bad_record_id,json=badRecordId,proto3" json:"bad_record_id,omitempty"`
+	Interval         *durationpb.Duration   `protobuf:"bytes,6,opt,name=interval,proto3" json:"interval,omitempty"`
+	GapTracking      bool                   `protobuf:"varint,7,opt,name=gap_tracking,json=gapTracking,proto3" json:"gap_tracking,omitempty"`
+	KernelRecords    int64                  `protobuf:"varint,8,opt,name=kernel_records,json=kernelRecords,proto3" json:"kernel_records,omitempty"`              // kernel events verified
+	BadKernelEventId int64                  `protobuf:"varint,9,opt,name=bad_kernel_event_id,json=badKernelEventId,proto3" json:"bad_kernel_event_id,omitempty"` // first kernel event whose hash doesn't match
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *HealthResponse_Integrity) Reset() {
@@ -4011,6 +4013,20 @@ func (x *HealthResponse_Integrity) GetGapTracking() bool {
 		return x.GapTracking
 	}
 	return false
+}
+
+func (x *HealthResponse_Integrity) GetKernelRecords() int64 {
+	if x != nil {
+		return x.KernelRecords
+	}
+	return 0
+}
+
+func (x *HealthResponse_Integrity) GetBadKernelEventId() int64 {
+	if x != nil {
+		return x.BadKernelEventId
+	}
+	return 0
 }
 
 type HealthResponse_Agent struct {
@@ -4844,7 +4860,7 @@ const file_sentient_proto_rawDesc = "" +
 	"\n" +
 	"NamedCount\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05count\x18\x02 \x01(\x03R\x05count\"\x8a\x1d\n" +
+	"\x05count\x18\x02 \x01(\x03R\x05count\"\xe0\x1d\n" +
 	"\x0eHealthResponse\x129\n" +
 	"\n" +
 	"checked_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\tcheckedAt\x12A\n" +
@@ -4905,7 +4921,7 @@ const file_sentient_proto_rawDesc = "" +
 	"\vlast_record\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"lastRecord\x12\x14\n" +
 	"\x05files\x18\x03 \x01(\x03R\x05files\x12\x18\n" +
-	"\aunknown\x18\x04 \x01(\x03R\aunknown\x1a\xa3\x02\n" +
+	"\aunknown\x18\x04 \x01(\x03R\aunknown\x1a\xf9\x02\n" +
 	"\tIntegrity\x129\n" +
 	"\n" +
 	"checked_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\tcheckedAt\x123\n" +
@@ -4914,7 +4930,9 @@ const file_sentient_proto_rawDesc = "" +
 	"\x02ok\x18\x04 \x01(\bR\x02ok\x12\"\n" +
 	"\rbad_record_id\x18\x05 \x01(\x03R\vbadRecordId\x125\n" +
 	"\binterval\x18\x06 \x01(\v2\x19.google.protobuf.DurationR\binterval\x12!\n" +
-	"\fgap_tracking\x18\a \x01(\bR\vgapTracking\x1aK\n" +
+	"\fgap_tracking\x18\a \x01(\bR\vgapTracking\x12%\n" +
+	"\x0ekernel_records\x18\b \x01(\x03R\rkernelRecords\x12-\n" +
+	"\x13bad_kernel_event_id\x18\t \x01(\x03R\x10badKernelEventId\x1aK\n" +
 	"\x05Agent\x12\x14\n" +
 	"\x05agent\x18\x01 \x01(\tR\x05agent\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x12\n" +

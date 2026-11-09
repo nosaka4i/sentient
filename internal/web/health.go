@@ -182,14 +182,25 @@ func newHealthPage(rep *health.Report, now time.Time) healthPage {
 
 	in := rep.Integrity
 	chain := htile{Label: "hash chain", Num: "Not checked yet", NumTxt: true, Wide: true,
-		Sum: "first full check runs at start · then every " + uptime(in.Interval)}
+		Sum: "first full check runs a little after start · then every " + uptime(in.Interval)}
 	switch {
 	case !in.CheckedAt.IsZero() && in.OK:
 		chain.Num, chain.Check = "Verified", true
-		chain.Sum = fmt.Sprintf("last check %s · %s records checked · full check every %s (last %s)",
-			render.Date(in.CheckedAt, now), humanize.Comma(in.Records), uptime(in.Interval), render.Date(in.FullAt, now))
+		checked := humanize.Comma(in.Records) + " agent log records"
+		if in.KernelRecords > 0 {
+			checked += " and " + humanize.Comma(in.KernelRecords) + " kernel events"
+		}
+		chain.Sum = fmt.Sprintf("last check %s · %s checked · full check every %s (last %s)",
+			render.Date(in.CheckedAt, now), checked, uptime(in.Interval), render.Date(in.FullAt, now))
 	case !in.CheckedAt.IsZero():
-		chain.Num = fmt.Sprintf("Broken at record #%d", in.BadRecordID)
+		switch {
+		case in.BadRecordID != 0 && in.BadKernelEventID != 0:
+			chain.Num = fmt.Sprintf("Broken at log record #%d and kernel event #%d", in.BadRecordID, in.BadKernelEventID)
+		case in.BadKernelEventID != 0:
+			chain.Num = fmt.Sprintf("Broken at kernel event #%d", in.BadKernelEventID)
+		default:
+			chain.Num = fmt.Sprintf("Broken at record #%d", in.BadRecordID)
+		}
 		chain.Sum = "a stored record was changed or removed · last check " + render.Date(in.CheckedAt, now)
 	}
 	p.Integrity = []htile{chain,

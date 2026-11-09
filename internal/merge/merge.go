@@ -42,6 +42,7 @@ type Merger struct {
 func (m *Merger) Run(ctx context.Context, interval time.Duration) error {
 	t := time.NewTicker(interval)
 	defer t.Stop()
+	first := true
 	for {
 		select {
 		case <-ctx.Done():
@@ -50,9 +51,20 @@ func (m *Merger) Run(ctx context.Context, interval time.Duration) error {
 			if m.Paused != nil && m.Paused() {
 				continue
 			}
-			if _, err := m.Once(ctx); err != nil && ctx.Err() == nil && m.Log != nil {
-				m.Log.Error("merge log and kernel", "err", err)
+			// The first pass after a start can be long (after an upgrade it looks at
+			// everything again), so it says what it is doing; later ones are silent.
+			began := time.Now()
+			if first && m.Log != nil {
+				m.Log.Info("matching the agent's logged commands with what the kernel saw")
 			}
+			n, err := m.Once(ctx)
+			switch {
+			case err != nil && ctx.Err() == nil && m.Log != nil:
+				m.Log.Error("merge log and kernel", "err", err)
+			case err == nil && first && m.Log != nil:
+				m.Log.Info("matched the agent's commands with kernel activity", "new_links", n, "took", time.Since(began).Round(time.Millisecond))
+			}
+			first = false
 		}
 	}
 }

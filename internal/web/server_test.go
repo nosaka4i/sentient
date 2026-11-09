@@ -194,7 +194,7 @@ func TestDashboard(t *testing.T) {
 		`<span class="flag" title="2 attention items">2</span>`,
 		`<span class="flag" title="1 attention item">1</span>`,
 		`<td class="agent">gemini</td>`, // no icon: the name
-		`v` + version.Version + `</span>`,
+		`v` + version.Version + ` · <a href="https://github.com/nosaka4i/sentient">GitHub</a></span>`,
 		`Copyright &copy; 2026 <a href="https://nosaka.ai">nosaka.ai</a>`,
 		`MIT License`,
 		`<script src="/static/sentient.js"></script>`,

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func openTest(t *testing.T) *Store {
@@ -403,6 +404,100 @@ func TestVerifyChainIncremental(t *testing.T) {
 	st.Close()
 	if _, err := st.VerifyChainFrom(ctx, ChainPoint{}); err == nil {
 		t.Error("want error on closed db")
+	}
+}
+
+func TestVerifyChainReadsInSlicesAndFreesTheConnectionBetweenThem(t *testing.T) {
+	ctx := context.Background()
+	st := openTest(t)
+	tx, _ := st.Begin(ctx)
+	for i := 0; i < 11; i++ {
+		if _, err := tx.AppendRaw(ctx, RawRecord{SourceFile: "f", Type: "user", Record: `{"i":1}`}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	whole, err := st.VerifyChainFrom(ctx, ChainPoint{})
+	if err != nil || whole.Checked != 11 || whole.BadID != 0 {
+		t.Fatalf("one slice = %+v, %v", whole, err)
+	}
+
+	free := 0
+	pace := VerifyPace{Slice: 3, Between: func() {
+		if st.DB.Stats().InUse == 0 {
+			free++
+		}
+	}}
+	sliced, err := st.VerifyChainPaced(ctx, ChainPoint{}, pace)
+	if err != nil || sliced != whole {
+		t.Fatalf("slices = %+v, %v; want the same as one pass %+v", sliced, err, whole)
+	}
+	if free != 3 { // 11 records in slices of 3: the connection is free after each of the first three
+		t.Errorf("the connection was free between %d slices, want 3", free)
+	}
+
+	// a record in a later slice that does not continue the chain is still found
+	dropGuards(t, st)
+	st.DB.Exec(`UPDATE raw_log_records SET prev_hash = 'x' WHERE id = 8`)
+	if bad, _ := st.VerifyChainPaced(ctx, ChainPoint{}, VerifyPace{Slice: 3}); bad.BadID != 8 || bad.Checked != 8 {
+		t.Errorf("tampered in the third slice = %+v", bad)
+	}
+}
+
+func TestAPacedCheckWaitsBetweenSlicesAndStopsWithItsContext(t *testing.T) {
+	ctx := context.Background()
+	st := openTest(t)
+	tx, _ := st.Begin(ctx)
+	for i := 0; i < 7; i++ {
+		tx.AppendKernel(ctx, KernelEvent{ExecID: "e", TS: "2026-11-09T10:00:00.000000000Z", Type: "exec", Payload: "{}"})
+		tx.AppendRaw(ctx, RawRecord{SourceFile: "f", Type: "user", Record: `{"i":1}`})
+	}
+	tx.Commit()
+
+	// 7 records in slices of 3 make two pauses
+	start := time.Now()
+	res, err := st.VerifyChainPaced(ctx, ChainPoint{}, VerifyPace{Slice: 3, Pause: 30 * time.Millisecond})
+	if err != nil || res.Checked != 7 || res.BadID != 0 {
+		t.Fatalf("log chain = %+v, %v", res, err)
+	}
+	if took := time.Since(start); took < 60*time.Millisecond {
+		t.Errorf("two pauses of 30ms took only %v", took)
+	}
+	kres, err := st.VerifyKernelChainPaced(ctx, ChainPoint{}, VerifyPace{Slice: 3, Pause: 30 * time.Millisecond})
+	if err != nil || kres.Checked != 7 || kres.BadID != 0 {
+		t.Fatalf("kernel chain = %+v, %v", kres, err)
+	}
+
+	// cancelling during a pause ends the check at once, with the context's error
+	cctx, cancel := context.WithCancel(ctx)
+	go func() { time.Sleep(20 * time.Millisecond); cancel() }()
+	start = time.Now()
+	if _, err := st.VerifyChainPaced(cctx, ChainPoint{}, VerifyPace{Slice: 3, Pause: time.Hour}); err == nil {
+		t.Error("a cancelled check reported no error")
+	}
+	if _, err := st.VerifyKernelChainPaced(cctx, ChainPoint{}, VerifyPace{Slice: 3, Pause: time.Hour}); err == nil {
+		t.Error("a cancelled kernel check reported no error")
+	}
+	if took := time.Since(start); took > 5*time.Second {
+		t.Errorf("cancelling took %v", took)
+	}
+
+	// a tampered kernel event in a later slice is found
+	dropGuards(t, st)
+	st.DB.Exec(`UPDATE kernel_events SET prev_hash = 'x' WHERE id = 5`)
+	if bad, _ := st.VerifyKernelChainPaced(ctx, ChainPoint{}, VerifyPace{Slice: 3}); bad.BadID != 5 || bad.Checked != 5 {
+		t.Errorf("tampered kernel event = %+v", bad)
+	}
+
+	id, err := st.LastKernelEventID(ctx)
+	if err != nil || id != 7 {
+		t.Errorf("last kernel event = %d, %v", id, err)
+	}
+	st.Close()
+	if _, err := st.LastKernelEventID(ctx); err == nil {
+		t.Error("closed store: no error")
 	}
 }
 

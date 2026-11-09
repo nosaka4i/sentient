@@ -141,15 +141,19 @@ type IngestAgent struct {
 	Unknown    int64     // records of unknown type or unparsable lines
 }
 
-// Integrity is the hash-chain check of raw records.
+// Integrity is the hash-chain check of the agent log records and the kernel
+// events.
 type Integrity struct {
 	CheckedAt   time.Time // last completed check (zero = not yet)
 	FullAt      time.Time // last full (from the first record) check
-	Records     int64     // records verified in the last full check plus increments since
-	OK          bool
-	BadRecordID int64 // first record whose hash doesn't match (when !OK)
-	Interval    time.Duration
-	GapTracking bool // monitor gaps need kernel capture (not yet)
+	Records     int64     // log records verified in the last full check plus increments since
+	OK          bool      // neither chain is broken
+	BadRecordID int64     // first log record whose hash doesn't match (when !OK)
+	// KernelRecords and BadKernelEventID are the same for the kernel events.
+	KernelRecords    int64
+	BadKernelEventID int64
+	Interval         time.Duration
+	GapTracking      bool // monitor gaps need kernel capture (not yet)
 }
 
 // Capture is what sentient records of the kernel's events
@@ -207,9 +211,16 @@ func (r *Report) Warnings() []Warning {
 		})
 	}
 	if r.Integrity.CheckedAt.After(time.Time{}) && !r.Integrity.OK {
+		why := "A stored agent log record was changed or removed after it was written."
+		switch {
+		case r.Integrity.BadRecordID != 0 && r.Integrity.BadKernelEventID != 0:
+			why = "A stored agent log record and a stored kernel event were changed or removed after they were written."
+		case r.Integrity.BadKernelEventID != 0:
+			why = "A stored kernel event was changed or removed after it was written."
+		}
 		w = append(w, Warning{Critical: true, Headline: "Integrity check failed",
 			What: "Hash chain broken",
-			Why:  "A stored agent log record was changed or removed after it was written.",
+			Why:  why,
 		})
 	}
 	for _, u := range r.Sudo.Passwordless {

@@ -1,10 +1,13 @@
 package merge
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -393,6 +396,73 @@ func TestRunStopsWithContext(t *testing.T) {
 	cancel()
 	if err := <-done; err != nil {
 		t.Fatal(err)
+	}
+}
+
+// logBuf is a log destination that Run's goroutine and the test can both use.
+type logBuf struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (l *logBuf) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *logBuf) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
+}
+
+func TestTheFirstPassSaysWhatItIsDoingAndLaterOnesAreSilent(t *testing.T) {
+	f := newFixture(t)
+	buf := &logBuf{}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	m := &Merger{St: f.st, Log: slog.New(slog.NewTextHandler(buf, nil))}
+	go func() { done <- m.Run(ctx, 5*time.Millisecond) }()
+	deadline := time.Now().Add(10 * time.Second)
+	for !strings.Contains(buf.String(), "matched the agent's commands with kernel activity") {
+		if time.Now().After(deadline) {
+			t.Fatalf("no summary:\n%s", buf.String())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	time.Sleep(60 * time.Millisecond) // several more passes
+	cancel()
+	<-done
+	out := buf.String()
+	if strings.Count(out, "matching the agent's logged commands with what the kernel saw") != 1 || strings.Count(out, "matched the agent's commands") != 1 ||
+		!strings.Contains(out, "new_links=0") || !strings.Contains(out, "took=") {
+		t.Errorf("log:\n%s", out)
+	}
+	if strings.Index(out, "matching the agent's") > strings.Index(out, "matched the agent's") {
+		t.Errorf("order:\n%s", out)
+	}
+}
+
+func TestAFailedFirstPassIsAnErrorNotASummary(t *testing.T) {
+	f := newFixture(t)
+	f.st.DB.Close()
+	buf := &logBuf{}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	m := &Merger{St: f.st, Log: slog.New(slog.NewTextHandler(buf, nil))}
+	go func() { done <- m.Run(ctx, 5*time.Millisecond) }()
+	deadline := time.Now().Add(10 * time.Second)
+	for !strings.Contains(buf.String(), "merge log and kernel") {
+		if time.Now().After(deadline) {
+			t.Fatalf("no error logged:\n%s", buf.String())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	cancel()
+	<-done
+	if strings.Contains(buf.String(), "matched the agent's commands") {
+		t.Errorf("a failed pass was summarized:\n%s", buf.String())
 	}
 }
 

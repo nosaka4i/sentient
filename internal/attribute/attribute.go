@@ -77,6 +77,7 @@ type Attributor struct {
 func (a *Attributor) Run(ctx context.Context, interval time.Duration) error {
 	t := time.NewTicker(interval)
 	defer t.Stop()
+	first := true
 	for {
 		select {
 		case <-ctx.Done():
@@ -85,9 +86,18 @@ func (a *Attributor) Run(ctx context.Context, interval time.Duration) error {
 			if a.Paused != nil && a.Paused() {
 				continue
 			}
-			if _, err := a.Once(ctx); err != nil && ctx.Err() == nil && a.Log != nil {
-				a.Log.Error("attribute processes", "err", err)
+			began := time.Now()
+			if first && a.Log != nil {
+				a.Log.Info("tying kernel processes to the agent's sessions and prompts")
 			}
+			n, err := a.Once(ctx)
+			switch {
+			case err != nil && ctx.Err() == nil && a.Log != nil:
+				a.Log.Error("attribute processes", "err", err)
+			case err == nil && first && a.Log != nil:
+				a.Log.Info("tied kernel processes to the agent's sessions", "newly_tied", n, "took", time.Since(began).Round(time.Millisecond))
+			}
+			first = false
 		}
 	}
 }

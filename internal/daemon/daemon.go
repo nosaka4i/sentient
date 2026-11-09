@@ -81,7 +81,15 @@ type Config struct {
 	// IntegrityInterval is how often the full hash-chain check runs
 	// (default hourly).
 	IntegrityInterval time.Duration
-	Logger            *slog.Logger
+	// How hard the full check works, so it stays a background task
+	// (docs/integrity-check.md): it reads IntegritySlice records at a time (default
+	// 2,000), lets go of the database and waits IntegrityPause, and the first full
+	// check waits IntegrityStartDelay after the start. The zero values (no pause,
+	// no delay) are for tests; sentientd's flags default to gentler ones.
+	IntegritySlice      int
+	IntegrityPause      time.Duration
+	IntegrityStartDelay time.Duration
+	Logger              *slog.Logger
 	// Ready, if set, is closed once the socket is listening.
 	Ready chan<- struct{}
 }
@@ -142,6 +150,9 @@ func Run(ctx context.Context, cfg Config) error {
 	}
 	if cfg.IntegrityInterval <= 0 {
 		cfg.IntegrityInterval = time.Hour
+	}
+	if cfg.IntegritySlice < 0 || cfg.IntegrityPause < 0 || cfg.IntegrityStartDelay < 0 {
+		return errors.New("--integrity-slice, --integrity-pause and --integrity-start-delay must not be negative")
 	}
 
 	level, err := policy.ParseVerbosity(string(cfg.Verbosity))

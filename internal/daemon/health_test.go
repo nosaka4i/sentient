@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -52,6 +54,159 @@ func TestHealthReportCarriesTheCollector(t *testing.T) {
 }
 
 var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
+
+func TestTheIntegrityCheckCoversTheKernelEventsAndStaysQuietWithoutThem(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	rawN := func(n int) {
+		tx, _ := st.Begin(ctx)
+		for i := 0; i < n; i++ {
+			tx.AppendRaw(ctx, store.RawRecord{SourceFile: "f", Type: "user", Record: "{}"})
+		}
+		tx.Commit()
+	}
+	kernelN := func(n int) {
+		tx, _ := st.Begin(ctx)
+		for i := 0; i < n; i++ {
+			tx.AppendKernel(ctx, store.KernelEvent{ExecID: "e", TS: "2026-11-09T10:00:00.000000000Z", Type: "exec", Payload: "{}"})
+		}
+		tx.Commit()
+	}
+	var buf bytes.Buffer
+	clock := time.Unix(1000, 0)
+	in := &integrity{st: st, now: func() time.Time { return clock }, interval: time.Hour, log: slog.New(slog.NewTextHandler(&buf, nil)),
+		pace: store.VerifyPace{Slice: 2}}
+
+	// agent logs only: no kernel events, so nothing is said about them
+	rawN(3)
+	in.full(ctx)
+	if s := in.state(); !s.OK || s.Records != 3 || s.KernelRecords != 0 {
+		t.Fatalf("log only: %+v", s)
+	}
+	if strings.Contains(buf.String(), "kernel") {
+		t.Errorf("the log mentions kernel events with none stored:\n%s", buf.String())
+	}
+
+	// with kernel events, both chains are checked and said so
+	kernelN(5)
+	buf.Reset()
+	in.full(ctx)
+	if s := in.state(); !s.OK || s.Records != 3 || s.KernelRecords != 5 {
+		t.Fatalf("both: %+v", s)
+	}
+	for _, want := range []string{"checking that the stored kernel events are unchanged (hash chain)", "kernel events verified: none changed or removed", "events=5"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("log lacks %q:\n%s", want, buf.String())
+		}
+	}
+
+	// the cheap check on a page load counts what was added to either
+	kernelN(2)
+	rawN(1)
+	clock = clock.Add(time.Minute)
+	in.incremental(ctx)
+	if s := in.state(); !s.OK || s.Records != 4 || s.KernelRecords != 7 {
+		t.Errorf("after the incremental check: %+v", s)
+	}
+
+	// a changed kernel event breaks the check, whichever pass finds it
+	st.DB.Exec(`DROP TRIGGER kernel_events_no_update`)
+	st.DB.Exec(`UPDATE kernel_events SET prev_hash = 'x' WHERE id = 4`)
+	buf.Reset()
+	in.full(ctx)
+	if s := in.state(); s.OK || s.BadKernelEventID != 4 || s.BadRecordID != 0 {
+		t.Errorf("tampered kernel event: %+v", s)
+	}
+	if !strings.Contains(buf.String(), "HASH CHAIN BROKEN: a kernel event was changed or removed") || strings.Contains(buf.String(), "kernel events verified") {
+		t.Errorf("log:\n%s", buf.String())
+	}
+	clock = clock.Add(time.Minute)
+	in.incremental(ctx) // a failure stands until the next full check
+	if s := in.state(); s.OK {
+		t.Errorf("incremental cleared a kernel failure: %+v", s)
+	}
+}
+
+func TestTheFirstFullCheckWaitsAndStopsWithItsContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	st, err := store.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	in := &integrity{st: st, now: time.Now, interval: time.Hour, log: quiet, startDelay: time.Hour}
+	done := make(chan struct{})
+	go func() { in.loop(ctx); close(done) }()
+	time.Sleep(30 * time.Millisecond)
+	if s := in.state(); !s.CheckedAt.IsZero() {
+		t.Errorf("a full check ran during the start delay: %+v", s)
+	}
+	cancel() // stopped while waiting: no check at all
+	<-done
+	if s := in.state(); !s.CheckedAt.IsZero() {
+		t.Errorf("a full check ran after the stop: %+v", s)
+	}
+
+	// a short delay: the check runs after it
+	in2 := &integrity{st: st, now: time.Now, interval: time.Hour, log: quiet, startDelay: 20 * time.Millisecond}
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	done2 := make(chan struct{})
+	go func() { in2.loop(ctx2); close(done2) }()
+	deadline := time.Now().Add(5 * time.Second)
+	for in2.state().CheckedAt.IsZero() {
+		if time.Now().After(deadline) {
+			t.Fatal("the first check never ran")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	cancel2()
+	<-done2
+}
+
+func TestRunRefusesNegativeIntegritySettings(t *testing.T) {
+	for _, c := range []Config{{IntegritySlice: -1}, {IntegrityPause: -time.Second}, {IntegrityStartDelay: -time.Second}} {
+		c.DataDir, c.Socket, c.Logger = t.TempDir(), filepath.Join(t.TempDir(), "s.sock"), quiet
+		if err := Run(context.Background(), c); err == nil || !strings.Contains(err.Error(), "must not be negative") {
+			t.Errorf("%+v: err = %v", c, err)
+		}
+	}
+}
+
+func TestTheIntegrityCheckSaysWhatItIsDoing(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	tx, _ := st.Begin(ctx)
+	for i := 0; i < 4; i++ {
+		tx.AppendRaw(ctx, store.RawRecord{SourceFile: "f", Type: "user", Record: "{}"})
+	}
+	tx.Commit()
+	var buf bytes.Buffer
+	in := &integrity{st: st, now: time.Now, interval: time.Hour, log: slog.New(slog.NewTextHandler(&buf, nil))}
+
+	in.full(ctx)
+	out := buf.String()
+	if !strings.Contains(out, "checking that the stored agent log records are unchanged (hash chain)") ||
+		!strings.Contains(out, "agent log records verified: none changed or removed") || !strings.Contains(out, "records=4") || !strings.Contains(out, "took=") {
+		t.Errorf("log:\n%s", out)
+	}
+
+	// a broken chain is reported as an error, not as verified
+	buf.Reset()
+	st.DB.Exec(`DROP TRIGGER raw_log_records_no_update`)
+	st.DB.Exec(`UPDATE raw_log_records SET record = '{"x":1}' WHERE id = 2`)
+	in.full(ctx)
+	if strings.Contains(buf.String(), "verified") || !strings.Contains(buf.String(), "HASH CHAIN BROKEN") {
+		t.Errorf("tampered:\n%s", buf.String())
+	}
+}
 
 func TestParseVmRSS(t *testing.T) {
 	n, ok := parseVmRSS([]byte("Name:\tsentientd\nVmPeak:\t 900 kB\nVmRSS:\t   31000 kB\n"))

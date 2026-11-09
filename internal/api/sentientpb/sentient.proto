@@ -427,6 +427,8 @@ message HealthResponse {
     int64 bad_record_id = 5;
     google.protobuf.Duration interval = 6;
     bool gap_tracking = 7;
+    int64 kernel_records = 8;        // kernel events verified
+    int64 bad_kernel_event_id = 9;   // first kernel event whose hash doesn't match
   }
   Integrity integrity = 7;
 

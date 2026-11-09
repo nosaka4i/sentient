@@ -111,7 +111,7 @@ func TestHealthOverSocket(t *testing.T) {
 		Storage: health.Storage{DataDir: "d", DBPath: "d/x.db", DBBytes: 1, FreeBytes: 2, SizeBytes: 3,
 			HighPct: 80, LowPct: 70, Paused: true, PausedSince: time.Date(2026, 11, 2, 14, 2, 0, 0, time.UTC), UsedPct: 81},
 		Ingest:     []health.IngestAgent{{Agent: "claude", Files: 2, Unknown: 1}},
-		Integrity:  health.Integrity{Records: 5, OK: true, Interval: time.Hour, BadRecordID: 0},
+		Integrity:  health.Integrity{Records: 5, OK: true, Interval: time.Hour, BadRecordID: 0, KernelRecords: 9, BadKernelEventID: 0},
 		Agents:     []health.Agent{{Agent: "claude", Version: "2.0", Logs: "~/.claude/projects"}},
 		Live:       []health.LiveSession{{SessionID: "s", Agent: "claude", Repo: "r", LastActivity: time.Date(2026, 10, 17, 11, 0, 0, 0, time.UTC)}},
 		Sudo:       health.Sudo{Checked: true, Passwordless: []string{"ubuntu"}},
@@ -133,7 +133,7 @@ func TestHealthOverSocket(t *testing.T) {
 		!reflect.DeepEqual(got.Ingest, want.Ingest) || !reflect.DeepEqual(got.Agents, want.Agents) ||
 		!reflect.DeepEqual(got.Live, want.Live) || !reflect.DeepEqual(got.Sudo, want.Sudo) || !reflect.DeepEqual(got.Capture, want.Capture) ||
 		!got.CheckedAt.Equal(want.CheckedAt) || !got.HistoryBegins.IsZero() || got.CatchingUp != want.CatchingUp || !reflect.DeepEqual(got.Collector, want.Collector) ||
-		got.Integrity.Records != 5 || !got.Integrity.OK || got.Integrity.Interval != time.Hour || !got.Integrity.CheckedAt.IsZero() {
+		got.Integrity.Records != 5 || got.Integrity.KernelRecords != 9 || !got.Integrity.OK || got.Integrity.Interval != time.Hour || !got.Integrity.CheckedAt.IsZero() {
 		t.Errorf("round trip:\n got %+v\nwant %+v", got, want)
 	}
 	// The server adds its own traffic: the three Health calls so far
