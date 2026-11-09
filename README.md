@@ -33,10 +33,14 @@ Manual steps for now; a package or `sen install` can come later.
    tar -xzf sentient_${v}_${os}_${arch}.tar.gz sentientd.service && mv sentientd.service deploy/
    ```
 
-   Then carry on from step 3 (Linux). The binaries are not signed. Fetching
-   with `curl` as above does not trigger macOS's quarantine; if you download
-   in a browser instead, clear it with
-   `xattr -d com.apple.quarantine sen sentientd`.
+   Then carry on from step 3 (Linux). The binaries are not signed or
+   notarized. Fetching with `curl` as above does not trigger macOS's
+   quarantine. If you download in a browser instead, the first run shows
+   "Apple could not verify sen is free of malware" (the dialog can sit behind
+   the terminal, so the command looks stuck). Click Done, not Move to Trash,
+   and clear the flag from the unpacked folder:
+   `xattr -dr com.apple.quarantine .`
+   (or System Settings, Privacy & Security, Open Anyway, once per binary).
 
    **On a Mac** there is no kernel collector yet, so sentientd runs in agent
    logs only mode: a view of what the agent says it did, with nothing

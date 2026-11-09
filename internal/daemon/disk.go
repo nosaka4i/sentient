@@ -26,24 +26,24 @@ const lowBelowHigh = 5
 const diskCheckEvery = 15 * time.Second
 
 // closeStaleGaps ends the gaps the last run left open (a crash, or a stop while
-// paused) at the time this run starts.
-func closeStaleGaps(ctx context.Context, st *store.Store, now time.Time, log *slog.Logger) error {
+// paused) at the time this run starts, and returns how many there were.
+func closeStaleGaps(ctx context.Context, st *store.Store, now time.Time, log *slog.Logger) (int64, error) {
 	tx, err := st.Begin(ctx)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer tx.Rollback()
 	n, err := tx.CloseOpenGaps(ctx, dbtime.Format(now))
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if err := tx.Commit(); err != nil {
-		return err
+		return 0, err
 	}
 	if n > 0 {
 		log.Info("closed gaps the last run left open", "count", n)
 	}
-	return nil
+	return n, nil
 }
 
 // diskUsage is the free space available to sentientd, the size of the

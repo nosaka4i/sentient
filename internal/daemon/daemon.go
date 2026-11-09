@@ -176,7 +176,8 @@ func Run(ctx context.Context, cfg Config) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	// Gaps the last run left open end now: nothing watched while it was down.
-	if err := closeStaleGaps(ctx, st, time.Now(), log); err != nil {
+	staleClosed, err := closeStaleGaps(ctx, st, time.Now(), log)
+	if err != nil {
 		return err
 	}
 
@@ -189,6 +190,17 @@ func Run(ctx context.Context, cfg Config) error {
 	var capt *capture
 	if cfg.Tetragon != "" {
 		if capt, err = startCapture(ctx, st, cfg, policy.SystemEnv(), time.Now(), log); err != nil {
+			return err
+		}
+	}
+
+	// The time sentientd itself was down becomes a gap, and from here on it
+	// records that it is watching (docs/heartbeat.md). Only with a collector: in
+	// agent logs only mode a gap in kernel coverage means nothing.
+	var hb *heartbeat
+	if cfg.Tetragon != "" {
+		hb = newHeartbeat(st, tetragon.Name, log)
+		if err := hb.start(ctx, staleClosed); err != nil {
 			return err
 		}
 	}
@@ -227,7 +239,8 @@ func Run(ctx context.Context, cfg Config) error {
 			Sink: &collector.FilterSink{Sink: buffered, Level: capt.level, Noise: capt.noise}}
 		att := &attribute.Attributor{St: st, Log: log, Paused: guard.Paused, IsAgent: func(b string) bool { return policy.IsAgent(agents, b) }}
 		mrg := &merge.Merger{St: st, Log: log, Paused: guard.Paused}
-		wg.Add(4)
+		wg.Add(5)
+		go func() { defer wg.Done(); hb.run(ctx) }()
 		go func() { defer wg.Done(); errc <- buffered.Run(ctx) }()
 		go func() { defer wg.Done(); errc <- coll.Run(ctx, sink) }()
 		go func() { defer wg.Done(); errc <- att.Run(ctx, attributeInterval) }()
@@ -241,6 +254,9 @@ func Run(ctx context.Context, cfg Config) error {
 	}
 	cancel()
 	wg.Wait()
+	if hb != nil {
+		hb.stop() // after the last beat, so nothing marks the stop as not clean
+	}
 	if first != nil && !errors.Is(first, context.Canceled) {
 		return first
 	}

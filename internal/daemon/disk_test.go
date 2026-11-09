@@ -360,8 +360,8 @@ func TestStaleGapsAreClosedWhenSentientdStarts(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(&logs, nil))
 
 	// none open: nothing to say
-	if err := closeStaleGaps(ctx, st, time.Now(), log); err != nil || logs.Len() != 0 {
-		t.Fatalf("no gaps: %v, %q", err, logs.String())
+	if n, err := closeStaleGaps(ctx, st, time.Now(), log); err != nil || n != 0 || logs.Len() != 0 {
+		t.Fatalf("no gaps: %d, %v, %q", n, err, logs.String())
 	}
 	tx, _ := st.Begin(ctx)
 	tx.OpenGap(ctx, store.Gap{Collector: "sentientd", StartedAt: "2026-11-02T14:00:00.000000000Z", Reason: "disk 81% used: recording paused"})
@@ -371,8 +371,8 @@ func TestStaleGapsAreClosedWhenSentientdStarts(t *testing.T) {
 	tx.Commit()
 
 	now := time.Date(2026, 11, 2, 15, 0, 0, 0, time.UTC)
-	if err := closeStaleGaps(ctx, st, now, log); err != nil {
-		t.Fatal(err)
+	if n, err := closeStaleGaps(ctx, st, now, log); err != nil || n != 2 {
+		t.Fatalf("closed %d, %v; want 2", n, err)
 	}
 	got := gaps(t, st)
 	if got[0][2] != "2026-11-02T15:00:00.000000000Z" || got[1][2] != "2026-11-02T15:00:00.000000000Z" || got[2][2] != "2026-11-02T13:30:00.000000000Z" {
@@ -382,7 +382,7 @@ func TestStaleGapsAreClosedWhenSentientdStarts(t *testing.T) {
 		t.Errorf("log:\n%s", logs.String())
 	}
 	st.Close()
-	if err := closeStaleGaps(ctx, st, now, log); err == nil {
+	if _, err := closeStaleGaps(ctx, st, now, log); err == nil {
 		t.Error("closed store: no error")
 	}
 }

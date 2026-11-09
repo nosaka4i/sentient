@@ -110,6 +110,20 @@ func TestKernelCaptureCardIdleAndGapEnds(t *testing.T) {
 	wantAll(t, body, `none in the last minute`, `still open`, `…`)
 }
 
+func TestKernelCaptureCardWordsTheGapSentientdWasStopped(t *testing.T) {
+	c := tetragonUp()
+	c.Latest = health.GapNote{Set: true, From: now.Add(-3 * time.Hour), To: now.Add(-3*time.Hour + 29*time.Minute), Reason: health.StoppedReason}
+	body := captureBody(t, withCollector(c))
+	wantAll(t, body, `latest: sentientd was stopped around `, ` · back `)
+	wantNone(t, body, `latest: sentientd was stopped ·`)
+
+	// still open (it should not be, but a reader must not be told it is back)
+	c.Latest.Open = true
+	body = captureBody(t, withCollector(c))
+	wantAll(t, body, `latest: sentientd was stopped · since `, `still open`)
+	wantNone(t, body, `around `)
+}
+
 func TestKernelCaptureCardCountsWhatSentientLoses(t *testing.T) {
 	c := tetragonUp()
 	c.QueueWaiting, c.Lost, c.Reconnects = 3, 4, 1

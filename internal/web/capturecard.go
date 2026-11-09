@@ -219,6 +219,11 @@ func gapsTile(rep *health.Report, now time.Time) htile {
 		if g.Open {
 			when = "since " + render.Date(g.From, now) + ", still open"
 		}
+		if g.Reason == health.StoppedReason && !g.Open {
+			// "around": after a crash the gap starts up to a beat early (docs/heartbeat.md)
+			t.Sum = "latest: " + g.Reason + " around " + render.Date(g.From, now) + " · back " + render.Date(g.To, now)
+			break
+		}
 		t.Sum = "latest: " + trunc(g.Reason, 60) + " · " + when
 	}
 	return t

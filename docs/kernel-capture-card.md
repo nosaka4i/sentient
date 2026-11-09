@@ -1,6 +1,6 @@
 # The Kernel capture card
 
-**Status:** built: `internal/collector/status.go` (what a collector reports about itself), `internal/collector/tetragon/client.go` (the Tetragon collector fills it in), `internal/query/collector.go` (what the database holds), `internal/web/capturecard.go` and `web/templates/health.html` (the card), `internal/health/health.go` (the warning). Mock: `.mocks/health-05.html`. Not built: a collector for macOS or Windows (the card is designed for them, see "One card for every platform"), the heartbeat that records when sentientd itself was down (undecided), and Tetragon's own lost-event counters. Backlog `3ffc94f`.
+**Status:** built: `internal/collector/status.go` (what a collector reports about itself), `internal/collector/tetragon/client.go` (the Tetragon collector fills it in), `internal/query/collector.go` (what the database holds), `internal/web/capturecard.go` and `web/templates/health.html` (the card), `internal/health/health.go` (the warning). Mock: `.mocks/health-05.html`. Not built: a collector for macOS or Windows (the card is designed for them, see "One card for every platform"), and Tetragon's own lost-event counters. Backlog `3ffc94f`.
 
 The one Health card that answers "is the kernel side of sentient working?". It replaces the two cards (Capture and Collector) that the first mocks had, which both said "off" when there was no collector and both carried the policy.
 
@@ -43,7 +43,7 @@ sentientd works without a kernel collector, as a nicer view of the agent's own l
 
 ## Known limits
 
-- **A gap is only recorded while sentientd runs.** While sentientd is down no gap is written, so the gaps tile does not count that downtime and the agent's actions in it look unverified. The heartbeat that fixes this is next (backlog).
+- **The time sentientd itself was down is a gap, written at the next start** from a heartbeat that sentientd keeps while a collector runs ([heartbeat.md](heartbeat.md), backlog `38e8dec`). After a crash the gap starts up to 30 seconds early; the latest-gap line reads "sentientd was stopped around ...". Downtime from before the heartbeat existed is not recorded.
 - **"Processes tracked" and "events stored since"** are all-time, from the database, so they include history from before the last restart.
 - **While the database is busy** (a start after a long import) the database-backed tiles read "still counting", and a notice says sentientd is processing logs since the last startup (backlog `42c435d`).
 

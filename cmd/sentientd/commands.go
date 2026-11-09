@@ -28,6 +28,10 @@ func newRootCmd() *cobra.Command {
 		SilenceErrors: true,
 		Args:          cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// A log pipe that closes first (Ctrl-C also ends the `tee` it is piped
+			// through) must not kill the daemon on its next log line: a write then
+			// fails quietly, and the clean stop is still recorded.
+			signal.Ignore(syscall.SIGPIPE)
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
 			cfg.Logger = slog.New(slog.NewTextHandler(cmd.ErrOrStderr(), nil))

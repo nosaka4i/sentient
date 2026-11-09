@@ -277,6 +277,17 @@ CREATE TRIGGER capture_levels_no_update BEFORE UPDATE ON capture_levels
 CREATE TRIGGER capture_levels_no_delete BEFORE DELETE ON capture_levels
 	BEGIN SELECT RAISE(ABORT, 'capture_levels is append-only'); END;
 `,
+	// 13: when sentientd last saw a collector's kernel being watched, one row per
+	// collector (docs/heartbeat.md). Monitoring state, not evidence: it is
+	// updated in place, and at the next start the time between it and now is
+	// recorded as a gap.
+	`
+CREATE TABLE heartbeat (
+	collector TEXT PRIMARY KEY,
+	seen_at   TEXT NOT NULL,
+	clean     INTEGER NOT NULL DEFAULT 0                -- 1 once sentientd stopped on purpose
+);
+`,
 }
 
 // SchemaVersion is the version the code expects.

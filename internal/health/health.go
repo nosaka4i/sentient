@@ -67,6 +67,11 @@ type Collector struct {
 	Latest         GapNote   // the most recent gap
 }
 
+// StoppedReason is the reason of the gap sentientd writes for the time it was
+// not running (docs/heartbeat.md). The Health card words that gap as "sentientd
+// was stopped around ..." by matching it.
+const StoppedReason = "sentientd was stopped"
+
 // GapNote is one gap in kernel coverage.
 type GapNote struct {
 	Set    bool // false when there has been no gap

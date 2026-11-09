@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"os/signal"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/nosaka4i/sentient/internal/version"
@@ -29,6 +31,18 @@ func TestRunReportsStartupError(t *testing.T) {
 	cmd.SetArgs([]string{"--data-dir", "/proc/nope", "--socket", "/proc/nope/s.sock", "--home", "/nonexistent"})
 	if err := cmd.Execute(); err == nil {
 		t.Fatal("want error for unwritable data dir")
+	}
+}
+
+func TestARunIgnoresABrokenLogPipe(t *testing.T) {
+	cmd := newRootCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"--data-dir", "/proc/nope", "--socket", "/proc/nope/s.sock", "--home", "/nonexistent"})
+	cmd.Execute() // fails at startup, after the signals are set up
+	if !signal.Ignored(syscall.SIGPIPE) {
+		t.Error("SIGPIPE is not ignored: a closed log pipe would kill the daemon before it records a clean stop")
 	}
 }
 
