@@ -120,7 +120,7 @@ sentient build       # make build (bin/sen, bin/sentientd)
 sentient install     # make install (into $GOBIN)
 sentient sentientd   # the daemon, unprivileged, agent logs only (no kernel capture)
 sentient kernel      # the daemon as root with --tetragon (SENTIENT_VERBOSITY=essential|extended|complete)
-sentient serve       # the web UI on 127.0.0.1:7357 (SENTIENT_ADDR to change)
+sentient serve       # the web UI on 127.0.0.1:7357 (SENTIENT_ADDR to change); finds the daemon from sentientd or kernel
 ```
 
 On a Mac use `sentientd` and `serve`; `kernel` needs Tetragon, which is

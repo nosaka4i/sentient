@@ -81,12 +81,18 @@ case "$SERVICE" in
 
   serve)
     need_bin sen
-    if [ ! -S "$SOCKET" ]; then
-      echo "sentientd isn't running (no socket at $SOCKET) — start it first: $0 sentientd" >&2
+    # The unprivileged daemon's socket, or else the kernel daemon's (see "kernel").
+    KSOCK="${SENTIENT_KERNEL_DIR:-$DEV_DIR/kdata}/s.sock"
+    if [ -S "$SOCKET" ]; then
+      SERVE_SOCKET="$SOCKET"
+    elif [ -S "$KSOCK" ]; then
+      SERVE_SOCKET="$KSOCK"
+    else
+      echo "sentientd isn't running (no socket at $SOCKET or $KSOCK) — start it first: $0 sentientd or $0 kernel" >&2
       exit 1
     fi
     cd "$REPO_ROOT"
-    bin/sen serve --addr "$ADDR" --socket "$SOCKET" 2>&1 | tee -a "$LOG_DIR/serve.log"
+    bin/sen serve --addr "$ADDR" --socket "$SERVE_SOCKET" 2>&1 | tee -a "$LOG_DIR/serve.log"
     ;;
 
   *)
