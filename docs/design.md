@@ -357,7 +357,7 @@ internal/rules/     alerts and severity
 internal/render/    CLI tables
 internal/web/       HTTP API, embedded frontend assets
 web/                frontend source (later)
-macos/              Swift ES/NE collector (later)
+apps/mac/           Swift ES/NE collector (later; prototype in apps/mac/prototype)
 deploy/             systemd unit, Tetragon TracingPolicy
 testdata/           fixtures: Tetragon captures, Claude Code sessions
 ```
