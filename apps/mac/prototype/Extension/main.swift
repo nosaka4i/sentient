@@ -136,6 +136,13 @@ func handle(_ msg: UnsafePointer<es_message_t>) {
         }
         emit(rec)
 
+    case ES_EVENT_TYPE_NOTIFY_OPEN:
+        guard agentPids.contains(pid) else { return }
+        rec["type"] = "open"
+        rec["path"] = filePath(m.event.open.file)
+        rec["flags"] = m.event.open.fflag
+        emit(rec)
+
     default:
         return
     }
@@ -151,7 +158,7 @@ guard result == ES_NEW_CLIENT_RESULT_SUCCESS, let client = client else {
 let events: [es_event_type_t] = [
     ES_EVENT_TYPE_NOTIFY_EXEC, ES_EVENT_TYPE_NOTIFY_FORK, ES_EVENT_TYPE_NOTIFY_EXIT,
     ES_EVENT_TYPE_NOTIFY_CREATE, ES_EVENT_TYPE_NOTIFY_WRITE, ES_EVENT_TYPE_NOTIFY_CLOSE,
-    ES_EVENT_TYPE_NOTIFY_UNLINK, ES_EVENT_TYPE_NOTIFY_RENAME,
+    ES_EVENT_TYPE_NOTIFY_UNLINK, ES_EVENT_TYPE_NOTIFY_RENAME, ES_EVENT_TYPE_NOTIFY_OPEN,
 ]
 if es_subscribe(client, events, UInt32(events.count)) != ES_RETURN_SUCCESS {
     NSLog("sentient-es: es_subscribe failed")

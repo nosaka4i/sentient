@@ -1,10 +1,10 @@
-# macOS kernel collector: brief
+# Mac kernel collector: brief
 
 **Status:** brainstorm, not yet decided. Requirements and design come after this; no code before them. Backlog `fec08b8` (collector), `346867d` (entitlement), `710d18f` (signing and release).
 
 ## Problem
 
-On Linux, sentient compares what the agent's log says with what the kernel saw (Tetragon). On macOS it runs in agent logs only mode: the pages show what the agent reported, with no kernel evidence. A Mac user who wants the independent record has nothing. Most of the owner's own coding sessions are on a Mac.
+On Linux, sentient compares what the agent's log says with what the kernel saw (Tetragon). On the Mac it runs in agent logs only mode: the pages show what the agent reported, with no kernel evidence. A Mac user who wants the independent record has nothing. Most of the owner's own coding sessions are on a Mac.
 
 ## What changed
 
@@ -18,7 +18,7 @@ A Mac with sentient installed shows the same kernel evidence as Linux: the agent
 
 - Endpoint Security (ES) is an Apple C/Swift API. A program that uses it must be signed with the entitlement and run as root; the user approves it once and grants Full Disk Access.
 - ES has process (exec, fork, exit) and file (create, write, close, unlink, rename) events. It has **no network events**; those need a separate Network Extension with its own capability.
-- The collector interface (`internal/collector`: `Collector`, `Status`, the store sink, the gate, the buffer) is already platform-neutral. Only Tetragon implements it today; the macOS one would be the second.
+- The collector interface (`internal/collector`: `Collector`, `Status`, the store sink, the gate, the buffer) is already platform-neutral. Only Tetragon implements it today; the Mac one would be the second.
 - Agent filtering has to happen in our own code: ES selects by event type, not by process tree. Same job as the Linux collector's tree-keeping.
 - The Claude desktop app bundles Claude Code under `~/Library/Application Support/Claude/claude-code/<version>/`, and some users have no `claude` on PATH (backlog `a5fc746`), so the agent binary match is a list of path patterns.
 - The Mac's VPN makes Claude sessions unstable there, so testing cannot rely on long real sessions.
@@ -37,7 +37,7 @@ Calls ES directly, packaged in a signed bundle. No socket, no second process. St
 
 A signed, notarized `.pkg` containing:
 
-- `Sentient.app`: a small Swift host app with the system extension inside `Contents/Library/SystemExtensions/`. On first launch it asks macOS to install the extension; the user approves it in System Settings and grants Full Disk Access.
+- `Sentient.app`: a small Swift host app with the system extension inside `Contents/Library/SystemExtensions/`. On first launch it asks the system to install the extension; the user approves it in System Settings and grants Full Disk Access.
 - `sentientd` and `sen`, signed with the same Developer ID.
 - A launchd plist in `/Library/LaunchDaemons/` that starts `sentientd` as root at boot.
 
@@ -45,12 +45,30 @@ A `.pkg`, not a dmg, because the launchd daemon needs root to install. Homebrew 
 
 ## Scope options
 
-1. **Endpoint Security only first (recommended).** Processes and files. Health shows "network: not captured on macOS yet". Least to sign and approve; evidence sooner.
+1. **Endpoint Security only first (recommended).** Processes and files. Health shows "network: not captured on the Mac yet". Least to sign and approve; evidence sooner.
 2. Endpoint Security plus a Network Extension content filter from the start. More capability and approval, more to test.
 
 ## What I cannot do from the Linux box
 
 Build, sign or run the Swift side, or see real ES output. The Go side (socket reader, normalizer, tree filter, tests) builds and tests here. The owner builds the extension in Xcode and runs it on the Mac; real captures come back as fixtures. Distribution signing waits for the distribution profile.
+
+## First real capture (2026-11-12)
+
+The prototype ([../../apps/mac/prototype/](../../apps/mac/prototype/)) ran on the owner's Mac (Xcode 27.2, individual team, extension approved, Full Disk Access on). Workload: the bundled Claude Code 2.1.281 driven by a local model (`gpt-oss:20b` on Ollama on the LAN Windows PC), a few prompts in a scratch folder. 11,376 events, 3 MB, in `.claudetmp/es-experiment/es-1.jsonl` (not committed).
+
+What it shows:
+
+- **The chain works end to end,** with the development entitlement: signed extension, approval, Endpoint Security client, agent filter, output file. The filter (executable path contains `/claude-code/`, then fork/exec descendants) kept the agent's tree and nothing else.
+- **Event mix:** close 5,841 (only 1,269 with `modified: true`), write 3,216, create 1,027, unlink 947, exec 114, fork 99, exit 100, rename 32. Close and write are the volume.
+- **Noise to drop:** 2,420 of the writes are to `/dev/ttys001` (the terminal), 32 to `/dev/null`. Claude's own state is the next layer: `~/.claude.json.lock`, `~/.claude/projects/.../*.jsonl`, `~/.claude/shell-snapshots/`, `~/.claude/sessions/*.json`, `history.jsonl.lock`, `/private/tmp/claude-<uid>/.../tasks/*.output`. Same idea as the Linux plumbing rules (`internal/background`).
+- **Shell commands are visible as children:** the agent's `zsh` and its children (`git`, `rg`, `ioreg`, `ps`, `grep`, `uname`, `security`, `gh`). git appears twice per call (the `/usr/bin/git` shim and the Command Line Tools git behind it).
+- **The outside-the-repo write is captured.** The model wrote `/tmp/outside-test.txt` from a shell (`/bin/zsh`, child of the agent): `write` and `close modified:true`, path `/private/tmp/outside-test.txt`. **Mac paths need normalizing:** `/tmp` is `/private/tmp`, so matching the agent log's `/tmp/...` to the kernel's path means resolving the symlink. It also created a git repo under `/private/tmp/test-repo`, outside the project folder, which the model chose itself.
+- **Credential reads show up, which the log does not say:** Claude Code ran `security find-generic-password -s "Claude Code-credentials"` (and `-s "Claude Code"`), `security find-generic-password -s gh:github.com`, and `gh auth token`. These are Claude Code's own start-up behavior (its login and GitHub integration), but they are exactly the kind of evidence sentient is for, and a rule should treat keychain and token reads by an agent as notable.
+- **Other start-up noise:** `ps aux | grep` for IDE processes (IDE detection), `ioreg -rd1 -c IOPlatformExpertDevice` (machine id), `rg --files`, `git ls-files`.
+- **Not captured, as expected:** network (no Endpoint Security events for it) and file reads (not subscribed; `open` was left out).
+- **Volume is mostly not evidence:** about 4,500 `close` events with `modified:false` (every file the agent read) and 2,420 terminal writes. One Claude process produced 7,102 of the 11,376 events over about 14 minutes and two launches. Keep `close` only when `modified:true`, drop the tty.
+
+**Next milestone (decided 2026-11-12): network.** Endpoint Security has no connect events (only Unix socket ones). The plan is a Network Extension content filter (`NEFilterDataProvider`) as a second system extension, giving flows with the process attached. To check: the capability and whether the current approval covers it. Stopgap: poll `nettop` or `lsof -i` and attribute by pid (misses short connections). Packet capture is out, since it cannot name the process. Until then Health says "network: not captured on the Mac yet".
 
 ## Open questions
 

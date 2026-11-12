@@ -1,6 +1,6 @@
 # Endpoint Security prototype (throwaway)
 
-**Status:** spike, not the real collector. It exists to produce real Endpoint Security events from an agent session on the Mac (shapes, volume, where the process tree starts). The real extension comes after the requirements ([../../../docs/ideas/macos-collector.md](../../../docs/ideas/macos-collector.md)). Written without being built or run: expect a few compile fixes.
+**Status:** spike, not the real collector. It exists to produce real Endpoint Security events from an agent session on the Mac (shapes, volume, where the process tree starts). The real extension comes after the requirements ([../../../docs/ideas/mac-collector.md](../../../docs/ideas/mac-collector.md)). Written without being built or run: expect a few compile fixes.
 
 ## What it does
 

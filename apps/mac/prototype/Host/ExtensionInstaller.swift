@@ -6,8 +6,9 @@
 //     ...
 //     WindowGroup { ContentView().onAppear { installer.activate() } }
 //
-// The extension's bundle id must be <host bundle id>.extension.
+// The extension's bundle id must start with the host's bundle id (any suffix).
 
+import Combine
 import Foundation
 import SystemExtensions
 
@@ -16,7 +17,16 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
     @Published var status = "not requested"
 
     func activate() {
-        let id = (Bundle.main.bundleIdentifier ?? "") + ".extension"
+        // Find the embedded extension (Contents/Library/SystemExtensions/*.systemextension)
+        // and use its own bundle id, whatever it is named.
+        let dir = Bundle.main.bundleURL.appendingPathComponent("Contents/Library/SystemExtensions")
+        let items = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+        guard let ext = items.first(where: { $0.pathExtension == "systemextension" }),
+              let id = Bundle(url: ext)?.bundleIdentifier else {
+            NSLog("sentient-host: no embedded system extension found in %@", dir.path)
+            status = "no embedded system extension found"
+            return
+        }
         NSLog("sentient-host: activating %@", id)
         status = "requesting \(id)"
         let req = OSSystemExtensionRequest.activationRequest(forExtensionWithIdentifier: id, queue: .main)
