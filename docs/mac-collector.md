@@ -47,18 +47,19 @@ On Linux sentient compares what the agent's log says with what the kernel saw (T
 15. **What the user installs:** a signed, notarized `.pkg` with `Sentient.app` (a small Swift host app that asks the system to install the extension), the extension, `sentientd`, `sen` and a launchd plist that starts `sentientd` as root. The user approves the extension in System Settings and grants it Full Disk Access once. Sentient installs nothing else.
 16. **A missing approval is shown, not silent.** If the extension is not approved, not running, or lacks Full Disk Access (the client fails to start), Health says so plainly and records a gap. The first run of the prototype showed this failure is easy to hit: the extension was enabled but did nothing until Full Disk Access was on.
 17. **`sentientd` runs as root under launchd** with the data directory root-owned and the default homes covering `/Users/*`, as on Linux. The current tarball stays for agent logs only mode.
-18. **Distribution is outside the Mac App Store,** under the owner's individual Developer ID. Users see the owner's personal name as the publisher in Gatekeeper and in the approval prompt; the README says so. How to remove it (extension and app) is documented.
+18. **One version for the whole product.** The Mac app and extension carry the same `major.minor.patch` as `sen` and `sentientd` (the Version field; `internal/version` is the source), and the Build number rises on every build, because macOS replaces an extension only when its version or build is newer (found in the prototype: a rebuild with the same build number installed nothing).
+19. **Distribution is outside the Mac App Store,** under the owner's individual Developer ID. Users see the owner's personal name as the publisher in Gatekeeper and in the approval prompt; the README says so. How to remove it (extension and app) is documented.
 
 ### Accounting and honesty
 
-19. **The accounting keeps adding up** (`AgentLog = Confirmed + Unverified + NotChecked + Pending + NotCompared`), with the same gap rules.
-20. **Never claim more than was checked.** Network and file reads are not captured, and Health says so. The pages say "the command ran" and "the file was written", not more.
-21. **Agent logs only mode still works** on the Mac, with no marks, exactly as today.
+20. **The accounting keeps adding up** (`AgentLog = Confirmed + Unverified + NotChecked + Pending + NotCompared`), with the same gap rules.
+21. **Never claim more than was checked.** Network and file reads are not captured, and Health says so. The pages say "the command ran" and "the file was written", not more.
+22. **Agent logs only mode still works** on the Mac, with no marks, exactly as today.
 
 ### Quality
 
-22. **Tests.** The Go side is tested from fixtures made from the real capture (user name and paths made generic, no real work) at 70% coverage or above per package. The Swift side has a short build-and-run checklist, and the build steps are documented, since it can only be built on a Mac.
-23. **Docs:** how to build, sign, install and approve it, and how to read a capture.
+23. **Tests.** The Go side is tested from fixtures made from the real capture (user name and paths made generic, no real work) at 70% coverage or above per package. The Swift side has a short build-and-run checklist, and the build steps are documented, since it can only be built on a Mac.
+24. **Docs:** how to build, sign, install and approve it, and how to read a capture.
 
 ## Acceptance
 

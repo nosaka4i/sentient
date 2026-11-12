@@ -68,6 +68,13 @@ What it shows:
 - **Not captured, as expected:** network (no Endpoint Security events for it) and file reads (not subscribed; `open` was left out).
 - **Volume is mostly not evidence:** about 4,500 `close` events with `modified:false` (every file the agent read) and 2,420 terminal writes. One Claude process produced 7,102 of the 11,376 events over about 14 minutes and two launches. Keep `close` only when `modified:true`, drop the tty.
 
+Second capture (`es-2.jsonl`, 10,688 events in about 11 minutes, same three prompts, extension build 1.0/2):
+
+- **No `open` events arrived,** so the build that ran did not subscribe to them (the Xcode copy of `main.swift` was missing the `open` case and array entry); the read-volume measurement is still to do.
+- **The agent's own file edit is a temp file plus a rename.** Claude Code's write tool created `/private/tmp/outside-test.txt.tmp.<pid>.<hex>`, wrote it, then renamed it to `/private/tmp/outside-test.txt`. A kernel match for "the agent wrote this file" must therefore look at the destination of a `rename`, not only at writes to the final path.
+- **Other processes are attributed by their own executable:** the Python script that wrote `data.txt` ran as the Homebrew `Python.app` (not the shell), and `/bin/rm` unlinked it. Both are children of the agent's tree and were captured.
+- **Volume:** close 6,764, write 3,138, create 192, exec 165, exit 146, fork 145, unlink 91, rename 47. Close and write are still the bulk.
+
 **Next milestone (decided 2026-11-12): network.** Endpoint Security has no connect events (only Unix socket ones). The plan is a Network Extension content filter (`NEFilterDataProvider`) as a second system extension, giving flows with the process attached. To check: the capability and whether the current approval covers it. Stopgap: poll `nettop` or `lsof -i` and attribute by pid (misses short connections). Packet capture is out, since it cannot name the process. Until then Health says "network: not captured on the Mac yet".
 
 ## Open questions

@@ -4,3 +4,10 @@
 /dist/
 /logs/
 *.swp
+
+# Mac / Xcode: per-user state and build output, never the project itself
+.DS_Store
+xcuserdata/
+*.xcuserstate
+DerivedData/
+apps/mac/**/build/
