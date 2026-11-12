@@ -64,7 +64,7 @@
       "build-settings": {
         "CODE_SIGN_ENTITLEMENTS[sdk=*]": "Untitled Project/Host.entitlements",
         "CODE_SIGN_STYLE": "Automatic",
-        "CURRENT_PROJECT_VERSION": "2",
+        "CURRENT_PROJECT_VERSION": "3",
         "DEVELOPMENT_TEAM": "RYJT9BBCQ8",
         "ENABLE_APP_SANDBOX": "YES",
         "ENABLE_PREVIEWS": "YES",
@@ -109,7 +109,7 @@
       "build-settings": {
         "CODE_SIGN_ENTITLEMENTS": "SentientES/SentientES.entitlements",
         "CODE_SIGN_STYLE": "Automatic",
-        "CURRENT_PROJECT_VERSION": "2",
+        "CURRENT_PROJECT_VERSION": "3",
         "DEVELOPMENT_TEAM": "RYJT9BBCQ8",
         "ENABLE_HARDENED_RUNTIME": "YES",
         "GENERATE_INFOPLIST_FILE": "YES",
