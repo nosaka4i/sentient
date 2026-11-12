@@ -48,6 +48,14 @@ status() {
 
 case "$CMD" in
   build)
+    # xcode-select may point at the command line tools; use the Xcode app for this command only.
+    if [ -z "${DEVELOPER_DIR:-}" ]; then
+      XCODE_APP="$(ls -d /Applications/Xcode*.app 2>/dev/null | sort | tail -1)"
+      if [ -n "$XCODE_APP" ]; then
+        export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
+      fi
+    fi
+    echo "using ${DEVELOPER_DIR:-the active developer directory}"
     xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Debug -allowProvisioningUpdates build
     ;;
   install)
