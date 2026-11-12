@@ -4,11 +4,11 @@
 # Not tested on a Mac when written: if a step fails, paste its output.
 #
 # Usage:
-#   tools/dev/mac.sh build      # xcodebuild the host app and the extension (Debug)
-#   tools/dev/mac.sh install    # copy the newest build to /Applications, open it, show status
-#   tools/dev/mac.sh status     # extension version/state, process, capture file size
-#   tools/dev/mac.sh reset      # move the current capture aside (sudo) so the next one starts clean
-#   tools/dev/mac.sh capture    # scp the capture and the Claude session logs to the Linux box
+#   tools/dev/sentientes.sh build      # xcodebuild the host app and the extension (Debug)
+#   tools/dev/sentientes.sh install    # copy the newest build to /Applications, open it, show status
+#   tools/dev/sentientes.sh status     # extension version/state, process, capture file size
+#   tools/dev/sentientes.sh reset      # move the current capture aside (sudo) so the next one starts clean
+#   tools/dev/sentientes.sh capture    # scp the capture and the Claude session logs to the Linux box
 #
 # Remember: bump CURRENT_PROJECT_VERSION in the project (the Linux side does it) or
 # macOS keeps the old extension running. `status` prints the running version.
@@ -39,10 +39,13 @@ status() {
   systemextensionsctl list | grep -i sentient || echo "(not installed)"
   echo "== process"
   ps aux | grep -i '[S]entientES' || echo "(not running)"
-  echo "== capture file"
-  ls -l "$CAPTURE" 2>/dev/null || echo "(no $CAPTURE)"
-  if [ -f "$CAPTURE" ]; then
-    echo "lines: $(wc -l < "$CAPTURE")   open events: $(grep -c '"type":"open"' "$CAPTURE" || true)"
+  echo "== capture file (newest of $CAPTURE*)"
+  LATEST="$(ls -t "$CAPTURE"* 2>/dev/null | head -1)"
+  if [ -n "$LATEST" ]; then
+    ls -l "$LATEST"
+    echo "lines: $(wc -l < "$LATEST")   open events: $(grep -c '"type":"open"' "$LATEST" || true)"
+  else
+    echo "(no $CAPTURE*)"
   fi
 }
 
@@ -90,7 +93,14 @@ case "$CMD" in
     ;;
   capture)
     TS="$(date +%Y%m%d-%H%M%S)"
-    scp "$CAPTURE" "$REMOTE:$REMOTE_DIR/es-$TS.jsonl"
+    # The extension keeps writing into a renamed file (see reset), so send the newest one.
+    LATEST="$(ls -t "$CAPTURE"* 2>/dev/null | head -1)"
+    if [ -z "$LATEST" ]; then
+      echo "no capture file under $CAPTURE*" >&2
+      exit 1
+    fi
+    echo "sending $LATEST"
+    scp "$LATEST" "$REMOTE:$REMOTE_DIR/es-$TS.jsonl"
     scp "$HOME"/.claude/projects/-Users-*-cctest/*.jsonl "$REMOTE:$REMOTE_DIR/"
     echo "sent es-$TS.jsonl and the cctest session logs to $REMOTE:$REMOTE_DIR"
     ;;
