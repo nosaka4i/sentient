@@ -16,7 +16,7 @@ On Linux sentient compares what the agent's log says with what the kernel saw (T
 ## Not goals
 
 - **Network capture.** Endpoint Security has no connect events. Next milestone: a Network Extension content filter (backlog `cd35122`). Until then Health says "network: not captured on the Mac yet".
-- **File reads.** Not subscribed in this version (`open`); a sensitive-files watchlist is later.
+- **File contents.** Only paths and open flags are recorded, never what a file contained.
 - Intel Macs, the Mac App Store (Endpoint Security cannot be sandboxed), MDM deployment and pre-approved profiles, an organization developer account (the project is open source and not a company).
 - Other agents on the Mac (Codex and others use the same collector once their log side exists; see [multi-agent-support.md](multi-agent-support.md)).
 
@@ -24,10 +24,10 @@ On Linux sentient compares what the agent's log says with what the kernel saw (T
 
 ### The extension (Swift)
 
-1. **Notify events only, never authorization.** Subscribe to exec, fork, exit, create, write, close, unlink and rename. The extension cannot block anything, and must never hold up the system.
+1. **Notify events only, never authorization.** Subscribe to exec, fork, exit, create, write, close, unlink, rename and open. The extension cannot block anything, and must never hold up the system.
 2. **Know which processes are the agent.** A list of agent executable paths, kept in one place and extendable without a code change: the Claude desktop app's bundled Claude Code (`~/Library/Application Support/Claude/claude-code/<version>/claude.app/Contents/MacOS/claude`, matched by prefix, because the version is in the path) and CLI installs. Same idea as the Linux agent paths.
 3. **Keep only the agent's tree.** A process whose executable matches is a root; its fork and exec descendants are kept, and removed on exit. Only events of the agent tree leave the extension (the prototype did this and it worked). Whether the tree is kept in the extension or in `sentientd` is a design question.
-4. **Drop what is not evidence, at the source.** A `close` is kept only when the file was modified. Writes to terminals (`/dev/tty*`) and `/dev/null` are dropped. In the first capture these were about 7,000 of 11,376 events. Dropped events are counted, not silently lost.
+4. **Drop what is not evidence, at the source.** A `close` is not kept at all (reads are recorded by `open` instead, and writes by `write`, `create` and `rename`). Writes to terminals (`/dev/tty*`) and `/dev/null` are dropped. `open` is kept, with its read or write flag, except for noise locations: system libraries and binaries (`/System`, `/usr`, `/Library`, `/dev`, `/bin`, `/opt/homebrew`), the agent's own state under `~/.claude`, and caches. In the third capture, of 3,806 opens in about 8.5 minutes, 2,068 were system paths and 586 the agent's own state; the project folder was 691. Sensitive paths (keychains, `~/.ssh`, `.env`, cloud and token files) are always kept, whatever the noise rules say. Muting is done in the kernel by path prefix where Endpoint Security allows it. Dropped events are counted, not silently lost.
 5. **Each event carries** a sequence number, a timestamp, the pid and the process-instance version (a pid can be reused), the parent pid, the executable path, and for exec the full argv; for file events the path (and the destination for a rename).
 6. **Send to `sentientd` over a Unix socket under a root-only path,** one JSON record per line, with a schema version. The extension reconnects when the daemon restarts. If the daemon is not listening, the extension buffers a bounded amount and then drops and counts; it never grows without limit.
 7. **Report drops and its own state.** Gaps in the sequence numbers are drops, and a start and stop marker lets the daemon record when the extension was not running.
@@ -70,12 +70,13 @@ Run the scratch experiment (a prompt or two in a scratch folder with the real Cl
 1. **Where the process tree is kept:** in the extension (fewer events cross the socket; as the prototype did) or in `sentientd` (one place for the logic, shared with Tetragon). Leaning extension.
 2. **Whether the current entitlement covers distribution signing,** or a second request is needed. Only the developer account can show it.
 3. **Whether the Network Extension needs a separate approval,** and whether it is one extension with the Endpoint Security one or two.
-4. **Whether to subscribe to opens for a watchlist** of sensitive paths (`~/.ssh`, keychain files) to see credential reads that do not go through the `security` command.
+4. **The exact noise list for opens** (decided in principle, 2026-11-12: reads are in the first version, system paths and the agent's own state muted, sensitive paths always kept; see requirement 4). Open: the precise prefixes, whether muting can be done in the kernel for all of them, and how the list is extended per machine, as `sen policy` does on Linux.
 5. **Capture levels on the Mac:** what `extended` and `complete` mean for Endpoint Security (which events), beyond the filter above.
 6. **Minimum system version and architecture:** Apple silicon only (the owner's Mac is an M2) or also Intel, and the oldest macOS supported.
 
 ## Related
 
+- [mac-collector-design.md](mac-collector-design.md): the design that implements these requirements.
 - [ideas/mac-collector.md](ideas/mac-collector.md): the brief, the decisions, and the first real capture.
 - [ideas/test-environments.md](ideas/test-environments.md): how agent workload reaches the Mac (local model through Ollama, the rented Mac option).
 - [design.md](design.md) (macOS collector section), [tetragon-integration.md](tetragon-integration.md), [kernel-capture-card.md](kernel-capture-card.md), [rules.md](rules.md), [capture-verbosity.md](capture-verbosity.md).

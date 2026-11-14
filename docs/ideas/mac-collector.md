@@ -75,6 +75,13 @@ Second capture (`es-2.jsonl`, 10,688 events in about 11 minutes, same three prom
 - **Other processes are attributed by their own executable:** the Python script that wrote `data.txt` ran as the Homebrew `Python.app` (not the shell), and `/bin/rm` unlinked it. Both are children of the agent's tree and were captured.
 - **Volume:** close 6,764, write 3,138, create 192, exec 165, exit 146, fork 145, unlink 91, rename 47. Close and write are still the bulk.
 
+Third capture (`es-3.jsonl`, build 1.0/3, now with `open`): 3,806 `open` events in about 8.5 minutes of one session (the file also holds the second capture, 21,933 events in total).
+
+- **Where the opens go:** system paths (`/System`, `/usr`, `/Library`, `/dev`, `/opt/homebrew`) 2,068 (54%), the agent's own state under `~/.claude` 586 (15%), the project folder 691 (18%), `/private/tmp` 119 (3%), the rest (git config, `.CFUserTextEncoding`, and so on) about 340. Muting system paths and the agent's state would cut about 70%, leaving roughly 1,100 opens for the session, which is manageable.
+- **Sensitive reads are visible as opens:** `~/Library/Keychains/login.keychain-db` and `/Library/Keychains/System.keychain` were each opened 12 times (by the `security` command). The kernel sees the file read even where the command line says nothing about it.
+- **`flags` is the raw BSD open flags,** so read versus write is `flags & 3` (1 read, 2 write, 3 both); the high bits are close-on-exec and similar. Most were reads (the largest groups: 1, 16908293, 1048577, 16777217, 17825793, with 160 read-write).
+- **The renamed capture file:** the extension keeps writing into a file after it is renamed, so rotation by renaming does not start a new file until the extension restarts. The dev script sends the newest `sentient-es.jsonl*`.
+
 **Next milestone (decided 2026-11-12): network.** Endpoint Security has no connect events (only Unix socket ones). The plan is a Network Extension content filter (`NEFilterDataProvider`) as a second system extension, giving flows with the process attached. To check: the capability and whether the current approval covers it. Stopgap: poll `nettop` or `lsof -i` and attribute by pid (misses short connections). Packet capture is out, since it cannot name the process. Until then Health says "network: not captured on the Mac yet".
 
 ## Open questions
