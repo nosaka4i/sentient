@@ -72,7 +72,7 @@ Run the scratch experiment (a prompt or two in a scratch folder with the real Cl
 3. **Whether the Network Extension needs a separate approval,** and whether it is one extension with the Endpoint Security one or two.
 4. **The exact noise list for opens** (decided in principle, 2026-11-12: reads are in the first version, system paths and the agent's own state muted, sensitive paths always kept; see requirement 4). Open: the precise prefixes, whether muting can be done in the kernel for all of them, and how the list is extended per machine, as `sen policy` does on Linux.
 5. **Capture levels on the Mac:** what `extended` and `complete` mean for Endpoint Security (which events), beyond the filter above.
-6. **Minimum system version and architecture:** Apple silicon only (the owner's Mac is an M2) or also Intel, and the oldest macOS supported.
+6. **Minimum system version and architecture (decided by the owner, 2026-11-14):** macOS 26 and Apple silicon only for now; older versions later.
 
 ## Related
 

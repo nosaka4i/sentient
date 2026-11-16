@@ -1,0 +1,1 @@
+Run "go test ./..." and tell me how many packages passed.

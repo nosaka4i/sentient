@@ -101,8 +101,9 @@ case "$CMD" in
     fi
     echo "sending $LATEST"
     scp "$LATEST" "$REMOTE:$REMOTE_DIR/es-$TS.jsonl"
-    scp "$HOME"/.claude/projects/-Users-*-cctest/*.jsonl "$REMOTE:$REMOTE_DIR/"
-    echo "sent es-$TS.jsonl and the cctest session logs to $REMOTE:$REMOTE_DIR"
+    # Session logs of any project folder touched in the last 2 hours (the run may not be in cctest).
+    find "$HOME/.claude/projects" -name '*.jsonl' -mmin -120 -exec scp {} "$REMOTE:$REMOTE_DIR/" \;
+    echo "sent es-$TS.jsonl and the recent session logs to $REMOTE:$REMOTE_DIR"
     ;;
   *)
     echo "usage: $0 {build|install|status|reset|capture}" >&2

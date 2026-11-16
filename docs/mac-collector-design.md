@@ -34,9 +34,11 @@ A system extension (the prototype's `SentientES` target) with a small host app t
 3. **Keep the agent's tree.** A process whose executable path starts with an agent prefix is a root; fork and exec descendants are followed; an exit ends it. Only events of the tree leave the extension (the prototype did exactly this).
 4. **Send**, one JSON line per event, to `sentientd` over a Unix socket (below), counting what it drops.
 
-**Process identity.** A pid is reused, so the extension builds an `exec_id` from the pid, the process's pid version (from the audit token) and its start time: `es:<pid>:<pidversion>:<start>`. The Go side stores it as `store.Process.ExecID`, with `ParentExecID` from the parent's pid and version.
+**The extension does no normalization.** It sends the fields almost as ES gave them (event names, paths verbatim, raw open flags, pid, pid version and start time as separate fields) and applies only what `config` tells it: the agent prefixes, the tree it keeps (the one piece of logic, a set of pids; without it every process on the Mac would cross the socket) and the kernel mutes. All normalization is in `sentientd`.
 
-**Write coalescing.** A program writing a file in many small writes would produce thousands of events for one change. The extension reports the first write to a path by a process and a count when the process closes or exits that file; the exact rule is an open question.
+**Process identity.** A pid is reused, so the extension sends the pid, the process's pid version (from the audit token) and its start time as separate fields. The Go side builds `exec_id` as `es:<pid>:<pidversion>:<start>`, stores it as `store.Process.ExecID`, and builds `ParentExecID` from the parent's pid and version.
+
+**Write coalescing.** A program writing a file in many small writes would produce many events for one change. The extension sends them all; `sentientd` collapses repeated writes by one process to one path into one stored event with a count, per capture level (open question 3, decided).
 
 ### The socket and its messages
 
@@ -45,11 +47,24 @@ A system extension (the prototype's `SentientES` target) with a small host app t
 - `hello`: the extension's version and build, the macOS version, a boot id, and the result of `es_new_client` (success, or the failure code). **This is how Health learns about a missing Full Disk Access:** the extension connects and says `es_new_client` failed with the not-permitted code, then exits, instead of dying silently.
 - `config` (daemon to extension, in reply): the agent prefixes, the noise prefixes for the configured capture level and the sensitive-path list. The extension keeps the last config in memory and has a built-in default for a first boot with no daemon. Agent paths therefore live in one place, the Go side.
 - `exec`, `exit`, `file` (with `op`: create, write, unlink, rename, open; `path`; `path2` for a rename; `flags` for an open), carrying the sequence number, the time, the `exec_id` and the process fields.
+- `ping`: every few seconds, with the latest ES sequence numbers; no `ping` for longer than the timeout is a gap.
 - `stats`: counts of dropped events by reason, so a drop is visible (requirement 4) and the sequence numbers are checked for jumps.
+
+**No disk writes by default.** The production extension never writes events to a file (the prototype did, for the first captures). The only path is the socket, and the only copy on disk is what `sentientd` stores as events. A debug switch in `sentientd` (off by default) can record the raw stream to a file, to make fixtures or investigate a problem.
+
+**Crashes and restarts.**
+- *Extension crashes:* macOS restarts system extensions (to be confirmed by killing it on the Mac). The daemon sees the socket close and opens a `monitor_gap`; Health shows "not running" until the next `hello`. The restarted extension has lost its tree, so agents that were already running are unknown until they exec again: the gap stays open for them and nothing is claimed about them. Whether the extension can rebuild the tree from the running process list at start is an open question.
+- *`sentientd` restarts:* the extension reconnects, buffers a bounded amount and counts drops beyond it; the sequence numbers show the gap.
+- *Heartbeats:* there is one heartbeat table, in `sentientd` ([heartbeat.md](heartbeat.md)), with a row for the Mac collector; it covers the daemon being down. The extension writes nothing to disk, so its heartbeat is a `ping` message on the socket every few seconds carrying its sequence numbers. A closed socket opens a gap at once; a socket that stays open but stops pinging (a hung extension) opens one after a timeout. ES numbers its own events (`seq_num`, `global_seq_num`), the extension forwards them, and a jump means ES dropped events. A ping shows the extension is alive, not that ES is delivering; the ES numbers cover that.
+- *Reboot:* the heartbeat ([heartbeat.md](heartbeat.md)) covers the daemon, and the extension's `hello` carries a boot id.
+
+**macOS versions.** Apple's event structures never reach Go: the extension flattens each event into our JSON with a schema version, and the Go side ignores unknown fields. What varies by macOS version is which ES calls exist (target-path muting is newer than the nine events we subscribe to; without it the extension drops those events itself), and behaviour (paths, firmlinks, how `zsh` is launched, Rosetta). `hello` reports the macOS version and the ES message version, so every capture says what produced it. A minimum version is set (open question 4), and other versions are covered by fixtures from users' captures, since the owner can test only one.
 
 JSON lines, not protobuf, for the same reason the store keeps `KernelEvent.Payload` verbatim as JSON: it is readable with `tail` and `jq`, a capture is a fixture as it is, and the volume is small once the noise is cut.
 
 ### The Go side (`internal/collector/<es>`)
+
+**Code layout across platforms.** `internal/collector` holds the neutral parts; each platform is a sibling package: `tetragon/` (Linux, gRPC `GetEvents` with protobuf messages), the Mac package (Unix socket, JSON lines), and a Windows one later. The Mac package imports no Apple code, so it builds and tests on Linux with no build tags or cgo. `cmd/sentientd` chooses the collector from a flag and `runtime.GOOS`; build tags (`_darwin.go`, `_linux.go`) are only for code that cannot compile elsewhere, such as launchd or service startup. Platform differences in shared code (path rules, plumbing rules, default homes) are data or functions chosen by the collector, not scattered `GOOS` checks.
 
 A package implementing `collector.Collector` (`Name`, `Run(ctx, sink)`). It owns the socket server, decodes the lines, and maps them to the `Sink` calls the Tetragon normalizer makes (`tetragon/normalize.go`):
 
@@ -103,13 +118,14 @@ Same pairing as Linux (`internal/merge/merge.go`), with the Mac's shapes:
 
 ## Open questions
 
-1. **Names.** The package (`internal/collector/es`?), the collector name stored in `processes.collector` (it is `tetragon` or `eslogger` today), the `sentientd` flag, and the Mac noise-list file. For the owner.
-2. **Agent list when the daemon is not connected:** a built-in default in the extension, or capture nothing until the first `config`. Leaning built-in, since a boot with no daemon must not lose evidence.
-3. **Write coalescing rule:** first write plus a count on close or exit, or a fixed time window per path.
-4. **Kernel muting reach:** whether target-prefix muting covers `open` for every prefix on the minimum macOS, and the oldest macOS supported.
+1. **Names (decided by the owner, 2026-11-14).** Package `internal/collector/es`; collector name stored in `processes.collector`: `endpointsecurity`; `sentientd` flag `--endpoint-security`; the extension and its bundle `SentientES`, with `sentientes` for scripts and paths; the future network extension `SentientNet` (placeholder). The Mac noise list is Go code beside `policy.systemNoise`, delivered in `config`; there is no policy file in v1, and a user-customizable policy for advanced users is backlog `9e99919`.
+2. **Agent list when the daemon is not connected (decided by the owner, 2026-11-14):** v1 has a built-in default in the extension, used only until the first `config`; the daemon's list is authoritative and changes with a `sentientd` restart, not an extension rebuild. Later, when `sentientd` gets a config file (backlog `9e99919`), the agent list comes from it, and the extension saves the last `config` to a small file (not evidence) so a boot with no daemon still uses the user's list; the built-in copy then shrinks to a first-boot default.
+3. **Write coalescing (decided by the owner, 2026-11-14):** in `sentientd`, not the extension. The extension sends every write; the daemon collapses repeated writes by the same process to the same path into one stored event with a count, according to the capture level (`complete` can keep every write). Reasons: the level decides how much detail to keep, and a rule change is a daemon restart, not an extension rebuild and possible re-approval. After the terminal writes are muted, the captures held only about 700 real file writes in 11 minutes, so the extra volume is small; question 5 measures a heavy workload. The extension keeps only the tree and the kernel mutes.
+4. **Minimum macOS (decided by the owner, 2026-11-14):** macOS 26 only for now, Apple silicon only; older versions can be added later, each one tested or covered by fixtures from users. Kernel muting by target path is therefore always available. Still to confirm on a real 26 build: that target-prefix muting covers `open` for every prefix in the noise list.
 5. **How many opens are left on a heavy workload** (a build or a test run). The three captures were small; one realistic run decides whether cache directories need muting too (backlog item for it).
 6. **Several users:** ES sees every user's processes; the tree filter only keeps agents, and attribution ties them to a session by cwd and time as on Linux, but a second logged-in user running an agent has not been tried.
 7. **Sensitive paths:** the list, and whether it is shared with Linux's "never filtered" classes.
+8. **Tree after an extension restart:** rebuild it from the running process list at start, or leave the gap open for agents already running.
 
 ## Related
 

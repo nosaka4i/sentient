@@ -12,7 +12,7 @@ The owner is behind the Great Firewall. Claude Code, Codex and Gemini CLI cannot
 |---|---|---|---|
 | Linux box (AWS, ssh, 2 GB RAM) | Claude Code, Codex (both run here today), Tetragon | yes | Linux kernel capture, log ingesters, all Go development |
 | Mac (M2, 24 GB) | Xcode, `eslogger`, Endpoint Security extension, Ollama | no, or unstable | Mac collector (the thing to build) |
-| Windows PC (LAN, 256 GB RAM, RTX 5070 12 GB) | Ollama server | n/a (local) | candidate model server for the Mac, on the same network |
+| Windows PC (LAN, 256 GB RAM, RTX 5070 12 GB) | Ollama server | n/a (local) | used for the first captures (`gpt-oss:20b`); dropped 2026-11-15 for the Mac's own Ollama (it sleeps, and the owner dislikes developing on Windows); kept only for models too big for the Mac (`gpt-oss:120b`) |
 
 The Linux box cannot capture Mac events, and the Mac cannot drive a real agent. Everything below is about closing that gap.
 
