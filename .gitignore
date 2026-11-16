@@ -11,3 +11,4 @@ xcuserdata/
 *.xcuserstate
 DerivedData/
 apps/mac/**/build/
+tools/dev/agent-standin

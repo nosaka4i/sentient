@@ -1,0 +1,18 @@
+{"v":1,"t":"hello","seq":1,"ts_sec":1794640800,"ext":"1.0","build":"4","macos":"26.0","es_version":8,"boot_id":"b1","es_client":"ok"}
+{"v":1,"t":"exec","seq":2,"ts_sec":1794640830,"ts_nsec":853109593,"pid":6258,"pidver":1,"ppid":6232,"ppidver":1,"start":1794640830,"uid":501,"exe":"/Users/dev/Library/Application Support/Claude/claude-code/2.1.281/claude.app/Contents/MacOS/claude","args":["/Users/dev/Library/Application Support/Claude/claude-code/2.1.281/claude.app/Contents/MacOS/claude","--model","gpt-oss:20b"],"cwd":"/Users/dev/cctest"}
+{"v":1,"t":"fork","seq":3,"ts_sec":1794640831,"pid":6301,"pidver":1,"ppid":6258,"ppidver":1,"start":1794640831}
+{"v":1,"t":"exec","seq":4,"ts_sec":1794640831,"ts_nsec":5,"pid":6301,"pidver":2,"ppid":6258,"ppidver":1,"start":1794640831,"uid":501,"exe":"/bin/zsh","args":["/bin/zsh","-c","source /Users/dev/.claude/shell-snapshots/snapshot-zsh-1.sh && eval 'python3 write_data.py && rm data.txt' < /dev/null && pwd -P >| /tmp/claude-501-cwd"],"cwd":"/Users/dev/cctest"}
+{"v":1,"t":"fork","seq":5,"ts_sec":1794640832,"pid":6310,"pidver":1,"ppid":6301,"ppidver":2,"start":1794640832}
+{"v":1,"t":"file","seq":6,"ts_sec":1794640832,"ts_nsec":10,"pid":6310,"pidver":1,"ppid":6301,"ppidver":2,"op":"write","path":"/Users/dev/cctest/data.txt"}
+{"v":1,"t":"exec","seq":7,"ts_sec":1794640832,"ts_nsec":20,"pid":6310,"pidver":2,"ppid":6301,"ppidver":2,"start":1794640832,"uid":501,"exe":"/opt/homebrew/Cellar/python@3.14/3.14.0/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python","args":["python3","write_data.py"],"cwd":"/Users/dev/cctest"}
+{"v":1,"t":"file","seq":8,"ts_sec":1794640832,"ts_nsec":30,"pid":6310,"pidver":2,"op":"create","path":"/Users/dev/cctest/data.txt"}
+{"v":1,"t":"file","seq":9,"ts_sec":1794640832,"ts_nsec":40,"pid":6310,"pidver":2,"op":"open","path":"/Users/dev/cctest/write_data.py","flags":1}
+{"v":1,"t":"file","seq":10,"ts_sec":1794640832,"ts_nsec":50,"pid":6310,"pidver":2,"op":"open","path":"/Users/dev/cctest/data.txt","flags":3}
+{"v":1,"t":"exit","seq":11,"ts_sec":1794640833,"pid":6310,"pidver":2,"status":0}
+{"v":1,"t":"file","seq":12,"ts_sec":1794640834,"pid":6258,"pidver":1,"op":"create","path":"/private/tmp/outside-test.txt.tmp.6258.ab12"}
+{"v":1,"t":"file","seq":13,"ts_sec":1794640834,"ts_nsec":1,"pid":6258,"pidver":1,"op":"rename","path":"/private/tmp/outside-test.txt.tmp.6258.ab12","path2":"/private/tmp/outside-test.txt"}
+{"v":1,"t":"file","seq":14,"ts_sec":1794640835,"pid":6258,"pidver":1,"op":"unlink","path":"/Users/dev/cctest/data.txt"}
+{"v":1,"t":"ping","seq":15,"ts_sec":1794640836,"es_seq":4682005,"es_global_seq":9412001}
+{"v":1,"t":"stats","seq":16,"ts_sec":1794640837,"dropped":{"queue_full":3}}
+{"v":1,"t":"exit","seq":17,"ts_sec":1794640838,"pid":6301,"pidver":2,"status":1}
+{"v":1,"t":"file","seq":18,"ts_sec":1794640839,"pid":9999,"pidver":1,"op":"write","path":"/Users/dev/not-in-the-tree"}
