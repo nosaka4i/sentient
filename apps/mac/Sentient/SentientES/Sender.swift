@@ -135,7 +135,7 @@ final class Sender {
 
         while true {
             cond.lock()
-            while lines.isEmpty && connected { cond.wait(timeout: Date().addingTimeInterval(1)) }
+            while lines.isEmpty && connected { _ = cond.wait(until: Date().addingTimeInterval(1)) }
             if !connected { cond.unlock(); return }
             let batch = lines
             lines.removeAll(keepingCapacity: true)
