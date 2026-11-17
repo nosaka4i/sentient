@@ -115,14 +115,11 @@ final class Sender {
     // queue until a write fails.
     private func serve(_ fd: Int32) {
         if let h = hello?() {
-            // the hello is outside the queue so it is always the first line
-            // on a new connection; it still takes the next sequence number
-            cond.lock()
-            seq += 1
+            // the hello is outside the queue so it is always the first line on a
+            // new connection; it carries no sequence number, because messages
+            // queued earlier already hold lower ones and the daemon would see a jump
             var m = h
             m["v"] = 1
-            m["seq"] = seq
-            cond.unlock()
             guard let data = try? JSONSerialization.data(withJSONObject: m, options: [.withoutEscapingSlashes]),
                   write(fd, data + Data([10])) else { return }
         }
