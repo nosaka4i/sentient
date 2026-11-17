@@ -37,6 +37,8 @@ var systemNoise = []policy.NoisePath{
 	{Path: "/opt/homebrew/", Category: "Homebrew"},
 	{Path: "/private/var/db/", Category: "system files"},
 	{Path: "/private/var/folders/", Category: "temporary and cache folders"},
+	// every process opens the root directory; only that one path
+	{Path: "/", Category: "the root directory", Exact: true},
 }
 
 // userNoise is relative to a home: the agent's own state, caches, and tool
@@ -82,7 +84,7 @@ func Mutes(noise []policy.NoisePath, sensitive []string) []string {
 	var out []string
 next:
 	for _, n := range noise {
-		if n.Anywhere {
+		if n.Anywhere || n.Exact {
 			continue
 		}
 		for _, s := range sensitive {

@@ -28,3 +28,21 @@ func TestMatchAnywhere(t *testing.T) {
 		t.Error("project file matched")
 	}
 }
+
+func TestMatchDirectoryItselfAndExact(t *testing.T) {
+	noise := []NoisePath{
+		{Path: "/dev/", Category: "devices"},
+		{Path: "/", Category: "the root directory", Exact: true},
+	}
+	for _, p := range []string{"/dev", "/dev/null", "/"} {
+		if _, ok := Match(noise, p); !ok {
+			t.Errorf("%q is not noise", p)
+		}
+	}
+	// "/dev/" is a directory entry, not a prefix of a sibling; "/" is only itself
+	for _, p := range []string{"/device-notes.txt", "/Users/a/x", "/etc"} {
+		if n, ok := Match(noise, p); ok {
+			t.Errorf("%q matched %+v", p, n)
+		}
+	}
+}

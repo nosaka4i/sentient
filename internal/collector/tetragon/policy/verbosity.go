@@ -47,6 +47,10 @@ type NoisePath struct {
 	// it; a Tetragon policy can only exclude by prefix, so the policy never
 	// gets such an entry.
 	Anywhere bool
+	// Exact makes Path match only that path itself: the root directory, which
+	// every process opens, must not make every path noise. Like Anywhere it is
+	// only for sentientd's own filter, never a kernel mute or a policy entry.
+	Exact bool
 }
 
 // systemNoise is always excluded at Essential: loaded by every program on exec.
@@ -240,12 +244,19 @@ func Match(noise []NoisePath, path string) (NoisePath, bool) {
 		return NoisePath{Path: procPrefix, Category: "agent polling itself"}, true
 	}
 	for _, n := range noise {
-		if n.Anywhere {
+		switch {
+		case n.Exact:
+			if path == n.Path {
+				return n, true
+			}
+		case n.Anywhere:
 			if strings.Contains(path, n.Path) {
 				return n, true
 			}
-		} else if strings.HasPrefix(path, n.Path) {
+		case strings.HasPrefix(path, n.Path):
 			return n, true
+		case strings.HasSuffix(n.Path, "/") && path == strings.TrimSuffix(n.Path, "/"):
+			return n, true // opening the directory itself: "/dev" for "/dev/"
 		}
 	}
 	return NoisePath{}, false

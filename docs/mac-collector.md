@@ -71,7 +71,7 @@ Run the scratch experiment (a prompt or two in a scratch folder with the real Cl
 2. **Whether the current entitlement covers distribution signing,** or a second request is needed. Only the developer account can show it.
 3. **Whether the Network Extension needs a separate approval,** and whether it is one extension with the Endpoint Security one or two.
 4. **The exact noise list for opens** (decided in principle, 2026-11-12: reads are in the first version, system paths and the agent's own state muted, sensitive paths always kept; see requirement 4). Open: the precise prefixes, whether muting can be done in the kernel for all of them, and how the list is extended per machine, as `sen policy` does on Linux.
-5. **Capture levels on the Mac:** what `extended` and `complete` mean for Endpoint Security (which events), beyond the filter above.
+5. **Capture levels on the Mac:** what `extended` and `complete` mean for Endpoint Security (which events), beyond the filter above. As built (2026-11-17): `essential` sends the kernel mutes to the extension, drops noise opens in `sentientd` and counts repeated writes once; `extended` sends no mutes but still drops noise opens and counts writes (the same stored result as `essential`; the per-command noise counts of Linux's `extended` are not built); `complete` mutes nothing, keeps every open and every write. At every level, `close` events, terminal and `/dev/null` writes, network and processes outside the agent's tree are not captured. Open: what `extended` should do on the Mac.
 6. **Minimum system version and architecture (decided by the owner, 2026-11-14):** macOS 26 and Apple silicon only for now; older versions later.
 
 ## Related

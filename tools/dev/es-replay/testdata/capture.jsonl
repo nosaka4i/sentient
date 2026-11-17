@@ -1,0 +1,14 @@
+{"ts_sec":1000,"exe":"/bin/zsh","ts_nsec":100,"pid":100,"seq":1,"target":"/Users/dev/cctest/claude-code/agent-standin","type":"exec","ppid":50,"args":["/Users/dev/cctest/claude-code/agent-standin","go test ./..."]}
+{"ts_sec":1000,"exe":"/Users/dev/cctest/claude-code/agent-standin","ts_nsec":200,"pid":100,"seq":2,"path":"/","flags":537919489,"type":"open","ppid":50}
+{"ts_sec":1000,"exe":"/Users/dev/cctest/claude-code/agent-standin","ts_nsec":300,"pid":100,"seq":3,"path":"/dev/ttys002","type":"write","ppid":50}
+{"ts_sec":1000,"exe":"/Users/dev/cctest/claude-code/agent-standin","ts_nsec":400,"pid":100,"seq":4,"path":"/Users/dev/proj/x","type":"close","ppid":50,"modified":true}
+{"ts_sec":1001,"exe":"/Users/dev/cctest/claude-code/agent-standin","ts_nsec":500,"pid":100,"seq":5,"child_pid":101,"type":"fork","ppid":50}
+{"ts_sec":1001,"exe":"/Users/dev/cctest/claude-code/agent-standin","ts_nsec":600,"pid":101,"seq":6,"path":"/Users/dev/proj/out.txt","type":"write","ppid":100}
+{"ts_sec":1002,"exe":"/Users/dev/cctest/claude-code/agent-standin","ts_nsec":700,"pid":101,"seq":7,"target":"/usr/local/go/bin/go","type":"exec","ppid":100,"args":["go","test","./..."]}
+{"ts_sec":1002,"exe":"/usr/local/go/bin/go","ts_nsec":800,"pid":101,"seq":8,"path":"/Users/dev/proj/new.txt","type":"create","ppid":100}
+{"ts_sec":1003,"exe":"/usr/local/go/bin/go","ts_nsec":900,"pid":101,"seq":9,"from":"/Users/dev/proj/new.txt.tmp.1","to":"/Users/dev/proj/new.txt","type":"rename","ppid":100}
+{"ts_sec":1003,"exe":"/usr/local/go/bin/go","ts_nsec":950,"pid":101,"seq":10,"path":"/Users/dev/proj/old.txt","type":"unlink","ppid":100}
+{"ts_sec":1004,"exe":"/usr/local/go/bin/go","ts_nsec":960,"pid":101,"seq":11,"status":0,"type":"exit","ppid":100}
+not a json line
+{"ts_sec":1004,"exe":"/Users/dev/cctest/claude-code/agent-standin","ts_nsec":970,"pid":100,"seq":12,"path":"/dev/null","type":"write","ppid":50}
+{"ts_sec":1005,"exe":"/Users/dev/cctest/claude-code/agent-standin","ts_nsec":980,"pid":100,"seq":13,"status":0,"type":"exit","ppid":50}
