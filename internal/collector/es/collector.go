@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -151,6 +152,9 @@ func (c *Collector) Run(ctx context.Context, sink collector.Sink) error {
 // listen opens the Unix socket, replacing a stale one and keeping it
 // root-only (0600).
 func listen(path string) (net.Listener, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return nil, err
+	}
 	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}

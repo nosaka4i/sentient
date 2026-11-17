@@ -15,6 +15,7 @@ import (
 	"github.com/nosaka4i/sentient/internal/api"
 	"github.com/nosaka4i/sentient/internal/attribute"
 	"github.com/nosaka4i/sentient/internal/collector"
+	"github.com/nosaka4i/sentient/internal/collector/es"
 	"github.com/nosaka4i/sentient/internal/collector/tetragon"
 	"github.com/nosaka4i/sentient/internal/collector/tetragon/policy"
 	"github.com/nosaka4i/sentient/internal/ingest/claudecode"
@@ -69,6 +70,10 @@ type Config struct {
 	// Tetragon is the gRPC address of a running Tetragon. Empty leaves the
 	// kernel collector off, which is the log-only mode.
 	Tetragon string
+	// EndpointSecurity is the Unix socket sentientd listens on for the Mac's
+	// SentientES extension (es.DefaultSocket). Empty leaves it off. It is the
+	// Mac's kernel collector, so it excludes Tetragon.
+	EndpointSecurity string
 	// Verbosity is the capture level (docs/capture-verbosity.md); empty is
 	// essential. PolicyFile is the installed Tetragon policy it is compared
 	// with (default policy.DefaultPolicyFile).
@@ -92,6 +97,18 @@ type Config struct {
 	Logger              *slog.Logger
 	// Ready, if set, is closed once the socket is listening.
 	Ready chan<- struct{}
+}
+
+// kernelOn is whether a kernel collector is configured, which is what the
+// heartbeat, the capture level and the Health card key on.
+func (c Config) kernelOn() bool { return c.Tetragon != "" || c.EndpointSecurity != "" }
+
+// kernelName is the name the collector is stored under.
+func (c Config) kernelName() string {
+	if c.EndpointSecurity != "" {
+		return es.Name
+	}
+	return tetragon.Name
 }
 
 // DefaultHomes returns the home directories whose ~/.claude/projects is
@@ -155,6 +172,9 @@ func Run(ctx context.Context, cfg Config) error {
 		return errors.New("--integrity-slice, --integrity-pause and --integrity-start-delay must not be negative")
 	}
 
+	if cfg.Tetragon != "" && cfg.EndpointSecurity != "" {
+		return errors.New("--tetragon and --endpoint-security cannot both be on: each platform has one kernel collector")
+	}
 	level, err := policy.ParseVerbosity(string(cfg.Verbosity))
 	if err != nil {
 		return err
@@ -199,7 +219,7 @@ func Run(ctx context.Context, cfg Config) error {
 	ing := claudecode.New(st, claudecode.Config{Homes: cfg.Homes, PollInterval: cfg.PollInterval, Logger: log, Paused: guard.Paused})
 
 	var capt *capture
-	if cfg.Tetragon != "" {
+	if cfg.kernelOn() {
 		if capt, err = startCapture(ctx, st, cfg, policy.SystemEnv(), time.Now(), log); err != nil {
 			return err
 		}
@@ -209,8 +229,8 @@ func Run(ctx context.Context, cfg Config) error {
 	// records that it is watching (docs/heartbeat.md). Only with a collector: in
 	// agent logs only mode a gap in kernel coverage means nothing.
 	var hb *heartbeat
-	if cfg.Tetragon != "" {
-		hb = newHeartbeat(st, tetragon.Name, log)
+	if cfg.kernelOn() {
+		hb = newHeartbeat(st, cfg.kernelName(), log)
 		if err := hb.start(ctx, staleClosed); err != nil {
 			return err
 		}
@@ -220,11 +240,15 @@ func Run(ctx context.Context, cfg Config) error {
 	// writes its events. Both are made here so the monitor can see them.
 	var kstatus *collector.Status
 	var buffered *collector.BufferedSink
-	if cfg.Tetragon != "" {
-		kstatus = tetragon.NewStatus(cfg.Tetragon, time.Now())
+	if cfg.kernelOn() {
+		if cfg.EndpointSecurity != "" {
+			kstatus = es.NewStatus(cfg.EndpointSecurity, time.Now())
+		} else {
+			kstatus = tetragon.NewStatus(cfg.Tetragon, time.Now())
+		}
 		// Events are queued and written in batches, so a busy store (the
-		// first import of a big transcript) slows the queue, not Tetragon.
-		buffered = collector.NewBufferedSink(st, tetragon.Name, kernelQueue)
+		// first import of a big transcript) slows the queue, not the collector.
+		buffered = collector.NewBufferedSink(st, cfg.kernelName(), kernelQueue)
 	}
 
 	mon := newMonitor(st, cfg, log)
@@ -241,13 +265,27 @@ func Run(ctx context.Context, cfg Config) error {
 	go func() { defer wg.Done(); errc <- ing.Run(ctx) }()
 	go func() { defer wg.Done(); errc <- api.Serve(ctx, lis, srv) }()
 	go func() { defer wg.Done(); mon.run(ctx) }()
-	if cfg.Tetragon != "" {
+	if cfg.kernelOn() {
 		agents := policy.AgentPrefixes(cfg.Homes)
-		var coll collector.Collector = &tetragon.Collector{Addr: cfg.Tetragon, Agents: agents, Status: kstatus}
-		log.Info("kernel collector on", "collector", coll.Name(), "addr", cfg.Tetragon)
+		var coll collector.Collector
+		var inner collector.Sink = buffered
+		var sensitive []string
+		if cfg.EndpointSecurity != "" {
+			agents = es.AgentPrefixes(cfg.Homes)
+			sensitive = es.SensitivePaths(cfg.Homes)
+			coll = &es.Collector{Socket: cfg.EndpointSecurity, Config: es.Config{
+				Agents: agents, Noise: kernelMutes(capt, sensitive), Sensitive: sensitive,
+			}, Status: kstatus, Log: log}
+			// repeated writes by one process to one path are stored once, with a count
+			inner = &collector.CoalesceSink{Sink: buffered, Level: capt.level}
+			log.Info("kernel collector on", "collector", coll.Name(), "socket", cfg.EndpointSecurity)
+		} else {
+			coll = &tetragon.Collector{Addr: cfg.Tetragon, Agents: agents, Status: kstatus}
+			log.Info("kernel collector on", "collector", coll.Name(), "addr", cfg.Tetragon)
+		}
 		// The gate is outermost: while paused nothing reaches the filter or the queue.
 		sink := &collector.GateSink{Paused: guard.Paused,
-			Sink: &collector.FilterSink{Sink: buffered, Level: capt.level, Noise: capt.noise}}
+			Sink: &collector.FilterSink{Sink: inner, Level: capt.level, Noise: capt.noise, Sensitive: sensitive}}
 		att := &attribute.Attributor{St: st, Log: log, Paused: guard.Paused, IsAgent: func(b string) bool { return policy.IsAgent(agents, b) }}
 		mrg := &merge.Merger{St: st, Log: log, Paused: guard.Paused}
 		wg.Add(5)

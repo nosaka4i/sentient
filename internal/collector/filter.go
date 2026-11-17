@@ -2,6 +2,7 @@ package collector
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	"github.com/nosaka4i/sentient/internal/collector/tetragon/policy"
@@ -17,6 +18,9 @@ type FilterSink struct {
 	Sink
 	Level policy.Verbosity
 	Noise []policy.NoisePath
+	// Sensitive are path prefixes whose opens are kept at every level, even
+	// inside a noise location (the Mac's keychains sit inside ~/Library).
+	Sensitive []string
 
 	mu      sync.Mutex
 	dropped map[string]int64
@@ -24,7 +28,7 @@ type FilterSink struct {
 
 // Event implements Sink.
 func (f *FilterSink) Event(ctx context.Context, e store.KernelEvent) error {
-	if e.Type == "file_open" && f.Level != policy.Complete {
+	if e.Type == "file_open" && f.Level != policy.Complete && !f.sensitive(e.Path) {
 		if n, ok := policy.Match(f.Noise, e.Path); ok {
 			f.mu.Lock()
 			if f.dropped == nil {
@@ -36,6 +40,15 @@ func (f *FilterSink) Event(ctx context.Context, e store.KernelEvent) error {
 		}
 	}
 	return f.Sink.Event(ctx, e)
+}
+
+func (f *FilterSink) sensitive(path string) bool {
+	for _, s := range f.Sensitive {
+		if strings.HasPrefix(path, s) {
+			return true
+		}
+	}
+	return false
 }
 
 // Dropped is how many opens were left out, by category, since the sink was

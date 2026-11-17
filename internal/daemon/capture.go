@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/nosaka4i/sentient/internal/collector/es"
 	"github.com/nosaka4i/sentient/internal/collector/tetragon/policy"
 	"github.com/nosaka4i/sentient/internal/dbtime"
 	"github.com/nosaka4i/sentient/internal/health"
@@ -39,6 +40,12 @@ func startCapture(ctx context.Context, st *store.Store, cfg Config, env policy.E
 	}
 
 	c.noise = policy.DetectNoise(cfg.Homes, env)
+	if cfg.EndpointSecurity != "" {
+		// the Mac has no Tetragon policy to agree with: the extension is told
+		// its mutes in the config, and this filter is the safety net behind them
+		c.noise = append(c.noise, es.NoisePaths(cfg.Homes)...)
+		return c, nil
+	}
 	file := cfg.PolicyFile
 	if file == "" {
 		file = policy.DefaultPolicyFile
@@ -71,6 +78,16 @@ func startCapture(ctx context.Context, st *store.Store, cfg Config, env policy.E
 	return c, nil
 }
 
+// kernelMutes are the path prefixes the Mac extension mutes in the kernel. It
+// mutes only at the essential level; at the other levels everything must reach
+// sentientd. A prefix that holds a sensitive path is not muted (es.Mutes).
+func kernelMutes(c *capture, sensitive []string) []string {
+	if c.level != policy.Essential {
+		return nil
+	}
+	return es.Mutes(c.noise, sensitive)
+}
+
 // captureReport is the Capture section of the health report: the level
 // sentientd runs at and what the installed policy says it was made for. The
 // policy file is read each time, so a reinstalled policy shows at once.
@@ -79,7 +96,11 @@ func captureReport(cfg Config, read func(string) ([]byte, error), mtime func(str
 	if file == "" {
 		file = policy.DefaultPolicyFile
 	}
-	c := health.Capture{Enabled: cfg.Tetragon != "", Level: string(cfg.Verbosity), PolicyFile: file}
+	c := health.Capture{Enabled: cfg.kernelOn(), Level: string(cfg.Verbosity), PolicyFile: file}
+	if cfg.EndpointSecurity != "" {
+		c.PolicyFile = "" // no Tetragon policy on the Mac
+		return c
+	}
 	if !c.Enabled {
 		return c
 	}

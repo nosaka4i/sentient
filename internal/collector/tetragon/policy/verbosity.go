@@ -41,16 +41,22 @@ func ParseVerbosity(s string) (Verbosity, error) {
 type NoisePath struct {
 	Path     string
 	Category string
+	// Anywhere makes Path match wherever it appears in a path, not only at the
+	// start: a dependency cache whose folder is set by the user (Go's module
+	// cache under any GOPATH, ".../pkg/mod/"). Only sentientd's own filter uses
+	// it; a Tetragon policy can only exclude by prefix, so the policy never
+	// gets such an entry.
+	Anywhere bool
 }
 
 // systemNoise is always excluded at Essential: loaded by every program on exec.
 var systemNoise = []NoisePath{
-	{"/usr/lib", "system libraries"},
-	{"/usr/lib64", "system libraries"},
-	{"/lib", "system libraries"},
-	{"/lib64", "system libraries"},
-	{"/usr/share", "shared system files"},
-	{"/etc/ld.so", "the dynamic linker's cache"},
+	{Path: "/usr/lib", Category: "system libraries"},
+	{Path: "/usr/lib64", Category: "system libraries"},
+	{Path: "/lib", Category: "system libraries"},
+	{Path: "/lib64", Category: "system libraries"},
+	{Path: "/usr/share", Category: "shared system files"},
+	{Path: "/etc/ld.so", Category: "the dynamic linker's cache"},
 }
 
 // procNoise is /proc/<pid>/stat and statm: an agent polling its own process.
@@ -111,7 +117,7 @@ func DetectNoise(homes []string, env Env) []NoisePath {
 			return
 		}
 		if _, ok := seen[p]; !ok {
-			seen[p] = NoisePath{p, why}
+			seen[p] = NoisePath{Path: p, Category: why}
 		}
 	}
 	for _, n := range systemNoise {
@@ -231,10 +237,14 @@ func RenderWith(o Options) (string, error) {
 // statm. The category of /proc polling is "agent polling itself".
 func Match(noise []NoisePath, path string) (NoisePath, bool) {
 	if strings.HasPrefix(path, procPrefix) && (strings.HasSuffix(path, "/stat") || strings.HasSuffix(path, "/statm")) {
-		return NoisePath{procPrefix, "agent polling itself"}, true
+		return NoisePath{Path: procPrefix, Category: "agent polling itself"}, true
 	}
 	for _, n := range noise {
-		if strings.HasPrefix(path, n.Path) {
+		if n.Anywhere {
+			if strings.Contains(path, n.Path) {
+				return n, true
+			}
+		} else if strings.HasPrefix(path, n.Path) {
 			return n, true
 		}
 	}
@@ -262,7 +272,7 @@ func ParseHeader(text string) (level Verbosity, noise []NoisePath, ok bool) {
 		path, cat, _ := strings.Cut("/"+rest, " ")
 		cat = strings.TrimSpace(cat)
 		cat = strings.TrimSuffix(strings.TrimPrefix(cat, "("), ")")
-		noise = append(noise, NoisePath{path, cat})
+		noise = append(noise, NoisePath{Path: path, Category: cat})
 	}
 	return level, noise, ok
 }

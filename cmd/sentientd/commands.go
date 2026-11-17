@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/nosaka4i/sentient/internal/api"
+	"github.com/nosaka4i/sentient/internal/collector/es"
 	"github.com/nosaka4i/sentient/internal/collector/tetragon"
 	"github.com/nosaka4i/sentient/internal/collector/tetragon/policy"
 	"github.com/nosaka4i/sentient/internal/daemon"
@@ -47,6 +48,8 @@ func newRootCmd() *cobra.Command {
 	f.DurationVar(&cfg.PollInterval, "poll-interval", 2*time.Second, "how often transcripts are checked for new records")
 	f.StringVar(&cfg.Tetragon, "tetragon", "", "read kernel events from Tetragon's gRPC address (bare --tetragon: "+tetragon.DefaultAddr+"); off by default")
 	f.Lookup("tetragon").NoOptDefVal = tetragon.DefaultAddr
+	f.StringVar(&cfg.EndpointSecurity, "endpoint-security", "", "read kernel events from the Mac's SentientES extension on this Unix socket (bare --endpoint-security: "+es.DefaultSocket+"); excludes --tetragon; off by default")
+	f.Lookup("endpoint-security").NoOptDefVal = es.DefaultSocket
 	f.StringVar((*string)(&cfg.Verbosity), "verbosity", "essential", "how much the kernel reports is stored: essential (leaves out build caches, toolchains and system libraries), extended or complete; match it to the policy from sen policy --verbosity")
 	f.StringVar(&cfg.PolicyFile, "policy-file", policy.DefaultPolicyFile, "the installed Tetragon policy whose level is compared with --verbosity")
 	f.IntVar(&cfg.DiskHigh, "disk-high-threshold", daemon.DefaultDiskHigh, "pause recording when this percent of the data disk is used (10-99); Health warns 10 points before")

@@ -393,8 +393,24 @@ func TestRunReplacesAStaleSocketAndFailsOnABadPath(t *testing.T) {
 	if err := <-done; err != nil {
 		t.Errorf("Run: %v", err)
 	}
-	if err := (&Collector{Socket: filepath.Join(dir, "no", "such", "dir", "s.sock")}).Run(context.Background(), &lockSink{}); err == nil {
-		t.Error("Run succeeded with a socket in a missing directory")
+	// the socket's folder is created when it is missing, root-only
+	nested := filepath.Join(dir, "run", "sentient", "es.sock")
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	done2 := make(chan error, 1)
+	go func() { done2 <- (&Collector{Socket: nested}).Run(ctx2, &lockSink{}) }()
+	waitFor(t, "the nested socket", func() bool { _, err := os.Stat(nested); return err == nil })
+	if fi, err := os.Stat(filepath.Dir(nested)); err != nil || fi.Mode().Perm() != 0o700 {
+		t.Errorf("socket folder: %v %v", fi, err)
+	}
+	cancel2()
+	<-done2
+	// a path whose parent is a file cannot be made
+	afile := filepath.Join(dir, "afile")
+	if err := os.WriteFile(afile, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := (&Collector{Socket: filepath.Join(afile, "s.sock")}).Run(context.Background(), &lockSink{}); err == nil {
+		t.Error("Run succeeded with a socket under a file")
 	}
 }
 

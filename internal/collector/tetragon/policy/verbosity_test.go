@@ -121,7 +121,7 @@ func TestDetectNoiseReadsTheUsersExtrasAndDropsUnsafePaths(t *testing.T) {
 var testBins = []string{"/h/.local/bin/claude", "/h/.local/share/claude/versions/2.1.9"}
 
 func TestEssentialLeavesOutTheNoiseAndKeepsTheRestOfProc(t *testing.T) {
-	noise := []NoisePath{{"/h/.cache/go-build", "Go build cache"}, {"/usr/lib", "system libraries"}}
+	noise := []NoisePath{{Path: "/h/.cache/go-build", Category: "Go build cache"}, {Path: "/usr/lib", Category: "system libraries"}}
 	p, err := RenderWith(Options{Binaries: testBins, Verbosity: Essential, Noise: noise})
 	if err != nil {
 		t.Fatal(err)
@@ -158,7 +158,7 @@ func TestEssentialLeavesOutTheNoiseAndKeepsTheRestOfProc(t *testing.T) {
 
 func TestExtendedAndCompleteAskForEveryOpen(t *testing.T) {
 	for _, v := range []Verbosity{Extended, Complete} {
-		p, err := RenderWith(Options{Binaries: testBins, Verbosity: v, Noise: []NoisePath{{"/usr/lib", "system libraries"}}})
+		p, err := RenderWith(Options{Binaries: testBins, Verbosity: v, Noise: []NoisePath{{Path: "/usr/lib", Category: "system libraries"}}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -184,9 +184,9 @@ func TestRenderWithDefaultsToEssentialAndRejectsBadInput(t *testing.T) {
 		"no binaries":      {Verbosity: Essential},
 		"relative binary":  {Binaries: []string{"claude"}, Verbosity: Essential},
 		"unknown level":    {Binaries: testBins, Verbosity: "standard"},
-		"relative noise":   {Binaries: testBins, Noise: []NoisePath{{"cache", "x"}}},
-		"quote in noise":   {Binaries: testBins, Noise: []NoisePath{{"/a\"b", "x"}}},
-		"newline in noise": {Binaries: testBins, Noise: []NoisePath{{"/a\nb", "x"}}},
+		"relative noise":   {Binaries: testBins, Noise: []NoisePath{{Path: "cache", Category: "x"}}},
+		"quote in noise":   {Binaries: testBins, Noise: []NoisePath{{Path: "/a\"b", Category: "x"}}},
+		"newline in noise": {Binaries: testBins, Noise: []NoisePath{{Path: "/a\nb", Category: "x"}}},
 	} {
 		if _, err := RenderWith(o); err == nil {
 			t.Errorf("%s: succeeded", name)
@@ -218,7 +218,7 @@ func TestSystemEnvIsUsable(t *testing.T) {
 }
 
 func TestMatchAppliesThePoliciesRule(t *testing.T) {
-	noise := []NoisePath{{"/h/.cache/go-build", "Go build cache"}, {"/etc/ld.so", "the dynamic linker's cache"}}
+	noise := []NoisePath{{Path: "/h/.cache/go-build", Category: "Go build cache"}, {Path: "/etc/ld.so", Category: "the dynamic linker's cache"}}
 	for path, want := range map[string]string{
 		"/h/.cache/go-build/ab/cd": "Go build cache",
 		"/etc/ld.so.cache":         "the dynamic linker's cache", // a plain string prefix, as Tetragon's Prefix
@@ -238,7 +238,7 @@ func TestMatchAppliesThePoliciesRule(t *testing.T) {
 }
 
 func TestParseHeaderReadsBackWhatRenderWrote(t *testing.T) {
-	noise := []NoisePath{{"/h/.cache/go-build", "Go build cache"}, {"/etc/ld.so", "the dynamic linker's cache"}}
+	noise := []NoisePath{{Path: "/h/.cache/go-build", Category: "Go build cache"}, {Path: "/etc/ld.so", Category: "the dynamic linker's cache"}}
 	p, err := RenderWith(Options{Binaries: testBins, Verbosity: Essential, Noise: noise})
 	if err != nil {
 		t.Fatal(err)
