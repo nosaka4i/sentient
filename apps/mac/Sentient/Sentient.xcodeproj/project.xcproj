@@ -11,21 +11,7 @@
     ],
   },
   "files": [
-    {
-      "kind": "folder",
-      "path": "Sentient",
-      "target-membership": [
-        "Sentient",
-      ],
-      "membership-exceptions": [
-        {
-          "target": "Sentient",
-          "exclusions": [
-            "Sentient.entitlements",
-          ],
-        },
-      ],
-    },
+    { "kind": "folder", "path": "Sentient", "target-membership": [ "Sentient" ] },
     {
       "kind": "folder",
       "path": "SentientES",
@@ -79,6 +65,7 @@
         "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
         "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
         "CODE_SIGN_ENTITLEMENTS": "Sentient/Sentient.entitlements",
+        "CODE_SIGN_IDENTITY": "Apple Development",
         "CODE_SIGN_STYLE": "Automatic",
         "COMBINE_HIDPI_IMAGES": "YES",
         "CURRENT_PROJECT_VERSION": "1",
@@ -96,6 +83,7 @@
         "MARKETING_VERSION": "0.1",
         "PRODUCT_BUNDLE_IDENTIFIER": "ai.nosaka.Sentient",
         "PRODUCT_NAME": "$(TARGET_NAME)",
+        "PROVISIONING_PROFILE_SPECIFIER": "",
         "REGISTER_APP_GROUPS": "YES",
         "STRING_CATALOG_GENERATE_SYMBOLS": "YES",
         "SWIFT_APPROACHABLE_CONCURRENCY": "YES",
@@ -116,9 +104,12 @@
       ],
       "build-settings": {
         "CODE_SIGN_ENTITLEMENTS": "SentientES/SentientES.entitlements",
-        "CODE_SIGN_STYLE": "Automatic",
+        "CODE_SIGN_IDENTITY": "Apple Development",
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "Mac Developer",
+        "CODE_SIGN_STYLE": "Manual",
         "CURRENT_PROJECT_VERSION": "1",
-        "DEVELOPMENT_TEAM": "RYJT9BBCQ8",
+        "DEVELOPMENT_TEAM": "",
+        "DEVELOPMENT_TEAM[sdk=macosx*]": "RYJT9BBCQ8",
         "ENABLE_HARDENED_RUNTIME": "YES",
         "GENERATE_INFOPLIST_FILE": "YES",
         "INFOPLIST_FILE": "SentientES/Info.plist",
@@ -132,6 +123,8 @@
         "MARKETING_VERSION": "0.1",
         "PRODUCT_BUNDLE_IDENTIFIER": "ai.nosaka.Sentient.SentientES",
         "PRODUCT_NAME": "$(inherited)",
+        "PROVISIONING_PROFILE_SPECIFIER": "",
+        "PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]": "Sentient ES dev 2",
         "REGISTER_APP_GROUPS": "YES",
         "SKIP_INSTALL": "YES",
         "STRING_CATALOG_GENERATE_SYMBOLS": "YES",
