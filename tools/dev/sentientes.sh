@@ -1,39 +1,27 @@
 #!/usr/bin/env bash
-# Mac dev helper for the SentientES extension (apps/mac/Sentient). The reset and
-# capture steps belong to the old prototype, which wrote a capture file; the
-# production extension writes none.
-# Runs on the Mac only. One short command per step, so nothing is copied by hand.
-# Not tested on a Mac when written: if a step fails, paste its output.
+# Mac helper for the Sentient app and its SentientES extension (apps/mac/Sentient).
+# Runs on the Mac only. Running sentientd for the extension is tools/dev/sentient.sh.
 #
 # Usage:
-#   tools/dev/sentientes.sh build      # xcodebuild the host app and the extension (Debug)
+#   tools/dev/sentientes.sh build      # xcodebuild the app and the extension (Debug)
 #   tools/dev/sentientes.sh install    # copy the newest build to /Applications, open it, show status
-#   tools/dev/sentientes.sh status     # extension version/state, process, capture file size
-#   tools/dev/sentientes.sh reset      # move the current capture aside (sudo) so the next one starts clean
-#   tools/dev/sentientes.sh capture    # scp the capture and the Claude session logs to the Linux box
+#   tools/dev/sentientes.sh status     # the extension's state and process
 #
-# Remember: bump CURRENT_PROJECT_VERSION in the project (the Linux side does it) or
-# macOS keeps the old extension running. `status` prints the running version.
-#
-# Overrides: SENTIENT_REMOTE (ssh alias, default nosaka), SENTIENT_REMOTE_DIR.
+# Raise CURRENT_PROJECT_VERSION (Build) in the project on every extension change,
+# or macOS keeps the old extension running. `status` shows the running version.
 
 set -euo pipefail
 
 CMD="${1:-}"
 SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -P "$SCRIPT_DIR/../.." && pwd)"
-PROJECT_DIR="$REPO_ROOT/apps/mac/Sentient"
-PROJECT="$PROJECT_DIR/Sentient.xcodeproj"
+PROJECT="$REPO_ROOT/apps/mac/Sentient/Sentient.xcodeproj"
 SCHEME="Sentient"
 APP_NAME="Sentient.app"
-EXT_ID="ai.nosaka.Sentient.SentientES"
-CAPTURE="/var/tmp/sentient-es.jsonl"
-REMOTE="${SENTIENT_REMOTE:-nosaka}"
-REMOTE_DIR="${SENTIENT_REMOTE_DIR:-work/src/github.com/nosaka4i/sentient/.claudetmp/es-experiment}"
 
 newest_build() {
-  # Newest Debug build of the host app under DerivedData.
-  ls -dt "$HOME"/Library/Developer/Xcode/DerivedData/*/Build/Products/Debug/"$APP_NAME" 2>/dev/null | head -1
+  # Newest Debug build of the app under DerivedData.
+  ls -dt "$HOME"/Library/Developer/Xcode/DerivedData/Sentient-*/Build/Products/Debug/"$APP_NAME" 2>/dev/null | head -1
 }
 
 status() {
@@ -41,14 +29,6 @@ status() {
   systemextensionsctl list | grep -i sentient || echo "(not installed)"
   echo "== process"
   ps aux | grep -i '[S]entientES' || echo "(not running)"
-  echo "== capture file (newest of $CAPTURE*)"
-  LATEST="$(ls -t "$CAPTURE"* 2>/dev/null | head -1)"
-  if [ -n "$LATEST" ]; then
-    ls -l "$LATEST"
-    echo "lines: $(wc -l < "$LATEST")   open events: $(grep -c '"type":"open"' "$LATEST" || true)"
-  else
-    echo "(no $CAPTURE*)"
-  fi
 }
 
 case "$CMD" in
@@ -85,30 +65,8 @@ case "$CMD" in
   status)
     status
     ;;
-  reset)
-    if [ -f "$CAPTURE" ]; then
-      sudo mv "$CAPTURE" "$CAPTURE.$(date +%Y%m%d-%H%M%S)"
-      echo "moved the old capture aside; the running extension keeps writing to it until it restarts"
-    else
-      echo "no capture file"
-    fi
-    ;;
-  capture)
-    TS="$(date +%Y%m%d-%H%M%S)"
-    # The extension keeps writing into a renamed file (see reset), so send the newest one.
-    LATEST="$(ls -t "$CAPTURE"* 2>/dev/null | head -1)"
-    if [ -z "$LATEST" ]; then
-      echo "no capture file under $CAPTURE*" >&2
-      exit 1
-    fi
-    echo "sending $LATEST"
-    scp "$LATEST" "$REMOTE:$REMOTE_DIR/es-$TS.jsonl"
-    # Session logs of any project folder touched in the last 2 hours (the run may not be in cctest).
-    find "$HOME/.claude/projects" -name '*.jsonl' -mmin -120 -exec scp {} "$REMOTE:$REMOTE_DIR/" \;
-    echo "sent es-$TS.jsonl and the recent session logs to $REMOTE:$REMOTE_DIR"
-    ;;
   *)
-    echo "usage: $0 {build|install|status|reset|capture}" >&2
+    echo "usage: $0 {build|install|status}" >&2
     exit 2
     ;;
 esac

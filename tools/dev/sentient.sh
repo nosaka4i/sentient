@@ -9,6 +9,7 @@
 #   ./sentient.sh install     # throttled `make install` (sen, sentientd into $GOBIN / $GOPATH/bin)
 #   ./sentient.sh sentientd   # the monitor daemon, unprivileged dev mode
 #   ./sentient.sh kernel      # the daemon as root with --tetragon (SENTIENT_VERBOSITY=essential|extended|complete), scratch data in .claudetmp/dev/kdata, logs/sentientd-kernel.log
+#   ./sentient.sh endpoint    # Mac: the daemon as root listening for the SentientES extension (--endpoint-security), scratch data in .claudetmp/dev/edata, logs/sentientd-endpoint.log
 #   ./sentient.sh serve       # the web UI on 127.0.0.1:7357
 #
 # Dev data, socket and logs stay under the repo (.claudetmp/dev/, logs/),
@@ -79,16 +80,33 @@ case "$SERVICE" in
     sudo bin/sentientd --tetragon --verbosity "${SENTIENT_VERBOSITY:-essential}" --home "$HOME" --data-dir "$KDATA" --socket "$KDATA/s.sock" --socket-group "$(id -gn)" 2>&1 | tee -a "$LOG_DIR/sentientd-kernel.log"
     ;;
 
+  endpoint)
+    # Mac only: sentientd as root, listening for the SentientES extension on its
+    # socket (the extension connects to /var/run/sentient/es.sock; sentientd
+    # creates the folder). Scratch database under .claudetmp/dev/edata. The
+    # control socket gets your group, so `sen serve` (as you) can reach it.
+    # The capture level is a flag: SENTIENT_VERBOSITY=essential|extended|complete.
+    need_bin sentientd
+    cd "$REPO_ROOT"
+    EDATA="${SENTIENT_ENDPOINT_DIR:-$DEV_DIR/edata}"
+    mkdir -p "$EDATA"
+    sudo bin/sentientd --endpoint-security=/var/run/sentient/es.sock --verbosity "${SENTIENT_VERBOSITY:-essential}" --home "$HOME" --data-dir "$EDATA" --socket "$EDATA/s.sock" --socket-group "$(id -gn)" 2>&1 | tee -a "$LOG_DIR/sentientd-endpoint.log"
+    ;;
+
   serve)
     need_bin sen
-    # The unprivileged daemon's socket, or else the kernel daemon's (see "kernel").
+    # The unprivileged daemon's socket, or else the kernel daemon's (see "kernel")
+    # or the endpoint daemon's (see "endpoint").
     KSOCK="${SENTIENT_KERNEL_DIR:-$DEV_DIR/kdata}/s.sock"
+    ESOCK="${SENTIENT_ENDPOINT_DIR:-$DEV_DIR/edata}/s.sock"
     if [ -S "$SOCKET" ]; then
       SERVE_SOCKET="$SOCKET"
     elif [ -S "$KSOCK" ]; then
       SERVE_SOCKET="$KSOCK"
+    elif [ -S "$ESOCK" ]; then
+      SERVE_SOCKET="$ESOCK"
     else
-      echo "sentientd isn't running (no socket at $SOCKET or $KSOCK) — start it first: $0 sentientd or $0 kernel" >&2
+      echo "sentientd isn't running (no socket at $SOCKET, $KSOCK or $ESOCK) — start it first: $0 sentientd, kernel or endpoint" >&2
       exit 1
     fi
     cd "$REPO_ROOT"
@@ -96,7 +114,7 @@ case "$SERVICE" in
     ;;
 
   *)
-    echo "usage: $0 {build|install|sentientd|kernel|serve}" >&2
+    echo "usage: $0 {build|install|sentientd|kernel|endpoint|serve}" >&2
     exit 1
     ;;
 
