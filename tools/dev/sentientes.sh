@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Mac dev helper for the Endpoint Security prototype (apps/mac/prototype).
+# Mac dev helper for the SentientES extension (apps/mac/Sentient). The reset and
+# capture steps belong to the old prototype, which wrote a capture file; the
+# production extension writes none.
 # Runs on the Mac only. One short command per step, so nothing is copied by hand.
 # Not tested on a Mac when written: if a step fails, paste its output.
 #
@@ -20,11 +22,11 @@ set -euo pipefail
 CMD="${1:-}"
 SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -P "$SCRIPT_DIR/../.." && pwd)"
-PROJECT_DIR="$REPO_ROOT/apps/mac/prototype/Untitled Project"
-PROJECT="$PROJECT_DIR/Untitled Project.xcodeproj"
-SCHEME="Untitled Project"
-APP_NAME="Untitled Project.app"
-EXT_ID="ai.nosaka.sentientes.SentientES"
+PROJECT_DIR="$REPO_ROOT/apps/mac/Sentient"
+PROJECT="$PROJECT_DIR/Sentient.xcodeproj"
+SCHEME="Sentient"
+APP_NAME="Sentient.app"
+EXT_ID="ai.nosaka.Sentient.SentientES"
 CAPTURE="/var/tmp/sentient-es.jsonl"
 REMOTE="${SENTIENT_REMOTE:-nosaka}"
 REMOTE_DIR="${SENTIENT_REMOTE_DIR:-work/src/github.com/nosaka4i/sentient/.claudetmp/es-experiment}"
@@ -71,7 +73,7 @@ case "$CMD" in
     rm -rf "/Applications/$APP_NAME"
     cp -R "$SRC" /Applications/
     # A running old copy would just be brought forward by `open`, so quit it first.
-    osascript -e "tell application \"Untitled Project\" to quit" >/dev/null 2>&1 || true
+    osascript -e "tell application \"Sentient\" to quit" >/dev/null 2>&1 || true
     sleep 1
     open "/Applications/$APP_NAME"
     sleep 8

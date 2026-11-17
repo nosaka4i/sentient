@@ -91,9 +91,10 @@ final class Sender {
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
         let path = Sender.socketPath
+        let capacity = MemoryLayout.size(ofValue: addr.sun_path)
         let ok = withUnsafeMutablePointer(to: &addr.sun_path) { p -> Bool in
-            p.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: addr.sun_path)) { c in
-                if path.utf8.count >= MemoryLayout.size(ofValue: addr.sun_path) { return false }
+            p.withMemoryRebound(to: CChar.self, capacity: capacity) { c in
+                if path.utf8.count >= capacity { return false }
                 strcpy(c, path)
                 return true
             }
