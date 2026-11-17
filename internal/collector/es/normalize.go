@@ -142,10 +142,50 @@ func (n *Normalizer) exit(ctx context.Context, m Message) error {
 	return n.sink.Exit(ctx, p.execID, at(m), m.Status)
 }
 
+// adopt registers a process whose start the normalizer did not see: the
+// daemon restarted while the extension kept running, so the agent's processes
+// are alive and report file events without a new exec. Every message of the
+// extension is about a process of the agent tree, so the process is recorded
+// from the fields the message carries. Without an executable there is nothing
+// to record and the message is dropped.
+func (n *Normalizer) adopt(ctx context.Context, m Message) (proc, bool, error) {
+	if m.Exe == "" {
+		return proc{}, false, nil
+	}
+	id := ExecID(m.PID, m.PIDVer, m.Start)
+	p := proc{execID: id}
+	n.track(procKey{m.PID, m.PIDVer}, p)
+	started := at(m)
+	if m.Start != 0 {
+		started = time.Unix(m.Start, 0).UTC()
+	}
+	err := n.sink.Process(ctx, store.Process{
+		ExecID:       id,
+		Collector:    Name,
+		PID:          m.PID,
+		ParentExecID: n.procs[procKey{m.PPID, m.PPIDVer}].execID,
+		Binary:       m.Exe,
+		Argv:         "[]",
+		UID:          m.UID,
+		StartedAt:    dbtime.Format(started),
+	})
+	return p, true, err
+}
+
+// Reset forgets every tracked process. The collector calls it when the
+// extension reconnects: after the extension restarted, its tree is new.
+func (n *Normalizer) Reset() {
+	n.procs = map[procKey]proc{}
+	n.byPID = map[int64]procKey{}
+}
+
 func (n *Normalizer) file(ctx context.Context, m Message) error {
 	p, ok := n.procs[procKey{m.PID, m.PIDVer}]
 	if !ok {
-		return nil
+		var err error
+		if p, ok, err = n.adopt(ctx, m); err != nil || !ok {
+			return err
+		}
 	}
 	e := store.KernelEvent{ExecID: p.execID, TS: dbtime.Format(at(m)), Path: m.Path, Payload: "{}"}
 	switch m.Op {

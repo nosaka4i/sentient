@@ -146,6 +146,42 @@ func TestPerm(t *testing.T) {
 	}
 }
 
+func TestFileEventOfAProcessStartedBeforeTheDaemonAdoptsIt(t *testing.T) {
+	sink := &recSink{}
+	n := NewNormalizer(sink)
+	ctx := context.Background()
+	m := Message{T: KindFile, TSSec: 50, PID: 8, PIDVer: 3, Start: 40, UID: 501, Exe: "/bin/zsh", Op: OpWrite, Path: "/Users/dev/x"}
+	for i := 0; i < 2; i++ { // the second event must not report the process again
+		if err := n.Handle(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(sink.procs) != 1 || sink.procs[0].ExecID != "es:8:3:40" || sink.procs[0].Binary != "/bin/zsh" || sink.procs[0].Argv != "[]" {
+		t.Errorf("adopted process: %+v", sink.procs)
+	}
+	if len(sink.events) != 2 || sink.events[0].ExecID != "es:8:3:40" {
+		t.Errorf("events: %+v", sink.events)
+	}
+	// a message with no executable cannot be adopted
+	if err := n.Handle(ctx, Message{T: KindFile, PID: 9, PIDVer: 1, Op: OpWrite, Path: "/y"}); err != nil || len(sink.events) != 2 {
+		t.Errorf("%v %+v", err, sink.events)
+	}
+	// the adopted process links to a parent the normalizer knows
+	n.Handle(ctx, Message{T: KindFile, PID: 10, PIDVer: 1, PPID: 8, PPIDVer: 3, Exe: "/bin/ls", Op: OpWrite, Path: "/z"})
+	if got := sink.procs[len(sink.procs)-1].ParentExecID; got != "es:8:3:40" {
+		t.Errorf("parent of the adopted child = %q", got)
+	}
+	n.Reset()
+	if n.Known() != 0 {
+		t.Errorf("%d tracked after Reset", n.Known())
+	}
+	adoptErr := errors.New("disk full")
+	sink.fail = adoptErr
+	if err := n.Handle(ctx, m); !errors.Is(err, adoptErr) {
+		t.Errorf("adopt with a failing sink: %v", err)
+	}
+}
+
 func TestForkOfUnknownParentIsIgnored(t *testing.T) {
 	sink := &recSink{}
 	n := NewNormalizer(sink)
