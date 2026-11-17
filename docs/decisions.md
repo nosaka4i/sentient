@@ -2,11 +2,15 @@
 
 Small decided choices that don't need a design doc. Newest first.
 
-## 2026-11-12: version numbers are major.minor.build
+## 2026-11-17: each component has its own version, labelled the same way
 
-**Decided (owner).** `sen`, `sentientd` and the Mac app share one version of the form `major.minor.build`. The build number counts up with every release and does not reset when the minor number rises, so the release after `v0.0.3` is for example `v0.1.4`, not `v0.1.0`. Minor rises for a new feature (the Mac collector, a second agent). The Makefile `VERSION`, `internal/version/version.go` and the tag are bumped together, as before. The Mac app's Version field takes the same number, and its Build field rises on every build (macOS replaces a system extension only when its version or build is newer; see [mac-collector.md](mac-collector.md)). The next release number itself is not fixed yet.
+**Decided (owner, replaces the 2026-11-12 entry below).** `sen`, `sentientd`, `Sentient` (the Mac app) and `SentientES` (the Mac extension) each have their own version; they do not have to match, only be labelled the same way. `sen` and `sentientd` are `major.minor.patch`, set together in the Makefile `VERSION`, `internal/version/version.go` and the tag; they are now `0.1.0`. The app and extension share one Version in the Xcode project (`major.minor`, now `0.1`) plus a Build number that rises on every build, which reads as the patch (`0.1` build 1 is 0.1.1). macOS replaces a system extension only when its version or build is newer (see [mac-collector.md](mac-collector.md)).
 
-**Why a continuing build number.** It makes every release number unique and ordered at a glance, and the Mac build number has to rise anyway.
+**Why.** The Mac pieces ship and change at their own pace, and the extension's build number has to rise on every build anyway.
+
+## 2026-11-12: version numbers are major.minor.build (replaced 2026-11-17)
+
+`sen`, `sentientd` and the Mac app shared one version of the form `major.minor.build`, with the build counting up across minor bumps (the release after `v0.0.3` would be `v0.1.4`, not `v0.1.0`). Replaced by the entry above.
 
 ## 2026-11-08: release binaries from GoReleaser on a tag
 

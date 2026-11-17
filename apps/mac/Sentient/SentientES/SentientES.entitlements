@@ -4,9 +4,5 @@
 <dict>
 	<key>com.apple.developer.endpoint-security.client</key>
 	<true/>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>$(TeamIdentifierPrefix)com.example.app-group</string>
-	</array>
 </dict>
 </plist>

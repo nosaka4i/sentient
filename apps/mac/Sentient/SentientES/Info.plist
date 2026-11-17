@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
 	<key>NSSystemExtensionUsageDescription</key>
-	<string>SYSTEM_EXTENSION_USAGE_DESCRIPTION</string>
+	<string>Sentient records what your coding agent does on this Mac (the programs it runs and the files it opens or changes), so you can check it against the agent's own log.</string>
 </dict>
 </plist>
