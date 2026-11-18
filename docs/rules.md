@@ -22,7 +22,9 @@ Each rule is data, not prose generated at runtime:
 Fields available to `title` / `why`: `{path}`, `{file}` (basename),
 `{dir}`, `{cmd}` (first word of the command), `{argv}`, `{host}`,
 `{bytes_up}`, `{bytes_down}`, `{count}`, `{repo}`, `{target}` (git ref /
-pid / item).
+pid / item), `{process}` (the program that made the change, from the kernel
+record: an installer such as `conda init` run by the agent is named, not just
+"the agent").
 
 Wording rules:
 
@@ -40,8 +42,10 @@ Wording rules:
 
 | id | Matches | Title | Why |
 |---|---|---|---|
-| `shell-startup-write` | file update/create of `~/.zshrc`, `~/.bashrc`, `~/.bash_profile`, `~/.profile`, `~/.zprofile`, `~/.config/fish/config.fish` | Agent edited your shell startup file | It runs in every new shell, not just this project. |
-| `secret-read` | file read of `~/.ssh/id_*`, `~/.aws/credentials`, `~/.config/gcloud/**`, `~/.kube/config`, `~/.netrc`, `~/.docker/config.json`, `~/.npmrc` with a token, `*.pem` / `*.key` outside the repo | Agent read your {file} | It holds credentials that work outside this project. |
+| `shell-startup-write` | file update/create of `~/.zshrc`, `~/.bashrc`, `~/.bash_profile`, `~/.profile`, `~/.zprofile`, `~/.config/fish/config.fish` | Agent edited your shell startup file ({process}) | It runs in every new shell, not just this project. |
+| `shell-startup-read` | file read of the same shell startup files (`~/.zshrc`, `~/.bashrc`, `~/.bash_profile`, `~/.profile`, `~/.zprofile`, `~/.config/fish/config.fish`) | Agent read your shell startup file ({process}) | These files often hold exported API keys and tokens. |
+| `agent-log-tamper` | file write, rename or delete of the agent's own session records (`~/.claude/projects/**`, `~/.claude/history.jsonl`, `~/.claude/sessions/**`) by any process other than the agent's own binary; the agent's own housekeeping (expiring old transcripts, `/clear`) runs inside its binary and is not matched. Reads are not matched: `~/.claude` also holds what the agent is meant to read (`CLAUDE.md`, settings, skills, memory), so a read there is normal | Agent changed its own session log ({process}) | The log is what you check the agent against; rewriting it hides what happened. |
+| `secret-read` | file read of `~/.ssh/id_*`, `~/.aws/credentials`, `~/.config/gcloud/**`, `~/.kube/config`, `~/.netrc`, `~/.docker/config.json`, `~/.npmrc` with a token, `~/.git-credentials`, `~/.config/gh/hosts.yml`, `~/.gnupg/**`, `~/.pypirc`, `~/Library/Keychains/**` (Mac), `.env` / `.env.*` files outside the repo, `*.pem` / `*.key` outside the repo; also a command that prints a stored credential: `security find-generic-password`, `security find-internet-password`, `gh auth token` (except Claude Code's exact start-up lookups, see "Not alerts: the agent's own login lookups" below); also sensitive system files: `/etc/shadow`, `/etc/sudoers`, `/etc/ssh/ssh_host_*_key` | Agent read your {file} | It holds credentials that work outside this project. |
 | `pipe-to-shell` | command where a download (`curl`, `wget`) is piped into a shell or interpreter (`sh`, `bash`, `python`, …) | Agent ran a downloaded script ({host}) | Code from the internet ran without being saved or reviewed first. |
 | `git-force-push` | git push with `--force` / `--force-with-lease` / `+ref` | Agent force-pushed {target} | It can overwrite commits on the remote that other people rely on. |
 | `unclaimed-write` | kernel saw a file write/delete with no matching tool call or command in the agent's log | Agent changed {path} without saying so | The agent's own log doesn't mention this change. |
@@ -75,6 +79,17 @@ Wording rules:
 | `dependency-change` | edits to `package.json`, `go.mod`, `requirements*.txt`, `Cargo.toml`, `Gemfile`, `Podfile` adding a dependency | Agent added a dependency ({target}) | New dependencies bring code you haven't read. |
 | `new-host` | network connect to a host never seen before from this agent | Agent connected to a new host ({host}) | First contact with a host is worth a glance. |
 
+## Not alerts: the agent's own login lookups
+
+Claude Code looks up its own login and its GitHub integration every time it
+starts, and the agent's log does not record it: `security find-generic-password
+-s "Claude Code-credentials"`, `-s "Claude Code"`, `-s gh:github.com`, and
+`gh auth token` (exact command lines). An alert for each session would be
+noise, so these are not alerts. They are a plumbing group in
+`internal/background` ("Claude Code login lookup"), listed and counted on the
+agent's page so they are never invisible. Any other credential lookup, such as a
+different `-s` value, is a High `secret-read` alert.
+
 ## Health warnings, not alerts
 
 These describe the machine, not something the agent did, so they go on
@@ -88,10 +103,36 @@ the Health page (and `sen health`), not in NEEDS ATTENTION:
 ## Open questions
 
 - Allowlists: per-repo config for expected hosts, paths and commands
-  (backlog: user-defined rules).
+  (backlog: user-defined rules). **Decided 2026-11-18: none in v1.** Every
+  alert is shown, so the noise tells us what needs cleaning up. They come
+  with user-defined rules, stored root-owned in the data folder (a file the
+  agent can edit, such as one in the repo, cannot be trusted to silence its
+  own alerts).
 - Thresholds (`large-upload`, `bulk-delete`) need real-data tuning.
+  **Decided 2026-11-18:** `bulk-delete` defaults to 20 deletes in one prompt,
+  counted by each event's time inside the prompt's window (not by the
+  process's attributed prompt, which lumps a long-lived agent process into
+  one), excluding temp folders, caches, `.git` and the agent's own state
+  (`~/.claude`, `~/.cache/claude`, `~/.codex`). The number is a parameter of
+  the rule (`threshold:`), so it is changed in the rules file, not in code.
+  Basis: 33 sessions, 5,499 prompts of Linux captures; only 21 prompts
+  deleted anything outside those exclusions and 2 reached 20. `large-upload`
+  waits for network capture (no byte counts exist yet). The engine records
+  per-prompt counts from the start so the numbers can be retuned.
 - Grouping: one alert per prompt per rule, with `{count}` and "+N more"
-  paths (as in the dashboard's "reminders.ts, scheduler.ts +1 more"), is
-  the starting point.
+  paths (as in the dashboard's "reminders.ts, scheduler.ts +1 more").
+  **Decided 2026-11-18**, with one more rule: when one act matches several
+  rules (a recursive delete that is also a bulk delete), it is one alert at the
+  highest severity, with the other matches attached as detail.
+- **Principle (owner, 2026-11-18): the more noise sentient produces, the less
+  useful it is.** Every alert must be worth reading. Prefer fewer, merged,
+  well-grouped alerts; the agent's own routine behavior is plumbing, listed
+  but not alerted; a rule that would fire in normal work is not added until it
+  can be made narrow.
 - `!` commands typed by the user never raise alerts (attributed to the
-  user).
+  user). **Decided 2026-11-18: at any severity, High included.** sentient
+  monitors the agent, not the user. The log marks them: a plain user message
+  (`type: user`, `userType: external`) whose text is `<bash-input> ...</bash-input>`,
+  with no `tool_use` block, unlike an agent's Bash call. The kernel still
+  records them as evidence; only the alert is skipped. A forged marker needs
+  an edit to the log, which `agent-log-tamper` raises as High.
