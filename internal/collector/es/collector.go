@@ -238,6 +238,7 @@ func (s *session) serve(ctx context.Context, conn net.Conn) error {
 		lastSeq     uint64 // the previous message's sequence number
 		lastTime    = c.now()
 		lastDropped int64
+		seen        int // events received on this connection
 	)
 	for {
 		conn.SetReadDeadline(c.now().Add(c.pingTimeout()))
@@ -316,6 +317,10 @@ func (s *session) serve(ctx context.Context, conn net.Conn) error {
 				continue // events before a hello: not a protocol we know
 			}
 			c.Status.CountEvent(c.now())
+			if seen++; seen <= 5 {
+				// the first few of each connection, so the log shows that events arrive
+				c.logf("endpointsecurity: event received", "n", seen, "kind", m.T, "pid", m.PID, "exe", m.Exe, "path", m.Path)
+			}
 			if err := s.norm.Handle(ctx, m); err != nil {
 				return sinkError{err}
 			}
@@ -332,6 +337,7 @@ func (s *session) hello(ctx context.Context, conn net.Conn, m Message) error {
 	if m.Ext != "" {
 		c.Status.SetVersion(helloVersion(m))
 	}
+	c.logf("endpointsecurity: extension connected", "ext", m.Ext, "build", m.Build, "es_client", m.ESClient, "agents", len(c.Config.Agents))
 	if err := writeConfig(conn, c.Config); err != nil {
 		c.logf("endpointsecurity: could not send the config", "err", err)
 	}
