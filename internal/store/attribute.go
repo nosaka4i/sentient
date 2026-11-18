@@ -3,6 +3,9 @@ package store
 import (
 	"context"
 	"fmt"
+	"strings"
+
+	"github.com/nosaka4i/sentient/internal/paths"
 )
 
 // ProcessRef is an unattributed process, with the binary of its parent so the
@@ -47,10 +50,22 @@ type SessionHit struct {
 // SessionsActive returns the sessions started in cwd that wrote log records
 // between from and to, the one that began first first.
 func (t *Tx) SessionsActive(ctx context.Context, cwd, from, to string) ([]SessionHit, error) {
+	// the kernel's directory and the log's can be spelled differently
+	// (/private/tmp and /tmp on the Mac), so every spelling is tried
+	spell := paths.Spellings(cwd)
+	if len(spell) == 0 {
+		spell = []string{cwd}
+	}
+	args := []any{}
+	for _, s := range spell {
+		args = append(args, s)
+	}
+	args = append(args, from, to)
+	in := strings.TrimSuffix(strings.Repeat("?,", len(spell)), ",")
 	rows, err := t.tx.QueryContext(ctx, `
 SELECT r.session_id, COALESCE(s.started_at, '') FROM raw_log_records r JOIN sessions s ON s.id = r.session_id
-WHERE s.cwd = ? AND r.ts >= ? AND r.ts <= ?
-GROUP BY r.session_id ORDER BY s.started_at, r.session_id`, cwd, from, to)
+WHERE s.cwd IN (`+in+`) AND r.ts >= ? AND r.ts <= ?
+GROUP BY r.session_id ORDER BY s.started_at, r.session_id`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("sessions active: %w", err)
 	}

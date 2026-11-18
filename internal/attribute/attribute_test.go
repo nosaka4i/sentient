@@ -129,6 +129,19 @@ func TestRootAndDescendantsGoToTheSessionInTheirDirectory(t *testing.T) {
 	}
 }
 
+// The Mac: the log's directory is /tmp/proj, the kernel's is /private/tmp/proj.
+func TestADirectoryIsMatchedWhateverWayItIsSpelled(t *testing.T) {
+	f := newFixture(t)
+	a := f.session("a", "/tmp/proj", 2, 30)
+	f.proc("root", "", claude, "/private/tmp/proj", 0)
+	if _, err := f.att().Once(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if s, _, how := f.get("root"); s != a || how != Exact {
+		t.Errorf("root = %d %q, want session %d", s, how, a)
+	}
+}
+
 func TestSeveralSessionsInOneDirectoryAreAmbiguous(t *testing.T) {
 	f := newFixture(t)
 	first := f.session("a", "/work", 1, 20)

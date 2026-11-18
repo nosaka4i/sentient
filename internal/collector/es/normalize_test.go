@@ -232,6 +232,30 @@ func TestExecWithoutArgsAndStart(t *testing.T) {
 	}
 }
 
+// ES reports the program name first; the stored argv leaves it out, as
+// Tetragon's does (the binary's path is in Binary), and the exec event's
+// payload keeps the whole list.
+func TestExecArgvDropsTheProgramName(t *testing.T) {
+	sink := &recSink{}
+	n := NewNormalizer(sink)
+	args := []string{"sh", "-c", "echo hi"} // sh run by bash
+	if err := n.Handle(context.Background(), Message{V: 1, T: KindExec, PID: 5, PIDVer: 1, Exe: "/bin/bash", Args: args}); err != nil {
+		t.Fatal(err)
+	}
+	if got := sink.procs[0].Argv; got != `["-c","echo hi"]` {
+		t.Errorf("argv = %s", got)
+	}
+	if !strings.Contains(sink.events[0].Payload, `"sh","-c","echo hi"`) {
+		t.Errorf("payload lost the program name: %s", sink.events[0].Payload)
+	}
+	if got := argsAfterProgram(nil); len(got) != 0 {
+		t.Errorf("no args = %v", got)
+	}
+	if got := argsAfterProgram([]string{"ls"}); len(got) != 0 {
+		t.Errorf("program name only = %v", got)
+	}
+}
+
 func TestPidReuseDropsTheOldImage(t *testing.T) {
 	sink := &recSink{}
 	n := NewNormalizer(sink)

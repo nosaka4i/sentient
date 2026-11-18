@@ -43,6 +43,33 @@ func Canonical(p string) string {
 	return p
 }
 
+// Spellings returns every way the same file can be written: the path cleaned,
+// its canonical form, and the short form (/tmp/x for /private/tmp/x). Matching
+// a stored path against all of them needs no platform check: on Linux the
+// spellings that do not exist there simply match nothing.
+func Spellings(p string) []string {
+	if p == "" {
+		return nil
+	}
+	out := []string{path.Clean(p)}
+	add := func(s string) {
+		for _, have := range out {
+			if have == s {
+				return
+			}
+		}
+		out = append(out, s)
+	}
+	c := Canonical(p)
+	add(c)
+	for _, link := range privateLinks {
+		if c == "/private"+link || strings.HasPrefix(c, "/private"+link+"/") {
+			add(strings.TrimPrefix(c, "/private"))
+		}
+	}
+	return out
+}
+
 // Same reports whether a and b are the same file path once canonicalized.
 func Same(a, b string) bool {
 	return a != "" && b != "" && Canonical(a) == Canonical(b)

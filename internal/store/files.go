@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
+
+	"github.com/nosaka4i/sentient/internal/paths"
 )
 
 // The queries the merge runs to tie a logged file tool call (Read, Edit, Write)
@@ -91,15 +94,33 @@ func (t *Tx) FileEvent(ctx context.Context, pids []int64, action, path, from, to
 		ph += "?"
 		args = append(args, pid)
 	}
+	// the log's spelling of the path and the kernel's can differ (/tmp and
+	// /private/tmp on the Mac), so every spelling is tried
+	spell := paths.Spellings(path)
+	if len(spell) == 0 {
+		return 0, nil
+	}
+	in := strings.TrimSuffix(strings.Repeat("?,", len(spell)), ",")
 	var cond string
 	if action == "read" {
-		cond = `e.type = 'file_open' AND e.path = ?`
-		args = append(args, path)
+		cond = `e.type = 'file_open' AND e.path IN (` + in + `)`
+		for _, s := range spell {
+			args = append(args, s)
+		}
 	} else {
 		// the temp file is `<path>.tmp.<pid>.<hash>`, renamed over path
-		cond = `((e.type = 'file_rename' AND substr(e.path, 1, length(?)) = ? AND substr(e.path, length(?) + 1, 5) = '.tmp.')
-		         OR (e.type = 'file_create' AND e.path = ?))`
-		args = append(args, path, path, path, path)
+		var renames []string
+		var renameArgs []any
+		for _, s := range spell {
+			renames = append(renames, `(substr(e.path, 1, length(?)) = ? AND substr(e.path, length(?) + 1, 5) = '.tmp.')`)
+			renameArgs = append(renameArgs, s, s, s)
+		}
+		cond = `((e.type = 'file_rename' AND (` + strings.Join(renames, " OR ") + `))
+		         OR (e.type = 'file_create' AND e.path IN (` + in + `)))`
+		args = append(args, renameArgs...)
+		for _, s := range spell {
+			args = append(args, s)
+		}
 	}
 	var id int64
 	err := t.tx.QueryRowContext(ctx, `

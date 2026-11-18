@@ -106,7 +106,7 @@ func (n *Normalizer) exec(ctx context.Context, m Message) error {
 		PID:          m.PID,
 		ParentExecID: parent,
 		Binary:       m.Exe,
-		Argv:         mustJSON(orEmpty(m.Args)),
+		Argv:         mustJSON(argsAfterProgram(m.Args)),
 		Cwd:          m.Cwd,
 		UID:          m.UID,
 		StartedAt:    dbtime.Format(started),
@@ -117,6 +117,18 @@ func (n *Normalizer) exec(ctx context.Context, m Message) error {
 		ExecID: id, TS: dbtime.Format(at(m)), Type: "exec", Path: m.Exe,
 		Payload: mustJSON(map[string]any{"argv": orEmpty(m.Args), "cwd": m.Cwd, "pid": m.PID}),
 	})
+}
+
+// argsAfterProgram is the argument list without its first element. Endpoint
+// Security reports the program name first (as the caller wrote it: "sh" for bash,
+// "-zsh" for a login shell); Tetragon's arguments leave it out, and the binary's
+// full path is in the process's Binary. Dropping it by position makes the stored
+// argv the same on both platforms. The exec event's payload keeps the full list.
+func argsAfterProgram(args []string) []string {
+	if len(args) == 0 {
+		return []string{}
+	}
+	return args[1:]
 }
 
 // fork registers the child as sharing its parent's image until it execs, so

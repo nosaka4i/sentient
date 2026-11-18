@@ -35,6 +35,31 @@ func TestSame(t *testing.T) {
 	}
 }
 
+func TestSpellings(t *testing.T) {
+	for _, c := range []struct {
+		in   string
+		want []string
+	}{
+		{"/tmp/x", []string{"/tmp/x", "/private/tmp/x"}},
+		{"/private/tmp/x", []string{"/private/tmp/x", "/tmp/x"}},
+		{"/Users/a/f", []string{"/Users/a/f"}},
+		{"/System/Volumes/Data/Users/a", []string{"/System/Volumes/Data/Users/a", "/Users/a"}},
+		{"", nil},
+	} {
+		got := Spellings(c.in)
+		if len(got) != len(c.want) {
+			t.Errorf("Spellings(%q) = %v, want %v", c.in, got, c.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != c.want[i] {
+				t.Errorf("Spellings(%q) = %v, want %v", c.in, got, c.want)
+				break
+			}
+		}
+	}
+}
+
 func TestUnder(t *testing.T) {
 	for _, c := range []struct {
 		dir, p string

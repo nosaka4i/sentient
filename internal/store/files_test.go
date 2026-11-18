@@ -114,6 +114,16 @@ func TestFileEvent(t *testing.T) {
 			t.Errorf("FileEvent(%s %s) = %d, %v; want %d", tc.action, tc.path, got, err, tc.want)
 		}
 	}
+	// the Mac: the log says /tmp/..., the kernel reports /private/tmp/...
+	add("root", "file_open", "/private/tmp/m.txt", "20")
+	add("root", "file_rename", "/private/tmp/n.txt.tmp.1.abcd", "21")
+	if got, _ := tx.FileEvent(ctx, pids, "read", "/tmp/m.txt", from, to); got == 0 {
+		t.Error("read of /tmp/m.txt not matched to the kernel's /private/tmp/m.txt")
+	}
+	if got, _ := tx.FileEvent(ctx, pids, "update", "/tmp/n.txt", from, to); got == 0 {
+		t.Error("write of /tmp/n.txt not matched to the kernel's /private/tmp/n.txt.tmp.*")
+	}
+
 	// outside the window, and with no agent process
 	if got, _ := tx.FileEvent(ctx, pids, "read", "/w/a.go", "2026-10-17T09:00:11.000000000Z", to); got != 0 {
 		t.Errorf("event before the window = %d", got)
