@@ -4,6 +4,7 @@
 /dist/
 /logs/
 *.swp
+.rly
 
 # Mac / Xcode: per-user state and build output, never the project itself
 .DS_Store
